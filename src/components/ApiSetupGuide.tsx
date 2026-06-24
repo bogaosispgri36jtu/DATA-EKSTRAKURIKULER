@@ -236,8 +236,10 @@ function getStudentsList(ss) {
       kelurahanName: rows[i][26].toString(),
       eskulId: rows[i][27].toString(),
       eskulName: rows[i][28].toString(),
-      tahunPelajaran: rows[i][29].toString(),
-      createdAt: rows[i][30].toString()
+      eskulId2: rows[i][29] ? rows[i][29].toString() : "",
+      eskulName2: rows[i][30] ? rows[i][30].toString() : "",
+      tahunPelajaran: rows[i][31].toString(),
+      createdAt: rows[i][32].toString()
     });
   }
   return students;
@@ -295,6 +297,8 @@ function saveStudent(ss, s) {
     s.kelurahanName,
     s.eskulId,
     s.eskulName,
+    s.eskulId2 || "",
+    s.eskulName2 || "",
     s.tahunPelajaran,
     createdAt
   ]);

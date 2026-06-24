@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Smartphone, ShieldCheck, Database, FileCode, CheckCircle, 
-  HelpCircle, Sparkles, School, Layers, Users, RefreshCw
+  HelpCircle, Sparkles, School, Layers, Users, RefreshCw, Lock, LogOut
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { Student, Extracurricular, AppSettings } from './types';
@@ -119,6 +119,44 @@ const SEED_STUDENTS: Student[] = [
 export default function App() {
   // Navigation / Frame toggles
   const [activeView, setActiveView] = useState<'student' | 'admin' | 'guide'>('student');
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  const handleSetIsAdminLoggedIn = (loggedIn: boolean) => {
+    setIsAdminLoggedIn(loggedIn);
+    if (loggedIn) {
+      setActiveView('admin');
+    } else {
+      setActiveView('student');
+    }
+  };
+
+  const handlePopupLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginUsername === settings.adminUsername && loginPassword === settings.adminPassword) {
+      setIsAdminLoggedIn(true);
+      setActiveView('admin');
+      setIsLoginModalOpen(false);
+      setLoginUsername('');
+      setLoginPassword('');
+      Swal.fire({
+        icon: 'success',
+        title: 'Login Berhasil',
+        text: 'Selamat datang di Dashboard Admin SMP PGRI Jatiuwung.',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    } else {
+      Swal.fire({
+        icon: 'error',
+        title: 'Akses Ditolak',
+        text: 'Username atau password yang Anda masukkan salah!',
+        confirmButtonColor: '#ef4444'
+      });
+    }
+  };
 
   // Core Data state
   const [students, setStudents] = useState<Student[]>([]);
@@ -402,188 +440,174 @@ export default function App() {
   };
 
   return (
-    <div className="bg-slate-900 min-h-screen text-slate-100 flex flex-col md:flex-row font-sans">
+    <div className="bg-slate-50 min-h-screen text-slate-800 flex flex-col font-sans animate-fadeIn">
       
-      {/* LEFT COLUMN: DESKTOP SIMULATOR CONTROLLER PANEL */}
-      <div className="w-full md:w-[350px] lg:w-[420px] bg-slate-950 p-6 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-800 shrink-0">
-        <div className="space-y-6">
-          {/* Brand Header */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center border-2 border-white shadow-md">
-              <School className="w-5.5 h-5.5 text-blue-900" />
-            </div>
-            <div>
-              <h2 className="text-sm font-black tracking-wide uppercase text-white leading-tight">SMP PGRI Jatiuwung</h2>
-              <p className="text-[10px] text-yellow-300 font-bold tracking-wider">PANEL KENDALILIVE PREVIEW</p>
-            </div>
-          </div>
-
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Selamat datang di simulator platform pendaftaran digital. Panel ini mensimulasikan fungsionalitas mobile-first dari website publik dan portal admin.
-          </p>
-
-          {/* Device Toggles */}
-          <div className="space-y-2.5">
-            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Pilih Simulasi Tampilan</span>
+      {/* PROFESSIONAL NAVBAR */}
+      <header className="bg-slate-900 text-slate-100 border-b border-slate-850 sticky top-0 z-50 shadow-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-14 sm:h-16">
             
-            {/* Toggle 1: Student view */}
-            <button
-              onClick={() => setActiveView('student')}
-              className={`w-full text-left p-3.5 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer ${
-                activeView === 'student' 
-                  ? 'bg-blue-600/10 border-blue-600 text-white shadow-md shadow-blue-500/5' 
-                  : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeView === 'student' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
-                  <Users className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold">Tampilan Formulir Siswa</h4>
-                  <p className="text-[9px] text-slate-500 mt-0.5">Form publik pendaftar eskul</p>
-                </div>
+            {/* Left Brand Area */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl flex items-center justify-center border-2 border-white shadow-sm shrink-0 overflow-hidden">
+                <img 
+                  src="https://lh3.googleusercontent.com/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT" 
+                  alt="Logo SMP PGRI Jatiuwung" 
+                  className="w-full h-full object-contain"
+                  referrerPolicy="no-referrer"
+                />
               </div>
-              {activeView === 'student' && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
-            </button>
-
-            {/* Toggle 2: Admin Dashboard */}
-            <button
-              onClick={() => setActiveView('admin')}
-              className={`w-full text-left p-3.5 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer ${
-                activeView === 'admin' 
-                  ? 'bg-blue-600/10 border-blue-600 text-white shadow-md shadow-blue-500/5' 
-                  : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeView === 'admin' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold">Portal Dashboard Guru</h4>
-                  <p className="text-[9px] text-slate-500 mt-0.5">Kelola kategori & rekap data</p>
-                </div>
+              <div className="flex flex-col">
+                <h1 className="text-[10px] sm:text-sm font-black tracking-wider uppercase text-white leading-none">SMP PGRI Jatiuwung</h1>
+                <p className="text-[7px] sm:text-[9px] text-yellow-300 font-bold tracking-widest uppercase mt-0.5 sm:mt-1">Pendaftaran Ekstrakurikuler</p>
               </div>
-              {activeView === 'admin' && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
-            </button>
-
-            {/* Toggle 3: API Connection Manual */}
-            <button
-              onClick={() => setActiveView('guide')}
-              className={`w-full text-left p-3.5 rounded-2xl border transition-all duration-300 flex items-center justify-between cursor-pointer ${
-                activeView === 'guide' 
-                  ? 'bg-blue-600/10 border-blue-600 text-white shadow-md shadow-blue-500/5' 
-                  : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700'
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${activeView === 'guide' ? 'bg-blue-600 text-white' : 'bg-slate-800 text-slate-500'}`}>
-                  <FileCode className="w-4 h-4" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold">Panduan Apps Script (kode.gs)</h4>
-                  <p className="text-[9px] text-slate-500 mt-0.5">Integrasi Google Sheet gratis</p>
-                </div>
-              </div>
-              {activeView === 'guide' && <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>}
-            </button>
-          </div>
-
-          {/* Connection Status Panel */}
-          <div className="bg-slate-900 rounded-2xl border border-slate-800 p-4 space-y-3">
-            <span className="text-[10px] font-black text-slate-400 tracking-wider uppercase block">Konektivitas Database</span>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Mode Database</span>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${isLiveConnection ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'}`}>
-                {isLiveConnection ? 'Google Sheets Live' : 'Simulasi Lokal'}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-slate-400">Pendaftar Terdata</span>
-              <span className="text-xs font-bold font-mono text-white">{students.length} Siswa</span>
-            </div>
-            
-            {/* Quick manual refresh */}
-            <button
-              onClick={() => fetchAppData(settings)}
-              className="w-full mt-1.5 bg-slate-800 hover:bg-slate-750 text-slate-300 hover:text-white text-[11px] font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-slate-700"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-              Segarkan Sinkronisasi
-            </button>
-          </div>
-        </div>
-
-        {/* Footer info */}
-        <div className="pt-6 border-t border-slate-900 text-[10px] text-slate-500 space-y-1">
-          <p className="font-semibold text-slate-400">SMP PGRI Jatiuwung Tangerang</p>
-          <p>© 2026. All rights reserved.</p>
-        </div>
-      </div>
-
-      {/* RIGHT COLUMN: PREVIEW SCREEN SIMULATOR AREA */}
-      <div className="flex-1 bg-slate-900 p-3 md:p-8 flex items-center justify-center overflow-hidden">
-        
-        {/* Device Wrapper Container (Adds a gorgeous smartphone border mockup on desktop viewports) */}
-        <div className="w-full max-w-md bg-transparent flex flex-col items-center">
-          
-          <div className="text-[10px] text-slate-400 mb-2.5 font-bold tracking-widest uppercase flex items-center gap-1.5 md:hidden">
-            <Smartphone className="w-4 h-4 text-yellow-400" />
-            <span>Simulasi HP Aktif</span>
-          </div>
-
-          {/* Virtual Mobile Screen */}
-          <div className="w-full h-[640px] md:h-[720px] rounded-[2.5rem] bg-white border-[10px] border-slate-950 shadow-2xl relative overflow-hidden flex flex-col justify-between max-w-[380px]">
-            {/* Phone Speaker Notch bar */}
-            <div className="absolute top-0 left-0 right-0 h-5 bg-slate-950 flex justify-center items-center z-50">
-              <div className="w-16 h-3 bg-slate-900 rounded-full border border-slate-850"></div>
             </div>
 
-            {/* Embedded Active Mobile App View Container */}
-            <div className="flex-1 overflow-y-auto mt-5 scrollbar-thin">
-              {isLoading ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-600 bg-white gap-3">
-                  <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
-                  <span className="text-xs font-bold text-slate-500">Sinkronisasi Database...</span>
-                </div>
+            {/* Middle Navigation - Removed for simple clean single view */}
+
+            {/* Right Indicators */}
+            <div className="flex items-center gap-2 sm:gap-4">
+              {!isAdminLoggedIn ? (
+                <button
+                  onClick={() => setIsLoginModalOpen(true)}
+                  className="px-2.5 py-1 text-[10px] sm:text-xs font-black bg-yellow-400 hover:bg-yellow-500 text-slate-950 rounded-md sm:rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-sm shrink-0 uppercase tracking-wider"
+                >
+                  <Lock className="w-3 h-3 text-slate-950" />
+                  <span>Masuk</span>
+                </button>
               ) : (
-                <>
-                  {activeView === 'student' && (
-                    <StudentForm 
-                      eskulList={eskulList} 
-                      tahunPelajaranAktif={settings.tahunPelajaranAktif}
-                      onSubmitRegistration={handleRegisterStudent}
-                      isLive={isLiveConnection}
-                    />
-                  )}
-                  {activeView === 'admin' && (
-                    <AdminDashboard 
-                      students={students}
-                      eskulList={eskulList}
-                      settings={settings}
-                      onAddEskul={handleAddEskul}
-                      onDeleteEskul={handleDeleteEskul}
-                      onResetEskulStudents={handleResetEskulStudents}
-                      onResetAllData={handleResetAllData}
-                      onUpdateSettings={handleUpdateSettings}
-                    />
-                  )}
-                  {activeView === 'guide' && (
-                    <ApiSetupGuide />
-                  )}
-                </>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => fetchAppData(settings)}
+                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700"
+                    title="Segarkan Sinkronisasi Data"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                  <button
+                    onClick={() => handleSetIsAdminLoggedIn(false)}
+                    className="px-2.5 py-1 rounded-md sm:rounded-lg text-[9px] sm:text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm cursor-pointer border border-red-700"
+                  >
+                    <LogOut className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
+                    <span>Keluar</span>
+                  </button>
+                </div>
               )}
             </div>
+
           </div>
-          
-          <p className="text-[10px] text-slate-500 text-center font-bold tracking-wide mt-3 uppercase hidden md:block">
-            Tekan tombol menu samping untuk bertukar kacamata pandangan (Form Siswa vs. Dashboard Guru)
-          </p>
         </div>
+      </header>
 
-      </div>
+      {/* MAIN LAYOUT */}
+      <main className="flex-grow">
+        {isLoading && activeView === 'admin' ? (
+          <div className="h-96 flex flex-col items-center justify-center text-slate-500 gap-3">
+            <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
+            <span className="text-xs font-bold">Sinkronisasi Database...</span>
+          </div>
+        ) : (
+          <div className="animate-fadeIn">
+            {activeView === 'student' && (
+              <StudentForm 
+                eskulList={eskulList} 
+                tahunPelajaranAktif={settings.tahunPelajaranAktif}
+                onSubmitRegistration={handleRegisterStudent}
+                isLive={isLiveConnection}
+              />
+            )}
+            {activeView === 'admin' && (
+              <AdminDashboard 
+                students={students}
+                eskulList={eskulList}
+                settings={settings}
+                onAddEskul={handleAddEskul}
+                onDeleteEskul={handleDeleteEskul}
+                onResetEskulStudents={handleResetEskulStudents}
+                onResetAllData={handleResetAllData}
+                onUpdateSettings={handleUpdateSettings}
+                isLoggedIn={isAdminLoggedIn}
+                setIsLoggedIn={handleSetIsAdminLoggedIn}
+              />
+            )}
+          </div>
+        )}
+      </main>
 
+      {/* Footer */}
+      <footer className="bg-slate-900 border-t border-slate-800 text-slate-400 text-center py-5 text-xs mt-auto">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-1">
+          <p className="font-extrabold text-slate-200 tracking-wider text-[11px] sm:text-xs">SMP PGRI JATIUWUNG</p>
+          <p className="font-medium text-slate-400 text-[10px] sm:text-[11px]">Sistem Pendaftaran Ekstrakurikuler</p>
+          <p className="text-[10px] text-slate-500">© 2026 all rights reserved</p>
+          <p className="text-[10px] text-slate-500 font-semibold mt-0.5">@nawasyiahmed</p>
+        </div>
+      </footer>
+
+      {/* RESPONSIVE POPUP LOGIN MODAL */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-fadeIn" id="login-modal-overlay">
+          <div 
+            className="bg-white rounded-2xl shadow-2xl border border-slate-100 w-full max-w-sm overflow-hidden transform transition-all animate-scaleUp"
+            id="login-modal-box"
+          >
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white p-4 relative">
+              <button 
+                onClick={() => setIsLoginModalOpen(false)}
+                className="absolute top-3.5 right-3.5 text-slate-300 hover:text-white transition-all text-xs font-bold bg-white/10 hover:bg-white/20 w-6 h-6 rounded-full flex items-center justify-center cursor-pointer"
+                aria-label="Tutup"
+              >
+                ✕
+              </button>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center border border-white/20 shrink-0">
+                  <Lock className="w-4 h-4 text-blue-900" />
+                </div>
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black tracking-wide uppercase leading-none">Login Administrator</h3>
+                  <p className="text-[8px] text-yellow-300 font-semibold tracking-wider uppercase mt-1 leading-none">SMP Guru & Guru Admin</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <form onSubmit={handlePopupLoginSubmit} className="p-4 space-y-3.5">
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-slate-600 uppercase tracking-wider block">Username</label>
+                <input
+                  type="text"
+                  value={loginUsername}
+                  onChange={(e) => setLoginUsername(e.target.value)}
+                  placeholder="admin"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-slate-600 uppercase tracking-wider block">Password</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
+                  required
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+              >
+                <ShieldCheck className="w-4 h-4" />
+                <span>Masuk Dashboard</span>
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Camera, School, Users, FileText, Phone, Award, MapPin, 
-  Send, FileCheck, CheckCircle2, RefreshCw, AlertTriangle
+  Send, FileCheck, CheckCircle2, RefreshCw, AlertTriangle, X
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -29,6 +29,17 @@ interface StudentFormProps {
 }
 
 export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRegistration, isLive }: StudentFormProps) {
+  const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = 'https://lh3.googleusercontent.com/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT';
+    img.onload = () => {
+      setLogoImgElement(img);
+    };
+  }, []);
+
   // Personal Details state
   const [name, setName] = useState('');
   const [photo, setPhoto] = useState('');
@@ -70,6 +81,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
   // Extracurricular state
   const [selectedEskul, setSelectedEskul] = useState<Extracurricular | null>(null);
+  const [selectedEskul2, setSelectedEskul2] = useState<Extracurricular | null>(null);
 
   // Result state
   const [registeredStudent, setRegisteredStudent] = useState<Student | null>(null);
@@ -219,6 +231,16 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     reader.readAsDataURL(file);
   };
 
+  const handleCancelPhoto = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setPhoto('');
+    setPhotoSize(null);
+    setOriginalPhotoSize(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   // Extract Grade from selected Class
   const getGrade = (selectedClass: string): string => {
     if (selectedClass.startsWith('VII')) return 'VII';
@@ -279,7 +301,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         icon: 'warning',
         title: 'Formulir Belum Lengkap',
         text: 'Silakan isi semua kolom wajib (*) yang ditandai.',
-        confirmButtonColor: '#1d4ed8'
+        confirmButtonColor: '#1d4ed8',
+        width: '360px'
       });
       return;
     }
@@ -293,6 +316,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       cancelButtonText: 'Batal',
       confirmButtonColor: '#1d4ed8',
       cancelButtonColor: '#ef4444',
+      width: '360px'
     });
 
     if (result.isConfirmed) {
@@ -326,6 +350,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           kelurahanName: selectedKelurahan?.name || '',
           eskulId: selectedEskul?.id || '',
           eskulName: selectedEskul?.nama || '',
+          eskulId2: selectedEskul2?.id || '',
+          eskulName2: selectedEskul2?.nama || '',
           tahunPelajaran: tahunPelajaranAktif
         };
 
@@ -336,14 +362,16 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           icon: 'success',
           title: 'Pendaftaran Berhasil!',
           text: `Selamat, Anda berhasil terdaftar dengan Nomor: ${res.regNo}`,
-          confirmButtonColor: '#1d4ed8'
+          confirmButtonColor: '#1d4ed8',
+          width: '360px'
         });
       } catch (error) {
         Swal.fire({
           icon: 'error',
           title: 'Gagal Menyimpan Data',
           text: 'Terjadi masalah saat mengirim data ke server. Coba beberapa saat lagi.',
-          confirmButtonColor: '#ef4444'
+          confirmButtonColor: '#ef4444',
+          width: '360px'
         });
       } finally {
         setIsSubmitting(false);
@@ -359,6 +387,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       title: 'Menyiapkan PDF...',
       html: 'Sedang membuat bukti pendaftaran resmi.',
       allowOutsideClick: false,
+      width: '340px',
       didOpen: () => {
         Swal.showLoading();
       }
@@ -385,17 +414,26 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       doc.setLineWidth(0.5);
       doc.rect(6.5, 6.5, 197, 284);
 
+      // Draw Logo
+      if (logoImgElement) {
+        try {
+          doc.addImage(logoImgElement, 'PNG', 15, 9, 20, 20);
+        } catch (e) {
+          console.error("Failed to add preloaded logo to PDF", e);
+        }
+      }
+
       // KOP SURAT Header
       doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(16);
-      doc.text('SMP PGRI JATIUWUNG', 105, 18, { align: 'center' });
+      doc.text('SMP PGRI JATIUWUNG', 114, 17, { align: 'center' });
       
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 116, 139);
-      doc.text('Tahun Pelajaran ' + registeredStudent.tahunPelajaran, 105, 23, { align: 'center' });
-      doc.text('Jl. Raya Pajajaran No.1, Gandasari, Kec. Jatiuwung, Kota Tangerang, Banten 15137', 105, 28, { align: 'center' });
+      doc.text('Tahun Pelajaran ' + registeredStudent.tahunPelajaran, 114, 22, { align: 'center' });
+      doc.text('Jl. Raya Pajajaran No.1, Gandasari, Kec. Jatiuwung, Kota Tangerang, Banten 15137', 114, 27, { align: 'center' });
       
       // Divider Line
       doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -480,7 +518,12 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       doc.line(15, currentY + 1, 195, currentY + 1);
       currentY += 6;
 
-      drawField('Pilihan Ekstrakurikuler', registeredStudent.eskulName.toUpperCase(), true);
+      if (registeredStudent.eskulName2) {
+        drawField('Pilihan Ekstrakurikuler 1', registeredStudent.eskulName.toUpperCase(), true);
+        drawField('Pilihan Ekstrakurikuler 2', registeredStudent.eskulName2.toUpperCase(), true);
+      } else {
+        drawField('Pilihan Ekstrakurikuler', registeredStudent.eskulName.toUpperCase(), true);
+      }
 
       // 3. DATA ORANG TUA
       doc.setFont('helvetica', 'bold');
@@ -566,7 +609,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 No: ${registeredStudent.regNo}
 Nama: ${registeredStudent.name}
 Kelas: ${registeredStudent.kelas}
-Eskul: ${registeredStudent.eskulName}
+Eskul 1: ${registeredStudent.eskulName}${registeredStudent.eskulName2 ? `\nEskul 2: ${registeredStudent.eskulName2}` : ''}
 Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       
       const qrDataUrl = await QRCode.toDataURL(qrText, { margin: 1 });
@@ -583,7 +626,10 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
         icon: 'success',
         title: 'Unduh Berhasil!',
         text: 'File bukti pendaftaran PDF telah disimpan di perangkat Anda.',
-        confirmButtonColor: '#1d4ed8'
+        confirmButtonColor: '#1d4ed8',
+        width: '360px',
+        timer: 1500,
+        showConfirmButton: false
       });
     } catch (e) {
       Swal.close();
@@ -591,7 +637,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
         icon: 'error',
         title: 'PDF Error',
         text: 'Gagal membuat dokumen bukti PDF.',
-        confirmButtonColor: '#ef4444'
+        confirmButtonColor: '#ef4444',
+        width: '360px'
       });
     }
   };
@@ -621,14 +668,15 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
     setSelectedKecamatan(null);
     setSelectedKelurahan(null);
     setSelectedEskul(null);
+    setSelectedEskul2(null);
     setRegisteredStudent(null);
   };
 
   // If successfully registered, show the Success Screen
   if (registeredStudent) {
     return (
-      <div className="bg-slate-50 min-h-screen py-6 px-4 flex flex-col justify-between max-w-md mx-auto" id="registration-success-screen">
-        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 flex-1 flex flex-col justify-center items-center p-8 text-center">
+      <div className="bg-slate-50 min-h-[calc(100vh-4rem)] py-12 px-4 flex items-center justify-center w-full" id="registration-success-screen">
+        <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100 max-w-xl w-full flex flex-col justify-center items-center p-8 md:p-10 text-center">
           <div className="w-20 h-20 bg-green-50 rounded-full flex items-center justify-center mb-6 border-2 border-green-400 animate-bounce">
             <CheckCircle2 className="w-12 h-12 text-green-600" />
           </div>
@@ -648,10 +696,23 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               <span className="text-xs text-blue-600 font-medium">Kelas</span>
               <span className="text-sm font-semibold text-blue-900">{registeredStudent.kelas}</span>
             </div>
-            <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
-              <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler</span>
-              <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName}</span>
-            </div>
+            {registeredStudent.eskulName2 ? (
+              <>
+                <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
+                  <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler 1</span>
+                  <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName}</span>
+                </div>
+                <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
+                  <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler 2</span>
+                  <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName2}</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
+                <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler</span>
+                <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName}</span>
+              </div>
+            )}
             <div className="flex justify-between pt-1">
               <span className="text-xs text-blue-600 font-medium">Tahun Pelajaran</span>
               <span className="text-sm font-semibold text-blue-900">{registeredStudent.tahunPelajaran}</span>
@@ -665,7 +726,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
             >
               <FileCheck className="w-5 h-5 text-yellow-300" />
-              Download Formulir PDF
+              Download Formulir PDF Resmi
             </button>
             
             <button
@@ -674,7 +735,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-3 px-4 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
             >
               <RefreshCw className="w-4 h-4 text-slate-500" />
-              Daftar Siswa Baru
+              Kembali / Tutup
             </button>
           </div>
         </div>
@@ -684,514 +745,518 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
 
   // Active form view
   return (
-    <div className="bg-slate-50 min-h-screen pb-12 max-w-md mx-auto" id="student-form-screen">
+    <div className="bg-slate-50 min-h-[calc(100vh-4rem)] pb-12 w-full" id="student-form-screen">
       {/* Top Banner Header */}
-      <div className="bg-gradient-to-br from-blue-700 via-blue-800 to-blue-950 text-white pb-12 pt-6 px-6 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-br from-blue-800 via-blue-900 to-slate-950 text-white pt-8 pb-14 sm:pt-10 sm:pb-16 px-3.5 sm:px-8 relative overflow-hidden shadow-md border-b border-slate-800">
         {/* Yellow artistic highlight */}
-        <div className="absolute -top-12 -right-12 w-32 h-32 bg-yellow-400 opacity-20 rounded-full blur-2xl"></div>
-        <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-blue-400 opacity-20 rounded-full blur-xl"></div>
+        <div className="absolute -top-12 -right-12 w-64 h-64 bg-yellow-400 opacity-15 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-8 -left-8 w-48 h-48 bg-blue-500 opacity-20 rounded-full blur-2xl"></div>
         
-        <div className="flex items-center gap-4 relative z-10">
-          <div className="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center shadow-md border-2 border-white">
-            <School className="w-7 h-7 text-blue-900" />
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold tracking-wide leading-tight">SMP PGRI JATIUWUNG</h1>
-            <p className="text-xs text-yellow-300 font-medium">Sistem Informasi Pendaftaran Ekstrakurikuler</p>
-          </div>
-        </div>
-
-        <div className="mt-6 bg-blue-900/40 border border-blue-500/30 rounded-2xl p-4 flex justify-between items-center relative z-10 backdrop-blur-md">
-          <div>
-            <p className="text-[10px] text-blue-200 font-semibold tracking-wider uppercase">Tahun Pelajaran Aktif</p>
-            <p className="text-lg font-black text-yellow-300 font-mono mt-0.5">{tahunPelajaranAktif}</p>
-          </div>
-          <div className="flex items-center gap-1.5 bg-green-500/20 text-green-300 border border-green-500/30 px-2.5 py-1 rounded-full text-[10px] font-bold">
-            <span className="w-2 h-2 bg-green-400 rounded-full animate-ping"></span>
-            {isLive ? 'KONEKSI GOOGLE SHEET' : 'SIMULASI LOKAL'}
+        <div className="max-w-4xl mx-auto flex flex-col items-center justify-center text-center gap-2 relative z-10">
+          <div className="flex flex-col items-center text-center">
+            <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-wide leading-tight">SMP PGRI JATIUWUNG</h1>
+            <p className="text-sm sm:text-lg md:text-xl text-yellow-300 font-extrabold tracking-wide mt-1">Pendaftaran Ekstrakurikuler</p>
+            <p className="text-xs sm:text-sm text-blue-200 font-extrabold tracking-wider uppercase mt-1.5 bg-blue-950/40 px-3.5 py-1 rounded-full">
+              Tahun Pelajaran: <span className="text-yellow-300 font-mono font-black">{tahunPelajaranAktif}</span>
+            </p>
           </div>
         </div>
       </div>
 
       {/* Main Registration Form */}
-      <div className="px-4 -mt-6">
-        <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-xl p-5 space-y-6 border border-slate-100">
-          <h2 className="text-md font-bold text-slate-800 border-b border-slate-100 pb-2 flex items-center gap-2">
-            <User className="w-5 h-5 text-blue-700" />
-            Isi Data Registrasi Siswa
-          </h2>
+      <div className="max-w-3xl mx-auto px-3 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
+        <form onSubmit={handleSubmit} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-5 md:p-6 space-y-3.5 sm:space-y-4 md:space-y-5 border border-slate-100">
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4.5 items-start">
+            
+            {/* LEFT COLUMN: BIODATA & ESKUL */}
+            <div className="space-y-3.5">
+              <h2 className="text-[10px] sm:text-xs font-black text-blue-950 uppercase tracking-wider border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 text-blue-700" />
+                Data Diri Pendaftar
+              </h2>
 
-          {/* Foto Siswa Upload & Compression */}
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-slate-700 block">PAS FOTO BERSERAGAM <span className="text-red-500">*</span></label>
-            <div className="flex items-center gap-4">
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-24 h-28 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-600 bg-slate-50 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 overflow-hidden relative shadow-sm"
-              >
-                {photo ? (
-                  <img src={photo} alt="Student preview" className="w-full h-full object-cover" />
-                ) : (
-                  <>
-                    <Camera className="w-8 h-8 text-slate-400 mb-1" />
-                    <span className="text-[9px] text-slate-400 text-center font-semibold px-2">Klik Pas Foto</span>
-                  </>
-                )}
-                
-                {isCompressing && (
-                  <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
-                    <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent mb-1"></span>
-                    <span className="text-[8px] uppercase tracking-wider font-bold">Kompres...</span>
+              {/* Foto Siswa Upload & Compression */}
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">PAS FOTO <span className="text-red-500">*</span></label>
+                <div className="flex items-center gap-3">
+                  <div 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-16 h-20 sm:w-20 sm:h-24 rounded-lg border-2 border-dashed border-slate-300 hover:border-blue-600 bg-slate-50 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 overflow-hidden relative shadow-sm shrink-0"
+                  >
+                    {photo ? (
+                      <>
+                        <img src={photo} alt="Student preview" className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={handleCancelPhoto}
+                          className="absolute top-1 right-1 bg-red-600 border border-white text-white rounded-full p-1 shadow-md hover:bg-red-700 transition-all duration-300 hover:scale-110 flex items-center justify-center z-20"
+                          title="Hapus Foto"
+                          id="btn-cancel-photo"
+                        >
+                          <X className="w-3 h-3 stroke-[3]" />
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-slate-400 mb-0.5" />
+                        <span className="text-[7px] sm:text-[8px] text-slate-400 text-center font-bold px-1">Pas Foto</span>
+                      </>
+                    )}
+                    
+                    {isCompressing && (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white">
+                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mb-1"></span>
+                        <span className="text-[7px] uppercase tracking-wider font-bold">Kompres...</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex-1 space-y-1">
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      accept="image/*" 
+                      onChange={handlePhotoUpload} 
+                      className="hidden" 
+                    />
+                    <div className="text-[9px] sm:text-[10px] text-slate-400 font-semibold leading-normal">
+                      <p className="font-bold text-slate-500 mb-0.5">Syarat :</p>
+                      <p>• Foto wajib berseragam sekolah.</p>
+                      <p>• Maksimal ukuran Foto 1 MB</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nama Lengkap */}
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">NAMA LENGKAP SISWA <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <User className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input 
+                    type="text" 
+                    value={name} 
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Nama Lengkap Siswa" 
+                    className="w-full pl-8 pr-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Row: Kelas & Jenis Kelamin */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">KELAS <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <School className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <select
+                      value={kelas}
+                      onChange={(e) => {
+                        setKelas(e.target.value);
+                        setSelectedEskul(null); // Reset eskul selection as criteria may change
+                        setSelectedEskul2(null);
+                      }}
+                      className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
+                      required
+                    >
+                      <option value="">Pilih...</option>
+                      {KELAS_LIST.map(k => (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">JENIS KELAMIN <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Users className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <select
+                      value={jenisKelamin}
+                      onChange={(e) => setJenisKelamin(e.target.value as any)}
+                      className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
+                      required
+                    >
+                      <option value="">Pilih...</option>
+                      <option value="Laki-laki">Laki-laki</option>
+                      <option value="Perempuan">Perempuan</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Extracurricular Selection */}
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">PILIH EKSTRAKURIKULER 1 <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <Award className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={selectedEskul?.id || ''}
+                    onChange={(e) => {
+                      const eskul = eligibleEskuls.find(item => item.id === e.target.value) || null;
+                      setSelectedEskul(eskul);
+                      // Clear second if it is now identical or invalid
+                      if (selectedEskul2 && selectedEskul2.id === e.target.value) {
+                        setSelectedEskul2(null);
+                      }
+                    }}
+                    className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
+                    required
+                    disabled={!kelas}
+                  >
+                    <option value="">{kelas ? '-- Pilih Ekstrakurikuler --' : 'Pilih Kelas terlebih dahulu...'}</option>
+                    {eligibleEskuls.map(eskul => (
+                      <option key={eskul.id} value={eskul.id}>
+                        {eskul.nama} ({eskul.kelasAllowed.join('/')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {kelas && eligibleEskuls.length === 0 && (
+                  <div className="text-[8px] sm:text-[9px] text-red-500 font-semibold flex items-center gap-1 mt-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    Tidak ada eskul yang tersedia untuk kelas {studentGrade} di Tahun {tahunPelajaranAktif}.
                   </div>
                 )}
               </div>
 
-              <div className="flex-1 space-y-2">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  accept="image/*" 
-                  onChange={handlePhotoUpload} 
-                  className="hidden" 
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-2 px-4 rounded-xl transition-all duration-300 flex items-center gap-2 cursor-pointer"
-                >
-                  <Camera className="w-4 h-4 text-slate-600" />
-                  Pilih Berkas Foto
-                </button>
-                <div className="text-[10px] text-slate-400 font-medium leading-tight">
-                  <p className="font-semibold text-slate-500">Persyaratan Pas Foto:</p>
-                  <p>• JPG atau PNG berseragam resmi</p>
-                  <p>• Kompresi otomatis cerdas &lt; 200KB</p>
-                </div>
-              </div>
-            </div>
-            {photoSize !== null && originalPhotoSize !== null && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-2.5 flex items-center justify-between text-[11px] text-yellow-800">
-                <div className="flex items-center gap-1.5 font-medium">
-                  <FileCheck className="w-4 h-4 text-yellow-600" />
-                  <span>Kompresi berhasil dilakukan</span>
-                </div>
-                <div className="font-mono text-[10px] font-bold">
-                  <span className="line-through text-slate-400">{originalPhotoSize}KB</span>
-                  <span className="mx-1">→</span>
-                  <span className="text-green-600">{photoSize}KB</span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Nama Lengkap */}
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-slate-700 block">NAMA LENGKAP SISWA <span className="text-red-500">*</span></label>
-            <div className="relative">
-              <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
-              <input 
-                type="text" 
-                value={name} 
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Masukkan nama lengkap pendaftar..." 
-                className="w-full pl-11 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-medium"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Row: Kelas & Jenis Kelamin */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">KELAS <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <School className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <select
-                  value={kelas}
-                  onChange={(e) => {
-                    setKelas(e.target.value);
-                    setSelectedEskul(null); // Reset eskul selection as criteria may change
-                  }}
-                  className="w-full pl-9 pr-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold cursor-pointer appearance-none"
-                  required
-                >
-                  <option value="">Pilih...</option>
-                  {KELAS_LIST.map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">JENIS KELAMIN <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <select
-                  value={jenisKelamin}
-                  onChange={(e) => setJenisKelamin(e.target.value as any)}
-                  className="w-full pl-9 pr-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold cursor-pointer appearance-none"
-                  required
-                >
-                  <option value="">Pilih...</option>
-                  <option value="Laki-laki">Laki-laki</option>
-                  <option value="Perempuan">Perempuan</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Extracurricular Selection */}
-          <div className="bg-yellow-400/5 border border-yellow-400/20 rounded-2xl p-4 space-y-2">
-            <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-              <Award className="w-4.5 h-4.5 text-blue-700" />
-              PILIH EKSTRAKURIKULER <span className="text-red-500">*</span>
-            </label>
-            <p className="text-[10px] text-slate-500 leading-normal mb-2">
-              Daftar di bawah ini disesuaikan otomatis dengan tingkat kelas ({studentGrade || 'Silakan pilih kelas dahulu'}) dan Tahun Pelajaran aktif.
-            </p>
-            {kelas ? (
-              <div className="relative">
-                <select
-                  value={selectedEskul?.id || ''}
-                  onChange={(e) => {
-                    const eskul = eligibleEskuls.find(item => item.id === e.target.value) || null;
-                    setSelectedEskul(eskul);
-                  }}
-                  className="w-full px-3 py-2.5 bg-white border border-yellow-400/30 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:border-blue-700 focus:ring-1 focus:ring-blue-700 cursor-pointer"
-                  required
-                >
-                  <option value="">-- Pilih Ekstrakurikuler --</option>
-                  {eligibleEskuls.map(eskul => (
-                    <option key={eskul.id} value={eskul.id}>
-                      {eskul.nama} ({eskul.kelasAllowed.join('/')})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div className="bg-slate-50 rounded-xl p-3 text-center border border-dashed border-slate-200">
-                <span className="text-xs text-slate-400 font-medium">Pilih Kelas terlebih dahulu untuk melihat daftar eskul</span>
-              </div>
-            )}
-            {kelas && eligibleEskuls.length === 0 && (
-              <div className="text-[10px] text-red-500 font-medium flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Tidak ada eskul yang tersedia untuk kelas {studentGrade} di Tahun {tahunPelajaranAktif}.
-              </div>
-            )}
-          </div>
-
-          {/* Section: Data Orang Tua */}
-          <h3 className="text-xs font-black text-blue-800 tracking-wider uppercase border-t border-slate-100 pt-4 flex items-center gap-1">
-            <Users className="w-4 h-4" />
-            Informasi Orang Tua / Wali
-          </h3>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">NAMA AYAH <span className="text-red-500">*</span></label>
-              <input 
-                type="text" 
-                value={namaAyah} 
-                onChange={(e) => setNamaAyah(e.target.value)}
-                placeholder="Nama ayah kandung..." 
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
-                required
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">NAMA IBU <span className="text-red-500">*</span></label>
-              <input 
-                type="text" 
-                value={namaIbu} 
-                onChange={(e) => setNamaIbu(e.target.value)}
-                placeholder="Nama ibu kandung..." 
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Row: WhatsApp Numbers */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">NO. HP SISWA (WA) <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input 
-                  type="tel" 
-                  value={hpSiswa} 
-                  onChange={(e) => setHpSiswa(e.target.value)}
-                  placeholder="08xxxxxxxxxx" 
-                  className="w-full pl-8.5 pr-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
-                  required
-                />
-              </div>
-            </div>
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-slate-700 block">NO. HP ORTU (WA) <span className="text-red-500">*</span></label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                <input 
-                  type="tel" 
-                  value={hpOrtu} 
-                  onChange={(e) => setHpOrtu(e.target.value)}
-                  placeholder="08xxxxxxxxxx" 
-                  className="w-full pl-8.5 pr-2 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
-                  required
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section: Alamat Lengkap */}
-          <h3 className="text-xs font-black text-blue-800 tracking-wider uppercase border-t border-slate-100 pt-4 flex items-center gap-1">
-            <MapPin className="w-4 h-4" />
-            Alamat Tempat Tinggal
-          </h3>
-
-          <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
-            {/* Kampung/Perumahan */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-600 block">KAMPUNG / PERUMAHAN / NAMA JALAN <span className="text-red-500">*</span></label>
-              <input 
-                type="text" 
-                value={alamat} 
-                onChange={(e) => setAlamat(e.target.value)}
-                placeholder="Contoh: Kp. Jatake RT 02, Jalan Pajajaran..." 
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-medium"
-                required
-              />
-            </div>
-
-            {/* RT & RW */}
-            <div className="grid grid-cols-2 gap-3">
+              {/* Extracurricular Selection 2 (Optional) */}
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-600 block">RT <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  value={rt} 
-                  onChange={(e) => setRt(e.target.value)}
-                  placeholder="002" 
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-600 block">RW <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  value={rw} 
-                  onChange={(e) => setRw(e.target.value)}
-                  placeholder="001" 
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Dropdown 1: Provinsi */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-600 block">PROVINSI <span className="text-red-500">*</span></label>
-              <select
-                value={selectedProvinsi?.id || ''}
-                onChange={(e) => handleProvinsiChange(e.target.value)}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
-                required
-              >
-                <option value="">-- Pilih Provinsi --</option>
-                {provinces.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Dropdown 2: Kota/Kabupaten */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-600 block">KOTA / KABUPATEN <span className="text-red-500">*</span></label>
-              <select
-                value={selectedKabupaten?.id || ''}
-                onChange={(e) => handleKabupatenChange(e.target.value)}
-                disabled={!selectedProvinsi}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
-                required
-              >
-                <option value="">-- Pilih Kota/Kabupaten --</option>
-                {kabupatens.map(k => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Dropdown 3: Kecamatan */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-600 block">KECAMATAN <span className="text-red-500">*</span></label>
-              <select
-                value={selectedKecamatan?.id || ''}
-                onChange={(e) => handleKecamatanChange(e.target.value)}
-                disabled={!selectedKabupaten}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
-                required
-              >
-                <option value="">-- Pilih Kecamatan --</option>
-                {kecamatans.map(k => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Dropdown 4: Kelurahan */}
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-slate-600 block">KELURAHAN / DESA <span className="text-red-500">*</span></label>
-              <select
-                value={selectedKelurahan?.id || ''}
-                onChange={(e) => handleKelurahanChange(e.target.value)}
-                disabled={!selectedKecamatan}
-                className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
-                required
-              >
-                <option value="">-- Pilih Kelurahan --</option>
-                {kelurahans.map(k => (
-                  <option key={k.id} value={k.id}>{k.name}</option>
-                ))}
-              </select>
-            </div>
-            
-            {isLoadingRegions && (
-              <div className="text-[9px] text-blue-700 font-bold animate-pulse text-center pt-1 flex items-center justify-center gap-1">
-                <span className="w-1.5 h-1.5 bg-blue-700 rounded-full animate-ping"></span>
-                Memuat Data Wilayah...
-              </div>
-            )}
-          </div>
-
-          {/* Section: Prestasi Siswa */}
-          <div className="border-t border-slate-100 pt-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-blue-800 tracking-wider uppercase flex items-center gap-1">
-                <Award className="w-4 h-4 text-yellow-500" />
-                PRESTASI KHUSUS SISWA
-              </h3>
-              <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded-full uppercase">Opsional</span>
-            </div>
-
-            <div className="flex items-start gap-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/50">
-              <input 
-                type="checkbox" 
-                id="checkbox-prestasi"
-                checked={hasAchievements}
-                onChange={(e) => setHasAchievements(e.target.checked)}
-                className="w-4 h-4 text-blue-700 border-slate-300 rounded focus:ring-blue-700 mt-0.5 cursor-pointer"
-              />
-              <div className="text-xs">
-                <label htmlFor="checkbox-prestasi" className="font-bold text-slate-700 cursor-pointer block select-none">Siswa Memiliki Prestasi Khusus</label>
-                <p className="text-[10px] text-slate-400 leading-normal">Centang kotak ini untuk melampirkan piagam/prestasi lomba siswa di formulir.</p>
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">PILIH EKSTRAKURIKULER 2 (Tidak Wajib)</label>
+                <div className="relative">
+                  <Award className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={selectedEskul2?.id || ''}
+                    onChange={(e) => {
+                      const eskul = eligibleEskuls.find(item => item.id === e.target.value) || null;
+                      setSelectedEskul2(eskul);
+                    }}
+                    className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
+                    disabled={!kelas || !selectedEskul}
+                  >
+                    <option value="">{!kelas ? 'Pilih Kelas terlebih dahulu...' : !selectedEskul ? 'Pilih Ekstrakurikuler 1 terlebih dahulu...' : '-- Pilih Ekstrakurikuler 2 (Tidak Wajib) --'}</option>
+                    {eligibleEskuls
+                      .filter(eskul => eskul.id !== selectedEskul?.id)
+                      .map(eskul => (
+                        <option key={eskul.id} value={eskul.id}>
+                          {eskul.nama} ({eskul.kelasAllowed.join('/')})
+                        </option>
+                      ))}
+                  </select>
+                </div>
               </div>
             </div>
 
-            {hasAchievements && (
-              <div className="bg-slate-50/60 p-4 rounded-2xl border border-blue-100 space-y-3 transition-all duration-500 animate-fadeIn">
+            {/* RIGHT COLUMN: ORANG TUA, ALAMAT, PRESTASI */}
+            <div className="space-y-3.5">
+              <h2 className="text-[10px] sm:text-xs font-black text-blue-950 uppercase tracking-wider border-b border-slate-100 pb-1.5 flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-blue-700" />
+                Orang Tua & Alamat Rumah
+              </h2>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-700 block">NAMA LOMBA <span className="text-red-500">*</span></label>
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">NAMA AYAH <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
-                    value={namaLomba} 
-                    onChange={(e) => setNamaLomba(e.target.value)}
-                    placeholder="Contoh: Lomba Pencak Silat Piala Walikota..." 
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                    value={namaAyah} 
+                    onChange={(e) => setNamaAyah(e.target.value)}
+                    placeholder="Nama ayah kandung..." 
+                    className="w-full px-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">NAMA IBU <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    value={namaIbu} 
+                    onChange={(e) => setNamaIbu(e.target.value)}
+                    placeholder="Nama ibu kandung..." 
+                    className="w-full px-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* WhatsApp Numbers */}
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">NO. WHATSAPP SISWA <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Phone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <input 
+                      type="tel" 
+                      value={hpSiswa} 
+                      onChange={(e) => setHpSiswa(e.target.value)}
+                      placeholder="08xxxxxxxxxx" 
+                      className="w-full pl-6.5 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">NO. WHATSAPP ORANG TUA / WALI <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Phone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                    <input 
+                      type="tel" 
+                      value={hpOrtu} 
+                      onChange={(e) => setHpOrtu(e.target.value)}
+                      placeholder="08xxxxxxxxxx" 
+                      className="w-full pl-6.5 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Section: Alamat Lengkap */}
+              <div className="space-y-2 bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200/60">
+                {/* Kampung/Perumahan */}
+                <div className="space-y-1">
+                  <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KAMPUNG / PERUMAHAN <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    value={alamat} 
+                    onChange={(e) => setAlamat(e.target.value)}
+                    placeholder="Contoh: Kp. Jatake RT 02, Jalan Pajajaran..." 
+                    className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-medium"
                     required
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* RT & RW */}
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700 block">CABANG LOMBA <span className="text-red-500">*</span></label>
+                    <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">RT <span className="text-red-500">*</span></label>
                     <input 
                       type="text" 
-                      value={cabangLomba} 
-                      onChange={(e) => setCabangLomba(e.target.value)}
-                      placeholder="Contoh: Tanding Kelas C Putra..." 
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                      value={rt} 
+                      onChange={(e) => setRt(e.target.value)}
+                      placeholder="002" 
+                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
                       required
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700 block">TINGKAT LOMBA <span className="text-red-500">*</span></label>
-                    <select
-                      value={tingkatLomba}
-                      onChange={(e) => setTingkatLomba(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
+                    <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">RW <span className="text-red-500">*</span></label>
+                    <input 
+                      type="text" 
+                      value={rw} 
+                      onChange={(e) => setRw(e.target.value)}
+                      placeholder="001" 
+                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
                       required
-                    >
-                      <option value="">Pilih Tingkat...</option>
-                      <option value="Sekolah">Sekolah</option>
-                      <option value="Kecamatan">Kecamatan</option>
-                      <option value="Kota/Kabupaten">Kota/Kabupaten</option>
-                      <option value="Provinsi">Provinsi</option>
-                      <option value="Nasional">Nasional</option>
-                      <option value="Internasional">Internasional</option>
-                    </select>
+                    />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Dropdowns */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700 block">JUARA KE <span className="text-red-500">*</span></label>
+                    <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">PROVINSI <span className="text-red-500">*</span></label>
                     <select
-                      value={juaraKe}
-                      onChange={(e) => setJuaraKe(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
+                      value={selectedProvinsi?.id || ''}
+                      onChange={(e) => handleProvinsiChange(e.target.value)}
+                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
                       required
                     >
-                      <option value="">Pilih Juara...</option>
-                      <option value="1">Juara 1</option>
-                      <option value="2">Juara 2</option>
-                      <option value="3">Juara 3</option>
-                      <option value="Harapan 1">Harapan 1</option>
-                      <option value="Harapan 2">Harapan 2</option>
-                      <option value="Harapan 3">Harapan 3</option>
-                      <option value="Lainnya">Lainnya / Partisipan</option>
+                      <option value="">-- Pilih Provinsi --</option>
+                      {provinces.map(p => (
+                        <option key={p.id} value={p.id}>{p.name}</option>
+                      ))}
                     </select>
                   </div>
+
                   <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-slate-700 block">PENYELENGGARA <span className="text-red-500">*</span></label>
-                    <input 
-                      type="text" 
-                      value={penyelenggara} 
-                      onChange={(e) => setPenyelenggara(e.target.value)}
-                      placeholder="Nama penyelenggara lomba..." 
-                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                    <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KOTA / KABUPATEN <span className="text-red-500">*</span></label>
+                    <select
+                      value={selectedKabupaten?.id || ''}
+                      onChange={(e) => handleKabupatenChange(e.target.value)}
+                      disabled={!selectedProvinsi}
+                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
                       required
-                    />
+                    >
+                      <option value="">-- Pilih Kota/Kabupaten --</option>
+                      {kabupatens.map(k => (
+                        <option key={k.id} value={k.id}>{k.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KECAMATAN <span className="text-red-500">*</span></label>
+                    <select
+                      value={selectedKecamatan?.id || ''}
+                      onChange={(e) => handleKecamatanChange(e.target.value)}
+                      disabled={!selectedKabupaten}
+                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
+                      required
+                    >
+                      <option value="">-- Pilih Kecamatan --</option>
+                      {kecamatans.map(k => (
+                        <option key={k.id} value={k.id}>{k.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KELURAHAN / DESA <span className="text-red-500">*</span></label>
+                    <select
+                      value={selectedKelurahan?.id || ''}
+                      onChange={(e) => handleKelurahanChange(e.target.value)}
+                      disabled={!selectedKecamatan}
+                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold disabled:bg-slate-100 disabled:text-slate-400 cursor-pointer"
+                      required
+                    >
+                      <option value="">-- Pilih Kelurahan --</option>
+                      {kelurahans.map(k => (
+                        <option key={k.id} value={k.id}>{k.name}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
+                
+                {isLoadingRegions && (
+                  <div className="text-[8px] text-blue-700 font-bold animate-pulse text-center pt-1 flex items-center justify-center gap-1">
+                    <span className="w-1 h-1 bg-blue-700 rounded-full animate-ping"></span>
+                    Memuat Data Wilayah...
+                  </div>
+                )}
               </div>
-            )}
+
+              {/* Section: Prestasi Siswa */}
+              <div className="border-t border-slate-100 pt-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-[10px] sm:text-[11px] font-black text-blue-800 tracking-wider uppercase flex items-center gap-1">
+                    <Award className="w-3.5 h-3.5 text-yellow-500" />
+                    PRESTASI
+                  </h3>
+                  <span className="text-[8px] bg-slate-100 text-slate-500 font-bold px-1.5 py-0.5 rounded-full uppercase">Tidak Wajib</span>
+                </div>
+
+                <div className="flex items-start gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200/50">
+                  <input 
+                    type="checkbox" 
+                    id="checkbox-prestasi"
+                    checked={hasAchievements}
+                    onChange={(e) => setHasAchievements(e.target.checked)}
+                    className="w-3 h-3 text-blue-700 border-slate-300 rounded focus:ring-blue-700 mt-0.5 cursor-pointer"
+                  />
+                  <div className="text-[11px] sm:text-xs">
+                    <label htmlFor="checkbox-prestasi" className="font-bold text-slate-700 cursor-pointer block select-none">Siswa Memiliki Prestasi Khusus</label>
+                    <p className="text-[9px] sm:text-[10px] text-slate-400 leading-normal">Centang kotak ini untuk melampirkan piagam/prestasi lomba siswa di formulir.</p>
+                  </div>
+                </div>
+
+                {hasAchievements && (
+                  <div className="bg-slate-50/60 p-2.5 sm:p-3 rounded-lg border border-blue-100 space-y-2 transition-all duration-500 animate-fadeIn">
+                    <div className="space-y-1">
+                      <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">NAMA LOMBA <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        value={namaLomba} 
+                        onChange={(e) => setNamaLomba(e.target.value)}
+                        placeholder="Contoh: Lomba Pencak Silat Piala Walikota..." 
+                        className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                        required
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">CABANG LOMBA <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          value={cabangLomba} 
+                          onChange={(e) => setCabangLomba(e.target.value)}
+                          placeholder="Contoh: Tanding Kelas C Putra..." 
+                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">TINGKAT LOMBA <span className="text-red-500">*</span></label>
+                        <select
+                          value={tingkatLomba}
+                          onChange={(e) => setTingkatLomba(e.target.value)}
+                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
+                          required
+                        >
+                          <option value="">Pilih Tingkat...</option>
+                          <option value="Sekolah">Sekolah</option>
+                          <option value="Kecamatan">Kecamatan</option>
+                          <option value="Kota/Kabupaten">Kota/Kabupaten</option>
+                          <option value="Provinsi">Provinsi</option>
+                          <option value="Nasional">Nasional</option>
+                          <option value="Internasional">Internasional</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-1">
+                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">JUARA KE <span className="text-red-500">*</span></label>
+                        <select
+                          value={juaraKe}
+                          onChange={(e) => setJuaraKe(e.target.value)}
+                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
+                          required
+                        >
+                          <option value="">Pilih Juara...</option>
+                          <option value="1">Juara 1</option>
+                          <option value="2">Juara 2</option>
+                          <option value="3">Juara 3</option>
+                          <option value="Harapan 1">Harapan 1</option>
+                          <option value="Harapan 2">Harapan 2</option>
+                          <option value="Harapan 3">Harapan 3</option>
+                          <option value="Lainnya">Lainnya / Partisipan</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">PENYELENGGARA <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          value={penyelenggara} 
+                          onChange={(e) => setPenyelenggara(e.target.value)}
+                          placeholder="Nama penyelenggara lomba..." 
+                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
           </div>
 
           {/* Submit Button */}
-          <div className="pt-4">
+          <div className="pt-3 border-t border-slate-100">
             <button
               type="submit"
               disabled={isSubmitting}
               id="btn-submit-registration"
-              className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
+              className="w-full md:max-w-xs mx-auto bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white font-bold py-2 px-4 rounded-lg shadow-sm hover:shadow-md transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed text-[11px] sm:text-xs"
             >
               {isSubmitting ? (
                 <>
-                  <span className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></span>
+                  <span className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></span>
                   Memproses Pendaftaran...
                 </>
               ) : (
                 <>
-                  <Send className="w-4.5 h-4.5 text-yellow-300" />
-                  Kirim Data Registrasi
+                  <Send className="w-3.5 h-3.5 text-yellow-300 uppercase" />
+                  KIRIM PENDAFTARAN
                 </>
               )}
             </button>
-            <p className="text-[9px] text-slate-400 text-center mt-2.5 font-medium leading-normal">
-              Dengan mengklik tombol Kirim, Anda menyatakan bahwa seluruh data yang diisi adalah benar milik pendaftar yang bersangkutan.
+            <p className="text-[8px] sm:text-[9px] text-slate-400 text-center mt-2 font-semibold leading-normal max-w-sm mx-auto">
+              Dengan mengirim pendaftaran, Anda menyatakan bahwa data di atas diisi dengan jujur, benar, dan bersedia mengikuti seluruh kegiatan esktrakurikuller SMP SMP PGRI Jatiuwung.
             </p>
           </div>
         </form>

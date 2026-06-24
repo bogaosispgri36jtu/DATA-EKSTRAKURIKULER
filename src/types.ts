@@ -33,6 +33,8 @@ export interface Student {
   kelurahanName: string;
   eskulId: string;
   eskulName: string;
+  eskulId2?: string;
+  eskulName2?: string;
   tahunPelajaran: string;
   createdAt: string; // ISO string or date
 }

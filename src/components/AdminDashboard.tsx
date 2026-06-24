@@ -3,11 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Lock, LayoutDashboard, FileText, Settings, Plus, Trash2, 
   Download, Printer, Search, Filter, ShieldAlert, CheckCircle2,
-  RefreshCcw, Eye, ArrowUpDown, Layers, Database, UserCheck
+  RefreshCcw, Eye, ArrowUpDown, Layers, Database, UserCheck, LogOut
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -23,6 +23,8 @@ interface AdminDashboardProps {
   onResetEskulStudents: (eskulId: string) => Promise<void>;
   onResetAllData: () => Promise<void>;
   onUpdateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  isLoggedIn: boolean;
+  setIsLoggedIn: (loggedIn: boolean) => void;
 }
 
 export default function AdminDashboard({
@@ -33,10 +35,22 @@ export default function AdminDashboard({
   onDeleteEskul,
   onResetEskulStudents,
   onResetAllData,
-  onUpdateSettings
+  onUpdateSettings,
+  isLoggedIn,
+  setIsLoggedIn
 }: AdminDashboardProps) {
+  const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.src = 'https://lh3.googleusercontent.com/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT';
+    img.onload = () => {
+      setLogoImgElement(img);
+    };
+  }, []);
+
   // Login State
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   
@@ -169,7 +183,7 @@ export default function AdminDashboard({
     // Prepare CSV headers
     const headers = [
       'No. Registrasi', 'Tahun Pelajaran', 'Nama Lengkap', 'Kelas', 'Jenis Kelamin', 
-      'Ekstrakurikuler', 'Nama Ayah', 'Nama Ibu', 'No. HP Siswa', 'No. HP Orang Tua',
+      'Ekstrakurikuler 1', 'Ekstrakurikuler 2', 'Nama Ayah', 'Nama Ibu', 'No. HP Siswa', 'No. HP Orang Tua',
       'Memiliki Prestasi', 'Nama Lomba', 'Cabang Lomba', 'Tingkat Lomba', 'Juara Ke', 'Penyelenggara',
       'Alamat', 'RT', 'RW', 'Kelurahan', 'Kecamatan', 'Kota/Kabupaten', 'Provinsi', 'Tanggal Daftar'
     ];
@@ -181,6 +195,7 @@ export default function AdminDashboard({
       s.kelas,
       s.jenisKelamin,
       s.eskulName,
+      s.eskulName2 || '',
       s.namaAyah,
       s.namaIbu,
       s.hpSiswa,
@@ -247,16 +262,24 @@ export default function AdminDashboard({
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       
-      // Header
+      // Header with Logo
+      if (logoImgElement) {
+        try {
+          doc.addImage(logoImgElement, 'PNG', 15, 8, 18, 18);
+        } catch (e) {
+          console.error("Failed to add preloaded logo to recap PDF", e);
+        }
+      }
+
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
       doc.setTextColor(29, 78, 216);
-      doc.text('SMP PGRI JATIUWUNG', 105, 15, { align: 'center' });
+      doc.text('SMP PGRI JATIUWUNG', 114, 14, { align: 'center' });
       doc.setFontSize(10);
       doc.setTextColor(107, 114, 128);
       doc.setFont('helvetica', 'normal');
-      doc.text(`LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER`, 105, 20, { align: 'center' });
-      doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 105, 25, { align: 'center' });
+      doc.text(`LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER`, 114, 19, { align: 'center' });
+      doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 114, 24, { align: 'center' });
       
       doc.setDrawColor(29, 78, 216);
       doc.setLineWidth(0.5);
@@ -371,7 +394,8 @@ export default function AdminDashboard({
         doc.text(s.regNo, 28, currentY + 5);
         doc.text(s.name.toUpperCase().substring(0, 25), 60, currentY + 5);
         doc.text(s.kelas, 115, currentY + 5);
-        doc.text(s.eskulName.substring(0, 30), 135, currentY + 5);
+        const eskulStr = s.eskulName2 ? `${s.eskulName}, ${s.eskulName2}` : s.eskulName;
+        doc.text(eskulStr.substring(0, 32), 135, currentY + 5);
 
         doc.line(15, currentY + 7, 195, currentY + 7);
         currentY += 7;
@@ -598,63 +622,116 @@ export default function AdminDashboard({
     );
   }
 
-  // Render Admin Layout with Bottom Navigation
+  // Render Admin Layout with Responsive Layout & Top Tab Bar
   return (
-    <div className="bg-slate-50 min-h-screen pb-24 max-w-md mx-auto relative flex flex-col justify-between" id="admin-dashboard-screen">
-      {/* Upper header */}
-      <div className="bg-blue-900 text-white px-5 py-5 rounded-b-3xl shadow-md flex items-center justify-between">
+    <div className="bg-slate-50 min-h-[calc(100vh-4rem)] w-full flex flex-col justify-start pb-12" id="admin-dashboard-screen">
+      {/* Upper header banner */}
+      <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white px-6 py-6 md:py-8 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center">
-            <LayoutDashboard className="w-5.5 h-5.5 text-blue-900" />
+          <div className="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
+            <LayoutDashboard className="w-6.5 h-6.5 text-blue-900" />
           </div>
           <div>
-            <h1 className="text-sm font-extrabold tracking-wide uppercase">Dashboard Admin</h1>
-            <p className="text-[10px] text-yellow-300 font-bold">SMP PGRI Jatiuwung</p>
+            <h1 className="text-base sm:text-lg font-black tracking-wide uppercase leading-none font-montserrat">Portal Guru & Dashboard Admin</h1>
+            <p className="text-xs text-yellow-300 font-bold mt-1.5 font-poppins">SMP PGRI Jatiuwung Tangerang</p>
           </div>
         </div>
-        <button
-          onClick={() => {
-            setIsLoggedIn(false);
-            setPassword('');
-          }}
-          className="text-[10px] bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/20 py-1.5 px-3 rounded-lg font-bold transition-all"
-        >
-          Keluar
-        </button>
+        <div className="flex items-center gap-3.5 self-stretch sm:self-auto justify-between sm:justify-end">
+          <div className="text-right sm:block hidden">
+            <span className="text-[9px] text-slate-400 font-bold block uppercase leading-none">Status Database</span>
+            <span className="text-xs text-green-400 font-black flex items-center gap-1.5 mt-1 leading-none">
+              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span>
+              Koneksi Aktif
+            </span>
+          </div>
+          <button
+            onClick={() => {
+              setIsLoggedIn(false);
+              setPassword('');
+            }}
+            className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Keluar Portal
+          </button>
+        </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="px-3 py-4 flex-1">
+      {/* Main Container */}
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 md:py-8 flex flex-col gap-6">
         
+        {/* Modern Tab Bar Selector */}
+        <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-slate-200/60 flex gap-1 w-full max-w-2xl mx-auto">
+          <button
+            onClick={() => setActiveTab('eskul')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'eskul' 
+                ? 'bg-blue-700 text-white shadow-md' 
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+            }`}
+          >
+            <Layers className="w-4 h-4" />
+            <span className="hidden sm:inline">Kelola Ekstrakurikuler</span>
+            <span className="sm:hidden">Kategori</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('laporan')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'laporan' 
+                ? 'bg-blue-700 text-white shadow-md' 
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+            }`}
+          >
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">Laporan & Rekap Siswa</span>
+            <span className="sm:hidden">Laporan</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('pengaturan')}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              activeTab === 'pengaturan' 
+                ? 'bg-blue-700 text-white shadow-md' 
+                : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+            }`}
+          >
+            <Settings className="w-4 h-4" />
+            <span className="hidden sm:inline">Pengaturan Database</span>
+            <span className="sm:hidden">Setelan</span>
+          </button>
+        </div>
+
         {/* ===================== TAB 1: JENIS EKSTRAKURIKULER ===================== */}
         {activeTab === 'eskul' && (
-          <div className="space-y-4 animate-fadeIn" id="tab-eskul-management">
-            {/* Form Add New */}
-            <form onSubmit={handleAddEskulSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                <Plus className="w-4.5 h-4.5" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn" id="tab-eskul-management">
+            
+            {/* Form Add New (Left side - 1 col on lg) */}
+            <form onSubmit={handleAddEskulSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4 lg:col-span-1">
+              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Plus className="w-4.5 h-4.5 text-blue-700" />
                 Tambah Ekstrakurikuler Baru
               </h2>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-700 block">NAMA EKSTRAKURIKULER <span className="text-red-500">*</span></label>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">NAMA EKSTRAKURIKULER <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={newEskulNama}
                   onChange={(e) => setNewEskulNama(e.target.value)}
                   placeholder="Contoh: English Club, Hadroh..."
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-blue-700"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
                   required
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-700 block">TAHUN PELAJARAN</label>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN</label>
                   <select
                     value={newEskulTahun}
                     onChange={(e) => setNewEskulTahun(e.target.value)}
-                    className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer"
+                    className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
                   >
                     {TAHUN_PELAJARAN_LIST.map(y => (
                       <option key={y} value={y}>{y}</option>
@@ -662,16 +739,16 @@ export default function AdminDashboard({
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-slate-700 block">TINGKAT KELAS DIZINKAN</label>
-                  <div className="flex gap-2.5 pt-1.5">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TINGKAT KELAS DIZINKAN</label>
+                  <div className="flex gap-2.5 pt-2">
                     {['VII', 'VIII', 'IX'].map(grade => (
-                      <label key={grade} className="flex items-center gap-1 text-[11px] font-bold text-slate-600 cursor-pointer">
+                      <label key={grade} className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-700 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={newEskulKelas.includes(grade)}
                           onChange={() => handleClassCheckboxChange(grade)}
-                          className="w-3.5 h-3.5 text-blue-700 border-slate-300 rounded"
+                          className="w-4 h-4 text-blue-700 border-slate-300 rounded focus:ring-blue-500"
                         />
                         {grade}
                       </label>
@@ -683,35 +760,35 @@ export default function AdminDashboard({
               <button
                 type="submit"
                 disabled={isAddingEskul}
-                className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
               >
                 {isAddingEskul ? 'Menyimpan...' : 'Tambah Ekstrakurikuler'}
               </button>
             </form>
 
-            {/* List Table of Eskuls */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2 mb-3">
-                <Layers className="w-4.5 h-4.5 text-slate-600" />
-                Daftar Kategori Ekstrakurikuler ({eskulList.length})
+            {/* List Table of Eskuls (Right side - 2 cols on lg) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 lg:col-span-2">
+              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                <Layers className="w-4.5 h-4.5 text-blue-700" />
+                Daftar Kategori Ekstrakurikuler Aktif ({eskulList.length})
               </h2>
 
-              <div className="space-y-2.5 max-h-[300px] overflow-y-auto pr-1">
+              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
                 {eskulList.map(eskul => {
                   const numRegistered = students.filter(s => s.eskulId === eskul.id).length;
                   return (
-                    <div key={eskul.id} className="flex items-center justify-between border border-slate-100 p-3 rounded-xl hover:bg-slate-50 transition-all">
+                    <div key={eskul.id} className="flex items-center justify-between border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 hover:shadow-sm transition-all">
                       <div>
-                        <h4 className="text-xs font-bold text-slate-800">{eskul.nama}</h4>
-                        <div className="flex gap-1.5 mt-1 text-[9px] font-bold text-slate-400">
-                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase">Kelas: {eskul.kelasAllowed.join(', ')}</span>
-                          <span className="bg-yellow-400/10 text-yellow-800 px-1.5 py-0.5 rounded">{eskul.tahunPelajaran}</span>
-                          <span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">{numRegistered} pendaftar</span>
+                        <h4 className="text-sm font-bold text-slate-800 font-montserrat">{eskul.nama}</h4>
+                        <div className="flex flex-wrap gap-1.5 mt-1.5 text-[9px] font-bold">
+                          <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg uppercase tracking-wider">Kelas: {eskul.kelasAllowed.join(', ')}</span>
+                          <span className="bg-yellow-400/20 text-yellow-900 px-2 py-0.5 rounded-lg font-mono">{eskul.tahunPelajaran}</span>
+                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">{numRegistered} Siswa Terdaftar</span>
                         </div>
                       </div>
                       <button
                         onClick={() => handleDeleteEskulClick(eskul.id, eskul.nama)}
-                        className="text-red-500 hover:text-red-700 p-1.5 rounded-lg bg-red-50 hover:bg-red-100 transition-all cursor-pointer"
+                        className="text-red-500 hover:text-white p-2 rounded-xl bg-red-50 hover:bg-red-600 transition-all cursor-pointer shadow-sm border border-red-100"
                         title="Hapus eskul"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -720,7 +797,7 @@ export default function AdminDashboard({
                   );
                 })}
                 {eskulList.length === 0 && (
-                  <div className="text-center py-6 text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
+                  <div className="text-center py-12 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
                     Belum ada kategori eskul terdaftar.
                   </div>
                 )}
@@ -729,300 +806,286 @@ export default function AdminDashboard({
           </div>
         )}
 
-
         {/* ===================== TAB 2: LAPORAN PENDAFTAR ===================== */}
         {activeTab === 'laporan' && (
-          <div className="space-y-4 animate-fadeIn" id="tab-reports-list">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn" id="tab-reports-list">
             
-            {/* Quick Action Counters */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-blue-900 text-white rounded-2xl p-3.5 shadow-sm border border-blue-950 relative overflow-hidden">
-                <span className="text-[9px] font-bold text-blue-300 uppercase block tracking-wider">Total Terdaftar ({settings.tahunPelajaranAktif})</span>
-                <span className="text-2xl font-black font-mono block mt-1">{students.filter(s => s.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
-                <div className="absolute right-2 bottom-2 bg-white/10 p-1.5 rounded-lg text-yellow-300">
-                  <UserCheck className="w-5 h-5" />
-                </div>
-              </div>
-
-              <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 relative overflow-hidden">
-                <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider">Kategori Eskul</span>
-                <span className="text-2xl font-black font-mono text-slate-800 block mt-1">{eskulList.filter(e => e.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
-                <div className="absolute right-2 bottom-2 bg-yellow-400/20 p-1.5 rounded-lg text-blue-800">
-                  <Layers className="w-5 h-5" />
-                </div>
-              </div>
-            </div>
-
-            {/* Print & Export buttons */}
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={handlePrintPDFRecap}
-                className="bg-red-700 hover:bg-red-800 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-              >
-                <Printer className="w-4 h-4 text-white" />
-                Cetak Rekap PDF
-              </button>
+            {/* Filter & Quick Actions Panel (Left side - 1 col on lg) */}
+            <div className="space-y-4 lg:col-span-1">
               
-              <button
-                onClick={handleExportExcel}
-                className="bg-green-700 hover:bg-green-800 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all"
-              >
-                <Download className="w-4 h-4 text-white" />
-                Ekspor Excel (CSV)
-              </button>
-            </div>
-
-            {/* Filter Form */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                <Filter className="w-4 h-4" />
-                Saring Data Pendaftar
-              </h2>
-
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Cari nama, no. registrasi, HP..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
-                />
-              </div>
-
+              {/* Quick Action Counters */}
               <div className="grid grid-cols-2 gap-3">
-                <select
-                  value={filterEskul}
-                  onChange={(e) => setFilterEskul(e.target.value)}
-                  className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer"
-                >
-                  <option value="">Semua Eskul</option>
-                  {eskulList.map(e => (
-                    <option key={e.id} value={e.id}>{e.nama}</option>
-                  ))}
-                </select>
-
-                <select
-                  value={filterKelas}
-                  onChange={(e) => setFilterKelas(e.target.value)}
-                  className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none cursor-pointer"
-                >
-                  <option value="">Semua Kelas</option>
-                  {KELAS_LIST.map(k => (
-                    <option key={k} value={k}>{k}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Students List Display */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 space-y-2.5 max-h-[380px] overflow-y-auto">
-              <div className="flex justify-between items-center text-[10px] text-slate-400 font-bold px-1 uppercase tracking-wider border-b border-slate-50 pb-1.5">
-                <span>Daftar Siswa Terfilter</span>
-                <span className="text-blue-700">{filteredStudents.length} baris data</span>
-              </div>
-
-              {filteredStudents.map((s, idx) => {
-                const isExpanded = expandedStudentId === s.id;
-                return (
-                  <div key={s.id} className="border border-slate-100 rounded-xl p-3 hover:bg-slate-50 transition-all space-y-2">
-                    <div className="flex items-center gap-3">
-                      {s.photo ? (
-                        <img src={s.photo} alt="Student" className="w-10 h-12 object-cover rounded-lg border border-slate-200 bg-slate-100" />
-                      ) : (
-                        <div className="w-10 h-12 bg-slate-100 border border-slate-200 rounded-lg flex items-center justify-center text-slate-400 font-bold text-xs">?</div>
-                      )}
-
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">{s.regNo}</span>
-                          <span className="text-[8px] text-slate-400 font-semibold">{new Date(s.createdAt).toLocaleDateString('id-ID')}</span>
-                        </div>
-                        <h4 className="text-xs font-bold text-slate-800 truncate mt-0.5">{s.name.toUpperCase()}</h4>
-                        <div className="flex gap-2 text-[9px] text-slate-500 font-semibold mt-0.5">
-                          <span>Kelas {s.kelas}</span>
-                          <span>•</span>
-                          <span className="text-blue-900 font-bold">{s.eskulName}</span>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => setExpandedStudentId(isExpanded ? null : s.id)}
-                        className="p-1 hover:bg-slate-200 rounded-lg transition-all text-slate-500 cursor-pointer"
-                      >
-                        <Eye className="w-4.5 h-4.5" />
-                      </button>
-                    </div>
-
-                    {/* Expanded details */}
-                    {isExpanded && (
-                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 text-[11px] text-slate-700 space-y-2 animate-fadeIn">
-                        <div className="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2">
-                          <div>
-                            <span className="text-[9px] font-bold text-slate-400 block uppercase">Jenis Kelamin</span>
-                            <span className="font-semibold text-slate-800">{s.jenisKelamin}</span>
-                          </div>
-                          <div>
-                            <span className="text-[9px] font-bold text-slate-400 block uppercase">HP Siswa (WA)</span>
-                            <span className="font-semibold text-slate-800 font-mono">{s.hpSiswa}</span>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 border-b border-slate-200 pb-2">
-                          <div>
-                            <span className="text-[9px] font-bold text-slate-400 block uppercase">Nama Ayah / Ibu</span>
-                            <span className="font-semibold text-slate-800">{s.namaAyah} / {s.namaIbu}</span>
-                          </div>
-                          <div>
-                            <span className="text-[9px] font-bold text-slate-400 block uppercase">HP Orang Tua (WA)</span>
-                            <span className="font-semibold text-slate-800 font-mono">{s.hpOrtu}</span>
-                          </div>
-                        </div>
-
-                        {s.prestasiChecked && (
-                          <div className="bg-yellow-50 p-2 border border-yellow-200 rounded-lg text-yellow-900 border-b border-slate-200 pb-2">
-                            <span className="text-[9px] font-black text-yellow-800 block uppercase tracking-wider">★ PRESTASI KHUSUS SISWA</span>
-                            <p className="mt-0.5 font-bold">{s.namaLomba} ({s.cabangLomba})</p>
-                            <p className="text-[10px] font-medium text-yellow-700">Tingkat {s.tingkatLomba} | Juara {s.juaraKe} | Penyelenggara: {s.penyelenggara}</p>
-                          </div>
-                        )}
-
-                        <div>
-                          <span className="text-[9px] font-bold text-slate-400 block uppercase">Alamat Tempat Tinggal</span>
-                          <span className="font-semibold text-slate-800 leading-relaxed block">
-                            {s.alamat}, RT {s.rt}/RW {s.rw}, Kel. {s.kelurahanName}, Kec. {s.kecamatanName}, {s.kabupatenName}, {s.provinsiName}
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                <div className="bg-blue-900 text-white rounded-2xl p-4 shadow-md border border-blue-950 relative overflow-hidden">
+                  <span className="text-[9px] font-bold text-blue-300 uppercase block tracking-wider font-poppins">Total Siswa ({settings.tahunPelajaranAktif})</span>
+                  <span className="text-3xl font-black font-mono block mt-1.5">{students.filter(s => s.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
+                  <div className="absolute right-3 bottom-3 bg-white/10 p-2 rounded-xl text-yellow-300">
+                    <UserCheck className="w-5.5 h-5.5" />
                   </div>
-                );
-              })}
-
-              {filteredStudents.length === 0 && (
-                <div className="text-center py-10 text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
-                  Tidak ada pendaftar yang cocok dengan filter pencarian.
                 </div>
-              )}
-            </div>
-          </div>
-        )}
 
-
-        {/* ===================== TAB 3: PENGATURAN (RESET DATA) ===================== */}
-        {activeTab === 'pengaturan' && (
-          <div className="space-y-4 animate-fadeIn" id="tab-app-settings">
-            
-            {/* API & active year parameters */}
-            <form onSubmit={handleSaveSettings} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
-                <Settings className="w-4.5 h-4.5 text-blue-700" />
-                Konfigurasi Umum & Database API
-              </h2>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-700 block">TAHUN PELAJARAN AKTIF</label>
-                <select
-                  value={activeYearInput}
-                  onChange={(e) => setActiveYearInput(e.target.value)}
-                  className="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
-                >
-                  {TAHUN_PELAJARAN_LIST.map(y => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-                <p className="text-[9px] text-slate-400 leading-normal">Mengatur tahun aktif pendaftaran untuk formulir publik secara instan.</p>
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative overflow-hidden">
+                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider font-poppins">Kategori Eskul</span>
+                  <span className="text-3xl font-black font-mono text-slate-800 block mt-1.5">{eskulList.filter(e => e.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
+                  <div className="absolute right-3 bottom-3 bg-yellow-400/20 p-2 rounded-xl text-blue-800">
+                    <Layers className="w-5.5 h-5.5" />
+                  </div>
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-slate-700 block">GOOGLE APPS SCRIPT WEB APP URL</label>
+              {/* Print & Export buttons */}
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={handlePrintPDFRecap}
+                  className="bg-red-700 hover:bg-red-800 text-white text-xs font-bold py-3 px-3 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all border border-red-800"
+                >
+                  <Printer className="w-4 h-4 text-white animate-pulse" />
+                  Cetak PDF Rekap
+                </button>
+                
+                <button
+                  onClick={handleExportExcel}
+                  className="bg-green-700 hover:bg-green-800 text-white text-xs font-bold py-3 px-3 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all border border-green-800"
+                >
+                  <Download className="w-4 h-4 text-white" />
+                  Ekspor Excel (CSV)
+                </button>
+              </div>
+
+              {/* Filter Form */}
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 space-y-4">
+                <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                  <Filter className="w-4 h-4 text-blue-700" />
+                  Saring Data Pendaftar
+                </h2>
+
                 <div className="relative">
-                  <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <input
-                    type="url"
-                    value={gasUrlInput}
-                    onChange={(e) => setGasUrlInput(e.target.value)}
-                    placeholder="https://script.google.com/macros/s/.../exec"
-                    className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-medium focus:outline-none focus:border-blue-700"
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Cari nama, no. registrasi, HP..."
+                    className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
                   />
                 </div>
-                <p className="text-[9px] text-slate-400 leading-normal">
-                  Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
-                </p>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Ekstrakurikuler</span>
+                    <select
+                      value={filterEskul}
+                      onChange={(e) => setFilterEskul(e.target.value)}
+                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
+                    >
+                      <option value="">Semua Eskul</option>
+                      {eskulList.map(e => (
+                        <option key={e.id} value={e.id}>{e.nama}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Tingkat Kelas</span>
+                    <select
+                      value={filterKelas}
+                      onChange={(e) => setFilterKelas(e.target.value)}
+                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
+                    >
+                      <option value="">Semua Kelas</option>
+                      {KELAS_LIST.map(k => (
+                        <option key={k} value={k}>{k}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Students List Display (Right side - 2 cols on lg) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 lg:col-span-2 space-y-4">
+              <div className="flex justify-between items-center text-xs text-slate-400 font-bold uppercase tracking-wider border-b border-slate-100 pb-3">
+                <span className="font-montserrat">Daftar Siswa Terdaftar</span>
+                <span className="bg-blue-50 text-blue-800 font-black px-2.5 py-1 rounded-lg font-mono">{filteredStudents.length} baris data ditemukan</span>
               </div>
 
-              <button
-                type="submit"
-                disabled={isSavingSettings}
-                className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-              >
-                {isSavingSettings ? 'Menyimpan...' : 'Simpan Pengaturan'}
-              </button>
-            </form>
+              <div className="space-y-3 max-h-[600px] lg:max-h-[700px] overflow-y-auto pr-1">
+                {filteredStudents.map((s, idx) => {
+                  const isExpanded = expandedStudentId === s.id;
+                  return (
+                    <div key={s.id} className="border border-slate-100 rounded-2xl p-4 hover:bg-slate-50/70 hover:shadow-sm transition-all space-y-3">
+                      <div className="flex items-center gap-4">
+                        {s.photo ? (
+                          <img src={s.photo} alt="Student" className="w-12 h-14 object-cover rounded-xl border border-slate-200 bg-slate-100 shrink-0" />
+                        ) : (
+                          <div className="w-12 h-14 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center text-slate-400 font-bold text-sm shrink-0">?</div>
+                        )}
 
-            {/* Reset Database Actions Panel */}
-            <div className="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-4">
-              <h2 className="text-xs font-black text-red-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-red-200/50 pb-2">
-                <ShieldAlert className="w-5 h-5 text-red-700" />
-                Zona Bahaya (Reset Database)
-              </h2>
-              <p className="text-[10px] text-red-700 leading-normal">
-                Tindakan ini bersifat destruktif dan permanen. Pastikan Anda telah mengunduh rekap Excel terlebih dahulu sebelum melakukan pembersihan.
-              </p>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[9px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg">{s.regNo}</span>
+                            <span className="text-[9px] text-slate-400 font-bold">{new Date(s.createdAt).toLocaleDateString('id-ID')}</span>
+                          </div>
+                          <h4 className="text-sm font-bold text-slate-800 truncate mt-1 font-montserrat">{s.name.toUpperCase()}</h4>
+                          <div className="flex gap-2 text-xs text-slate-500 font-semibold mt-1">
+                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-md text-[10px]">Kelas {s.kelas}</span>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-blue-900 font-bold text-[11px] mt-0.5">
+                              {s.eskulName}{s.eskulName2 ? ` & ${s.eskulName2}` : ''}
+                            </span>
+                          </div>
+                        </div>
 
-              <div className="space-y-2.5">
+                        <button
+                          onClick={() => setExpandedStudentId(isExpanded ? null : s.id)}
+                          className={`p-2.5 rounded-xl transition-all cursor-pointer ${
+                            isExpanded ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700'
+                          }`}
+                        >
+                          <Eye className="w-4.5 h-4.5" />
+                        </button>
+                      </div>
+
+                      {/* Expanded details */}
+                      {isExpanded && (
+                        <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-700 space-y-3 animate-fadeIn">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-slate-200/50 pb-3">
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Jenis Kelamin</span>
+                              <span className="font-bold text-slate-800 text-xs">{s.jenisKelamin}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">No. HP Siswa (WhatsApp)</span>
+                              <span className="font-bold text-slate-800 font-mono text-xs">{s.hpSiswa}</span>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-slate-200/50 pb-3">
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Nama Orang Tua (Ayah / Ibu)</span>
+                              <span className="font-bold text-slate-800 text-xs">{s.namaAyah} / {s.namaIbu}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">No. HP Orang Tua (WhatsApp)</span>
+                              <span className="font-bold text-slate-800 font-mono text-xs">{s.hpOrtu}</span>
+                            </div>
+                          </div>
+
+                          {s.prestasiChecked && (
+                            <div className="bg-yellow-50/50 p-3 border border-yellow-200/70 rounded-xl text-yellow-900">
+                              <span className="text-[9px] font-black text-yellow-800 block uppercase tracking-wider">★ JALUR PRESTASI KHUSUS</span>
+                              <p className="mt-1 font-extrabold text-xs text-slate-800">{s.namaLomba} ({s.cabangLomba})</p>
+                              <p className="text-[10px] font-semibold text-slate-600 mt-0.5">Tingkat {s.tingkatLomba} | Juara {s.juaraKe} | Penyelenggara: {s.penyelenggara}</p>
+                            </div>
+                          )}
+
+                          <div>
+                            <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Alamat Lengkap Tempat Tinggal</span>
+                            <span className="font-semibold text-slate-800 leading-relaxed block mt-0.5 bg-white p-2.5 rounded-lg border border-slate-200/40">
+                              {s.alamat}, RT {s.rt}/RW {s.rw}, Kelurahan {s.kelurahanName}, Kecamatan {s.kecamatanName}, Kabupaten/Kota {s.kabupatenName}, Provinsi {s.provinsiName}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {filteredStudents.length === 0 && (
+                  <div className="text-center py-16 text-xs text-slate-400 font-semibold border border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                    Tidak ada pendaftar yang cocok dengan filter pencarian Anda.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ===================== TAB 3: PENGATURAN & DATABASE ===================== */}
+        {activeTab === 'pengaturan' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn" id="tab-app-settings">
+            
+            {/* Database Sync parameters (Left side - 2 cols on lg) */}
+            <div className="lg:col-span-2">
+              <form onSubmit={handleSaveSettings} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5">
+                <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                  <Settings className="w-4.5 h-4.5 text-blue-700" />
+                  Konfigurasi Umum & Database API
+                </h2>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN AKTIF</label>
+                  <select
+                    value={activeYearInput}
+                    onChange={(e) => setActiveYearInput(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
+                  >
+                    {TAHUN_PELAJARAN_LIST.map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                  <p className="text-[9px] text-slate-400 leading-normal">Mengatur tahun aktif pendaftaran untuk formulir publik secara instan.</p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">GOOGLE APPS SCRIPT WEB APP URL</label>
+                  <div className="relative">
+                    <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="url"
+                      value={gasUrlInput}
+                      onChange={(e) => setGasUrlInput(e.target.value)}
+                      placeholder="https://script.google.com/macros/s/.../exec"
+                      className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                    />
+                  </div>
+                  <p className="text-[9px] text-slate-400 leading-normal">
+                    Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
+                  </p>
+                </div>
+
                 <button
-                  onClick={handleResetEskulClick}
-                  className="w-full bg-white hover:bg-yellow-50 text-yellow-800 hover:text-yellow-900 border border-yellow-300 hover:border-yellow-400 text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  type="submit"
+                  disabled={isSavingSettings}
+                  className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                 >
-                  <RefreshCcw className="w-4 h-4 text-yellow-700" />
-                  Reset per Ekstrakurikuler
+                  {isSavingSettings ? 'Menyimpan...' : 'Simpan Pengaturan'}
                 </button>
+              </form>
+            </div>
 
-                <button
-                  onClick={handleResetAllDataClick}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Trash2 className="w-4 h-4 text-white animate-pulse" />
-                  Reset Seluruh Database Pendaftar
-                </button>
+            {/* Reset Database Actions (Right side - 1 col on lg) */}
+            <div className="lg:col-span-1">
+              <div className="bg-red-50/50 border border-red-200 rounded-2xl p-6 space-y-4">
+                <h2 className="text-xs font-black text-red-800 uppercase tracking-wider flex items-center gap-2 border-b border-red-200/50 pb-3">
+                  <ShieldAlert className="w-5 h-5 text-red-700" />
+                  Zona Bahaya
+                </h2>
+                <p className="text-[10px] text-red-700 leading-relaxed">
+                  Tindakan ini bersifat destruktif dan permanen. Pastikan Anda telah mengekspor rekap Excel terlebih dahulu sebelum melakukan penghapusan data.
+                </p>
+
+                <div className="space-y-3 pt-2">
+                  <button
+                    onClick={handleResetEskulClick}
+                    className="w-full bg-white hover:bg-yellow-50 text-yellow-800 hover:text-yellow-900 border border-yellow-300 hover:border-yellow-400 text-xs font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <RefreshCcw className="w-4 h-4 text-yellow-700" />
+                    Reset Per Ekstrakurikuler
+                  </button>
+
+                  <button
+                    onClick={handleResetAllDataClick}
+                    className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Trash2 className="w-4 h-4 text-white animate-pulse" />
+                    Reset Seluruh Database Pendaftar
+                  </button>
+                </div>
               </div>
             </div>
 
           </div>
         )}
-
-      </div>
-
-      {/* BOTTOM MOBILE NAVIGATION BAR */}
-      <div className="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 py-2.5 px-6 flex justify-around rounded-t-3xl shadow-lg z-20">
-        
-        {/* Nav 1: Eskul Management */}
-        <button
-          onClick={() => setActiveTab('eskul')}
-          className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${activeTab === 'eskul' ? 'text-blue-700 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          <Layers className="w-5 h-5" />
-          <span className="text-[9px] font-extrabold uppercase">Kategori Eskul</span>
-        </button>
-
-        {/* Nav 2: Reports List */}
-        <button
-          onClick={() => setActiveTab('laporan')}
-          className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${activeTab === 'laporan' ? 'text-blue-700 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          <FileText className="w-5 h-5" />
-          <span className="text-[9px] font-extrabold uppercase">Laporan</span>
-        </button>
-
-        {/* Nav 3: Settings & Resets */}
-        <button
-          onClick={() => setActiveTab('pengaturan')}
-          className={`flex flex-col items-center gap-1 transition-all cursor-pointer ${activeTab === 'pengaturan' ? 'text-blue-700 scale-105' : 'text-slate-400 hover:text-slate-600'}`}
-        >
-          <Settings className="w-5 h-5" />
-          <span className="text-[9px] font-extrabold uppercase">Pengaturan</span>
-        </button>
 
       </div>
     </div>
