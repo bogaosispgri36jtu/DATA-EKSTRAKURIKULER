@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Guru Admin - SMP PGRI Jatiuwung</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- jsPDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen pb-24 flex justify-center">
+
+    <!-- LOGIN WRAPPER -->
+    <div id="login-container" class="w-full max-w-md bg-slate-50 flex flex-col justify-center px-4 min-h-screen">
+        <div class="bg-white rounded-3xl shadow-xl p-6 border border-slate-100 text-center space-y-6">
+            <div class="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto border-2 border-blue-400 text-blue-700 text-2xl">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-black text-slate-800">Login Guru / Admin</h1>
+                <p class="text-xs text-slate-400 mt-1">Gunakan akun administrator Anda untuk mengelola eskul & rekap pendaftaran.</p>
+            </div>
+            <form id="login-form" class="space-y-4 text-left">
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">Username</label>
+                    <input type="text" id="username-input" placeholder="admin" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-blue-700" required />
+                </div>
+                <div class="space-y-1">
+                    <label class="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">Password</label>
+                    <input type="password" id="password-input" placeholder="••••••••" class="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold focus:outline-none focus:border-blue-700" required />
+                </div>
+                <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket text-yellow-300"></i>
+                    Masuk Dashboard
+                </button>
+            </form>
+            <div class="bg-yellow-50 text-yellow-800 text-[10px] font-semibold border border-yellow-200/50 p-2.5 rounded-xl flex items-start gap-1.5 text-left">
+                <i class="fa-solid fa-shield-halved text-yellow-600 mt-0.5"></i>
+                <span>Sandi Default: Gunakan <b>admin</b> dan sandi <b>admin123</b>. Terhubung dengan Sheets jika sinkronisasi aktif.</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN DASHBOARD CONTENT (HIDDEN BY DEFAULT) -->
+    <div id="dashboard-container" class="hidden w-full max-w-md bg-slate-50 flex flex-col relative min-h-screen">
+        
+        <!-- Header -->
+        <div class="bg-blue-900 text-white px-5 py-5 rounded-b-3xl shadow-md flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-yellow-400 rounded-xl flex items-center justify-center text-blue-900 text-lg font-bold shadow">
+                    <i class="fa-solid fa-chart-line"></i>
+                </div>
+                <div>
+                    <h1 class="text-sm font-extrabold tracking-wide uppercase">Dashboard Admin</h1>
+                    <p class="text-[10px] text-yellow-300 font-bold">SMP PGRI Jatiuwung</p>
+                </div>
+            </div>
+            <button id="logout-btn" class="text-[10px] bg-red-600/20 hover:bg-red-600 text-red-300 hover:text-white border border-red-500/20 py-1.5 px-3 rounded-lg font-bold transition-all">
+                Keluar
+            </button>
+        </div>
+
+        <!-- MAIN WINDOW VIEWPORT -->
+        <div class="px-3 py-4 flex-1">
+            
+            <!-- TAB 1: MANAJEMEN ESKUL -->
+            <div id="view-eskul" class="hidden space-y-4">
+                <!-- Add New Eskul Form -->
+                <form id="add-eskul-form" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
+                    <h2 class="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                        <i class="fa-solid fa-plus-circle"></i> Tambah Kategori Ekstrakurikuler
+                    </h2>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-700 block">NAMA EKSTRAKURIKULER <span class="text-red-500">*</span></label>
+                        <input type="text" id="new-eskul-name" placeholder="Hadroh, Futsal, English Club..." class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold" required />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-700 block">TAHUN PELAJARAN</label>
+                            <select id="new-eskul-year" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer"></select>
+                        </div>
+                        <div>
+                            <label class="text-[10px] font-bold text-slate-700 block">KELAS YANG DIIZINKAN</label>
+                            <div class="flex gap-2.5 pt-1.5">
+                                <label class="flex items-center gap-1 text-[11px] font-bold text-slate-600"><input type="checkbox" value="VII" checked class="class-checkbox rounded text-blue-700"> VII</label>
+                                <label class="flex items-center gap-1 text-[11px] font-bold text-slate-600"><input type="checkbox" value="VIII" checked class="class-checkbox rounded text-blue-700"> VIII</label>
+                                <label class="flex items-center gap-1 text-[11px] font-bold text-slate-600"><input type="checkbox" value="IX" checked class="class-checkbox rounded text-blue-700"> IX</label>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow-sm transition-all flex items-center justify-center gap-1.5">
+                        Tambah Ekstrakurikuler
+                    </button>
+                </form>
+
+                <!-- List of Eskuls -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4">
+                    <h2 class="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2 mb-3">
+                        <i class="fa-solid fa-list-check"></i> Daftar Kategori Ekstrakurikuler (<span id="eskul-count">0</span>)
+                    </h2>
+                    <div id="eskul-list-container" class="space-y-2.5 max-h-[300px] overflow-y-auto pr-1"></div>
+                </div>
+            </div>
+
+            <!-- TAB 2: LAPORAN PENDAFTAR -->
+            <div id="view-laporan" class="space-y-4">
+                <!-- Summary counters -->
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-blue-900 text-white rounded-2xl p-3.5 shadow-sm border border-blue-950 relative overflow-hidden">
+                        <span class="text-[9px] font-bold text-blue-300 uppercase block tracking-wider">Total Pendaftar</span>
+                        <span id="tot-pendaftar-counter" class="text-2xl font-black font-mono block mt-1">0</span>
+                        <div class="absolute right-2 bottom-2 bg-white/10 p-1.5 rounded-lg text-yellow-300"><i class="fa-solid fa-user-check"></i></div>
+                    </div>
+                    <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-100 relative overflow-hidden">
+                        <span class="text-[9px] font-bold text-slate-400 uppercase block tracking-wider font-semibold">Tahun Pelajaran</span>
+                        <span id="settings-year-indicator" class="text-md font-black font-mono text-slate-800 block mt-2">2026/2027</span>
+                    </div>
+                </div>
+
+                <!-- Print Export buttons -->
+                <div class="grid grid-cols-2 gap-3">
+                    <button onclick="printPDFReport()" class="bg-red-700 hover:bg-red-800 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-print"></i> Cetak Rekap PDF
+                    </button>
+                    <button onclick="exportExcelCSV()" class="bg-green-700 hover:bg-green-800 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-file-excel"></i> Ekspor Excel (CSV)
+                    </button>
+                </div>
+
+                <!-- Search filters -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-3">
+                    <h2 class="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                        <i class="fa-solid fa-filter"></i> Saring Data Pendaftar
+                    </h2>
+                    <div class="relative">
+                        <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                        <input type="text" id="search-input" placeholder="Cari nama atau no. registrasi..." class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs focus:outline-none" />
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <select id="filter-eskul" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer">
+                            <option value="">Semua Eskul</option>
+                        </select>
+                        <select id="filter-kelas" class="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold cursor-pointer">
+                            <option value="">Semua Kelas</option>
+                            <option value="VII-1">VII-1</option><option value="VII-2">VII-2</option><option value="VII-3">VII-3</option>
+                            <option value="VIII-1">VIII-1</option><option value="VIII-2">VIII-2</option><option value="VIII-3">VIII-3</option>
+                            <option value="IX-1">IX-1</option><option value="IX-2">IX-2</option><option value="IX-3">IX-3</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Registrants List -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-3 space-y-2.5 max-h-[380px] overflow-y-auto">
+                    <div class="flex justify-between items-center text-[10px] text-slate-400 font-bold px-1 uppercase tracking-wider border-b border-slate-50 pb-1.5">
+                        <span>Pendaftar Terdata</span>
+                        <span id="filtered-count" class="text-blue-700">0 baris data</span>
+                    </div>
+                    <div id="student-list-container" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- TAB 3: PENGATURAN RESET -->
+            <div id="view-pengaturan" class="hidden space-y-4">
+                <!-- Sync parameters -->
+                <form id="settings-form" class="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 space-y-4">
+                    <h2 class="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                        <i class="fa-solid fa-gears text-blue-700"></i> Konfigurasi Umum & Database API
+                    </h2>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-700 block">TAHUN PELAJARAN AKTIF</label>
+                        <select id="active-year-select" class="w-full px-2 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 cursor-pointer"></select>
+                    </div>
+                    <div class="space-y-1">
+                        <label class="text-[10px] font-bold text-slate-700 block">GOOGLE APPS SCRIPT WEB APP URL</label>
+                        <input type="url" id="gas-url-input" placeholder="https://script.google.com/macros/s/.../exec" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono" />
+                    </div>
+                    <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white text-xs font-bold py-2.5 px-3 rounded-lg shadow-sm">
+                        Simpan Pengaturan
+                    </button>
+                </form>
+
+                <!-- Zone reset danger -->
+                <div class="bg-red-50 border border-red-200 rounded-2xl p-4 space-y-4">
+                    <h2 class="text-xs font-black text-red-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-red-200/50 pb-2">
+                        <i class="fa-solid fa-triangle-exclamation text-red-700"></i> Zona Bahaya (Pembersihan Data)
+                    </h2>
+                    <p class="text-[10px] text-red-700 leading-normal">
+                        Prosedur ini akan menghapus data pendaftaran secara permanen. Ekspor data terlebih dahulu sebelum melakukan eksekusi!
+                    </p>
+                    <div class="space-y-2.5">
+                        <button onclick="resetByEskul()" class="w-full bg-white hover:bg-yellow-50 text-yellow-800 border border-yellow-300 text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-rotate"></i> Reset per Ekstrakurikuler
+                        </button>
+                        <button onclick="resetAllDatabase()" class="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-2.5 px-3 rounded-xl shadow-sm flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-trash-can animate-pulse"></i> Reset Seluruh Database Siswa
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- BOTTOM NAVIGATION BAR -->
+        <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-200 py-2.5 px-6 flex justify-around rounded-t-3xl shadow-lg z-20">
+            <button onclick="switchTab('eskul')" id="nav-eskul" class="flex flex-col items-center gap-1 text-slate-400">
+                <i class="fa-solid fa-layer-group text-lg"></i>
+                <span class="text-[9px] font-extrabold uppercase">Kategori Eskul</span>
+            </button>
+            <button onclick="switchTab('laporan')" id="nav-laporan" class="flex flex-col items-center gap-1 text-blue-700 scale-105">
+                <i class="fa-solid fa-file-lines text-lg"></i>
+                <span class="text-[9px] font-extrabold uppercase">Laporan</span>
+            </button>
+            <button onclick="switchTab('pengaturan')" id="nav-pengaturan" class="flex flex-col items-center gap-1 text-slate-400">
+                <i class="fa-solid fa-sliders text-lg"></i>
+                <span class="text-[9px] font-extrabold uppercase">Pengaturan</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGICS -->
+    <script>
+        // Store
+        let STUDENTS = [];
+        let ESKUL_LIST = [];
+        let SETTINGS = {
+            googleAppsScriptUrl: localStorage.getItem('smp_pgri_gas_url') || "",
+            tahunPelajaranAktif: "2026/2027",
+            adminUsername: "admin",
+            adminPassword: "admin123"
+        };
+
+        // UI tabs toggling
+        function switchTab(tab) {
+            document.getElementById("view-eskul").classList.add("hidden");
+            document.getElementById("view-laporan").classList.add("hidden");
+            document.getElementById("view-pengaturan").classList.add("hidden");
+            
+            document.getElementById("nav-eskul").className = "flex flex-col items-center gap-1 text-slate-400";
+            document.getElementById("nav-laporan").className = "flex flex-col items-center gap-1 text-slate-400";
+            document.getElementById("nav-pengaturan").className = "flex flex-col items-center gap-1 text-slate-400";
+
+            if (tab === 'eskul') {
+                document.getElementById("view-eskul").classList.remove("hidden");
+                document.getElementById("nav-eskul").className = "flex flex-col items-center gap-1 text-blue-700 scale-105 font-bold";
+            } else if (tab === 'laporan') {
+                document.getElementById("view-laporan").classList.remove("hidden");
+                document.getElementById("nav-laporan").className = "flex flex-col items-center gap-1 text-blue-700 scale-105 font-bold";
+            } else if (tab === 'pengaturan') {
+                document.getElementById("view-pengaturan").classList.remove("hidden");
+                document.getElementById("nav-pengaturan").className = "flex flex-col items-center gap-1 text-blue-700 scale-105 font-bold";
+            }
+        }
+
+        // On Load Page
+        document.addEventListener("DOMContentLoaded", () => {
+            // Generate Year Selector options up to 10 years ahead
+            const yearSelect = document.getElementById("active-year-select");
+            const newYearSelect = document.getElementById("new-eskul-year");
+            const startY = 2025;
+            for(let i=0; i<11; i++) {
+                const optStr = `${startY+i}/${startY+i+1}`;
+                yearSelect.innerHTML += `<option value="${optStr}">${optStr}</option>`;
+                newYearSelect.innerHTML += `<option value="${optStr}">${optStr}</option>`;
+            }
+
+            // Sync from localStorage if present
+            document.getElementById("gas-url-input").value = SETTINGS.googleAppsScriptUrl;
+            
+            // Trigger login or read
+            loadStoredMockData();
+        });
+
+        // Simple auth
+        document.getElementById("login-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const u = document.getElementById("username-input").value;
+            const p = document.getElementById("password-input").value;
+
+            if (u === SETTINGS.adminUsername && p === SETTINGS.adminPassword) {
+                document.getElementById("login-container").classList.add("hidden");
+                document.getElementById("dashboard-container").classList.remove("hidden");
+                loadDatabase();
+                Swal.fire({ icon: 'success', title: 'Login Berhasil', timer: 1200, showConfirmButton: false });
+            } else {
+                Swal.fire({ icon: 'error', title: 'Kredensial Salah', text: 'Username atau password ditolak!' });
+            }
+        });
+
+        document.getElementById("logout-btn").addEventListener("click", () => {
+            document.getElementById("login-container").classList.remove("hidden");
+            document.getElementById("dashboard-container").classList.add("hidden");
+            document.getElementById("password-input").value = "";
+        });
+
+        // Load DB from Storage or Sheets
+        async function loadDatabase() {
+            if (SETTINGS.googleAppsScriptUrl) {
+                try {
+                    const res = await fetch(`${SETTINGS.googleAppsScriptUrl}?action=getData`);
+                    const json = await res.json();
+                    if (json.status === "success") {
+                        STUDENTS = json.students || [];
+                        ESKUL_LIST = json.eskul || [];
+                        SETTINGS.tahunPelajaranAktif = json.settings.tahunPelajaranAktif;
+                        
+                        document.getElementById("settings-year-indicator").innerText = SETTINGS.tahunPelajaranAktif;
+                        document.getElementById("active-year-select").value = SETTINGS.tahunPelajaranAktif;
+                        renderAll();
+                        return;
+                    }
+                } catch (e) {
+                    console.warn("GAS Connection offline, falling back to offline LocalStorage.");
+                }
+            }
+            loadStoredMockData();
+            renderAll();
+        }
+
+        function loadStoredMockData() {
+            STUDENTS = JSON.parse(localStorage.getItem('smp_pgri_students') || "[]");
+            ESKUL_LIST = JSON.parse(localStorage.getItem('smp_pgri_eskul') || "[]");
+            renderAll();
+        }
+
+        function renderAll() {
+            // Summary
+            document.getElementById("tot-pendaftar-counter").innerText = STUDENTS.filter(s => s.tahunPelajaran === SETTINGS.tahunPelajaranAktif).length;
+            
+            // Dropdowns
+            const fEskul = document.getElementById("filter-eskul");
+            fEskul.innerHTML = '<option value="">Semua Eskul</option>';
+            ESKUL_LIST.forEach(e => {
+                fEskul.innerHTML += `<option value="${e.id}">${e.nama}</option>`;
+            });
+
+            // List Eskul Management
+            document.getElementById("eskul-count").innerText = ESKUL_LIST.length;
+            const eskulCont = document.getElementById("eskul-list-container");
+            eskulCont.innerHTML = "";
+            ESKUL_LIST.forEach(e => {
+                const studCount = STUDENTS.filter(s => s.eskulId === e.id).length;
+                eskulCont.innerHTML += `
+                    <div class="flex items-center justify-between border border-slate-100 p-3 rounded-xl hover:bg-slate-50 transition-all">
+                        <div>
+                            <h4 class="text-xs font-bold text-slate-800">${e.nama}</h4>
+                            <div class="flex gap-1.5 mt-1 text-[9px] font-bold text-slate-400">
+                                <span class="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase">Kelas: ${e.kelasAllowed.join(', ')}</span>
+                                <span class="bg-yellow-400/10 text-yellow-800 px-1.5 py-0.5 rounded">${e.tahunPelajaran}</span>
+                                <span class="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">${studCount} pendaftar</span>
+                            </div>
+                        </div>
+                        <button onclick="deleteEskul('${e.id}', '${e.nama}')" class="text-red-500 hover:text-red-700 p-1.5 rounded-lg bg-red-50 hover:bg-red-100 transition-all">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                `;
+            });
+
+            renderStudentList();
+        }
+
+        // Render Student registrations
+        function renderStudentList() {
+            const search = document.getElementById("search-input").value.toLowerCase();
+            const filterEs = document.getElementById("filter-eskul").value;
+            const filterKl = document.getElementById("filter-kelas").value;
+
+            const filtered = STUDENTS.filter(s => {
+                const matchSearch = s.name.toLowerCase().includes(search) || s.regNo.toLowerCase().includes(search);
+                const matchEs = filterEs ? s.eskulId === filterEs : true;
+                const matchKl = filterKl ? s.kelas === filterKl : true;
+                return matchSearch && matchEs && matchKl;
+            });
+
+            document.getElementById("filtered-count").innerText = `${filtered.length} baris data`;
+
+            const listCont = document.getElementById("student-list-container");
+            listCont.innerHTML = "";
+            filtered.forEach(s => {
+                listCont.innerHTML += `
+                    <div class="border border-slate-100 rounded-xl p-3 hover:bg-slate-50 transition-all space-y-2">
+                        <div class="flex items-center gap-3">
+                            <img src="${s.photo || 'https://via.placeholder.com/40'}" class="w-10 h-12 object-cover rounded-lg border border-slate-200" />
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[9px] font-mono font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded">${s.regNo}</span>
+                                    <span class="text-[8px] text-slate-400 font-semibold">${new Date(s.createdAt).toLocaleDateString('id-ID')}</span>
+                                </div>
+                                <h4 class="text-xs font-bold text-slate-800 truncate mt-0.5">${s.name.toUpperCase()}</h4>
+                                <div class="flex gap-2 text-[9px] text-slate-500 font-semibold mt-0.5">
+                                    <span>Kelas ${s.kelas}</span>
+                                    <span>•</span>
+                                    <span class="text-blue-900 font-bold">${s.eskulName}</span>
+                                </div>
+                            </div>
+                            <button onclick="toggleRowExpand('${s.id}')" class="p-1 hover:bg-slate-200 rounded-lg text-slate-500">
+                                <i class="fa-solid fa-eye"></i>
+                            </button>
+                        </div>
+                        
+                        <div id="expand-${s.id}" class="hidden bg-slate-50 p-3 rounded-lg border border-slate-100 text-[11px] text-slate-700 space-y-2">
+                            <p><b>Jenis Kelamin:</b> ${s.jenisKelamin}</p>
+                            <p><b>HP Siswa (WA):</b> ${s.hpSiswa}</p>
+                            <p><b>Orang Tua (Ayah / Ibu):</b> ${s.namaAyah} / ${s.namaIbu}</p>
+                            <p><b>HP Orang Tua (WA):</b> ${s.hpOrtu}</p>
+                            <p><b>Alamat:</b> ${s.alamat}, RT ${s.rt}/RW ${s.rw}, Kel. ${s.kelurahanName}, Kec. ${s.kecamatanName}, Banten</p>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (filtered.length === 0) {
+                listCont.innerHTML = `
+                    <div class="text-center py-10 text-xs text-slate-400 font-medium border border-dashed border-slate-200 rounded-xl">
+                        Tidak ada pendaftar yang cocok.
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById("search-input").addEventListener("input", renderStudentList);
+        document.getElementById("filter-eskul").addEventListener("change", renderStudentList);
+        document.getElementById("filter-kelas").addEventListener("change", renderStudentList);
+
+        function toggleRowExpand(id) {
+            const row = document.getElementById(`expand-${id}`);
+            if (row.classList.contains("hidden")) {
+                row.classList.remove("hidden");
+            } else {
+                row.classList.add("hidden");
+            }
+        }
+
+        // Add Eskul Category
+        document.getElementById("add-eskul-form").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const name = document.getElementById("new-eskul-name").value;
+            const year = document.getElementById("new-eskul-year").value;
+            
+            const checks = document.querySelectorAll(".class-checkbox:checked");
+            const classes = Array.from(checks).map(c => c.value);
+
+            if (classes.length === 0) {
+                Swal.fire("Pilih Kelas!", "Pilih tingkat kelas yang diizinkan pendaftaran.", "warning");
+                return;
+            }
+
+            const newEskul = {
+                id: `eskul-${Math.random().toString(36).substr(2, 9)}`,
+                nama: name,
+                kelasAllowed: classes,
+                tahunPelajaran: year
+            };
+
+            if (SETTINGS.googleAppsScriptUrl) {
+                try {
+                    await fetch(SETTINGS.googleAppsScriptUrl, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ action: "addEskul", data: newEskul })
+                    });
+                } catch(err) {
+                    console.error(err);
+                }
+            }
+
+            ESKUL_LIST.unshift(newEskul);
+            localStorage.setItem("smp_pgri_eskul", JSON.stringify(ESKUL_LIST));
+            document.getElementById("new-eskul-name").value = "";
+            renderAll();
+            Swal.fire("Kategori Ditambahkan", "Ekstrakurikuler berhasil tersimpan.", "success");
+        });
+
+        // Delete Eskul
+        async function deleteEskul(id, name) {
+            const confirm = await Swal.fire({
+                title: 'Hapus Eskul?',
+                html: `Apakah Anda yakin ingin menghapus <b>${name}</b>? Tindakan ini tidak bisa dibatalkan.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33'
+            });
+
+            if (confirm.isConfirmed) {
+                if (SETTINGS.googleAppsScriptUrl) {
+                    try {
+                        await fetch(SETTINGS.googleAppsScriptUrl, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ action: "deleteEskul", id })
+                        });
+                    } catch(err) {
+                        console.error(err);
+                    }
+                }
+                ESKUL_LIST = ESKUL_LIST.filter(e => e.id !== id);
+                localStorage.setItem("smp_pgri_eskul", JSON.stringify(ESKUL_LIST));
+                renderAll();
+                Swal.fire("Terhapus!", "Eskul telah dibersihkan.", "success");
+            }
+        }
+
+        // Settings save
+        document.getElementById("settings-form").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const url = document.getElementById("gas-url-input").value;
+            const year = document.getElementById("active-year-select").value;
+
+            SETTINGS.googleAppsScriptUrl = url;
+            SETTINGS.tahunPelajaranAktif = year;
+
+            localStorage.setItem('smp_pgri_gas_url', url);
+            localStorage.setItem('smp_pgri_settings', JSON.stringify(SETTINGS));
+            
+            loadDatabase();
+            Swal.fire("Pengaturan Tersimpan", "Tahun aktif & API tersinkronisasi.", "success");
+        });
+
+        // Resets
+        async function resetByEskul() {
+            if (ESKUL_LIST.length === 0) return;
+            
+            // Map eskul options
+            let options = {};
+            ESKUL_LIST.forEach(e => {
+                options[e.id] = e.nama;
+            });
+
+            const { value: selectedEskulId } = await Swal.fire({
+                title: 'Reset per Ekstrakurikuler',
+                input: 'select',
+                inputOptions: options,
+                inputPlaceholder: 'Pilih Ekstrakurikuler...',
+                showCancelButton: true
+            });
+
+            if (selectedEskulId) {
+                const confirm = await Swal.fire({
+                    title: 'Konfirmasi Penghapusan',
+                    text: 'Seluruh siswa terdaftar di eskul ini akan dibersihkan secara permanen. Lanjutkan?',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444'
+                });
+
+                if (confirm.isConfirmed) {
+                    if (SETTINGS.googleAppsScriptUrl) {
+                        try {
+                            await fetch(SETTINGS.googleAppsScriptUrl, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "resetEskulStudents", eskulId: selectedEskulId })
+                            });
+                        } catch(e) {}
+                    }
+                    STUDENTS = STUDENTS.filter(s => s.eskulId !== selectedEskulId);
+                    localStorage.setItem("smp_pgri_students", JSON.stringify(STUDENTS));
+                    renderAll();
+                    Swal.fire("Berhasil direset!", "", "success");
+                }
+            }
+        }
+
+        async function resetAllDatabase() {
+            const conf1 = await Swal.fire({
+                title: 'Kosongkan Seluruh Pendaftar?',
+                text: 'Tindakan ini akan menghapus seluruh data siswa di semua kategori eskul selamanya!',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ef4444'
+            });
+
+            if (conf1.isConfirmed) {
+                const conf2 = await Swal.fire({
+                    title: 'Verifikasi Ganda',
+                    text: 'Ketik "RESET" untuk mengeksekusi pembersihan database:',
+                    input: 'text',
+                    showCancelButton: true,
+                    inputValidator: (v) => { if (v !== 'RESET') return 'Salah!'; }
+                });
+
+                if (conf2.value === 'RESET') {
+                    if (SETTINGS.googleAppsScriptUrl) {
+                        try {
+                            await fetch(SETTINGS.googleAppsScriptUrl, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ action: "resetAllData" })
+                            });
+                        } catch(e) {}
+                    }
+                    STUDENTS = [];
+                    localStorage.setItem("smp_pgri_students", JSON.stringify([]));
+                    renderAll();
+                    Swal.fire("Database Bersih!", "Semua data pendaftar siswa telah dikosongkan.", "success");
+                }
+            }
+        }
+
+        // Export CSV/Excel
+        function exportExcelCSV() {
+            if (STUDENTS.length === 0) return;
+            const headers = ['No Registrasi', 'Nama Lengkap', 'Kelas', 'Gender', 'Pilihan Eskul', 'Tahun Pelajaran', 'HP Siswa', 'Alamat'];
+            let csvContent = '\ufeff' + headers.join(',') + '\n';
+            STUDENTS.forEach(s => {
+                const row = [s.regNo, s.name, s.kelas, s.jenisKelamin, s.eskulName, s.tahunPelajaran, s.hpSiswa, `${s.alamat} Kel ${s.kelurahanName}`];
+                csvContent += row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',') + '\n';
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = `LAPORAN_REKAPITULASI_ESKUL_${SETTINGS.tahunPelajaranAktif.replace(/\//g,'-')}.csv`;
+            link.click();
+        }
+
+        // Print Rekapitulasi PDF
+        function printPDFReport() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(14);
+            doc.setTextColor(29, 78, 216);
+            doc.text('SMP PGRI JATIUWUNG TANGERANG', 105, 15, { align: 'center' });
+            doc.setFontSize(10);
+            doc.setTextColor(107, 114, 128);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER`, 105, 20, { align: 'center' });
+            doc.text(`Tahun Pelajaran: ${SETTINGS.tahunPelajaranAktif}`, 105, 25, { align: 'center' });
+
+            doc.setDrawColor(29, 78, 216);
+            doc.line(15, 28, 195, 28);
+
+            doc.setFont('helvetica', 'bold');
+            doc.text('REKAP BULANAN JUMLAH SISWA DAFTAR PER ESKUL:', 15, 38);
+
+            let currentY = 46;
+            doc.setFillColor(243, 244, 246);
+            doc.rect(15, currentY, 180, 8, 'F');
+            doc.setFontSize(9);
+            doc.setTextColor(55, 65, 81);
+            doc.text('No', 18, currentY + 5.5);
+            doc.text('Nama Ekstrakurikuler', 35, currentY + 5.5);
+            doc.text('Jumlah Peserta Terdaftar', 150, currentY + 5.5);
+            doc.line(15, currentY, 195, currentY);
+            doc.line(15, currentY + 8, 195, currentY + 8);
+            currentY += 8;
+
+            let no = 1;
+            let total = 0;
+            ESKUL_LIST.forEach(e => {
+                const count = STUDENTS.filter(s => s.eskulId === e.id).length;
+                total += count;
+                doc.setFont('helvetica', 'normal');
+                doc.text(String(no++), 18, currentY + 5);
+                doc.text(e.nama, 35, currentY + 5);
+                doc.setFont('helvetica', 'bold');
+                doc.text(`${count} Siswa`, 150, currentY + 5);
+                doc.line(15, currentY + 7, 195, currentY + 7);
+                currentY += 7;
+            });
+
+            // Grand Total row
+            doc.setFillColor(239, 246, 255);
+            doc.rect(15, currentY, 180, 8, 'F');
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(29, 78, 216);
+            doc.text('GRAND TOTAL SELURUH PESERTA', 35, currentY + 5.5);
+            doc.text(`${total} Siswa`, 150, currentY + 5.5);
+            doc.line(15, currentY + 8, 195, currentY + 8);
+
+            // Stamp signature
+            const sigY = currentY + 25;
+            doc.setFont('helvetica', 'normal');
+            doc.setTextColor(55, 65, 81);
+            doc.text('Mengetahui,', 160, sigY, { align: 'center' });
+            doc.setFont('helvetica', 'bold');
+            doc.text('Panitia Penerimaan Eskul', 160, sigY + 5, { align: 'center' });
+            doc.line(130, sigY + 30, 190, sigY + 30);
+
+            doc.save('REKAP_TOTAL_PENDAFTARAN.pdf');
+        }
+    </script>
+</body>
+</html>

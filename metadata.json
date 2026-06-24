@@ -1,0 +1,6 @@
+{
+  "name": "Eskul SMP PGRI Jatiuwung",
+  "description": "Website pendaftaran ekstrakurikuler berbasis mobile-first untuk SMP PGRI Jatiuwung dengan backend Google Sheets dan Apps Script.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
