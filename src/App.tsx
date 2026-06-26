@@ -137,6 +137,32 @@ export default function App() {
 
   const handlePopupLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!loginUsername.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Opss ....',
+        text: 'Username wajib diisi!',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        width: '340px'
+      });
+      return;
+    }
+
+    if (!loginPassword.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Opss ....',
+        text: 'Password wajib diisi!',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        width: '340px'
+      });
+      return;
+    }
+
     if (loginUsername === settings.adminUsername && loginPassword === settings.adminPassword) {
       setIsAdminLoggedIn(true);
       setActiveView('admin');
@@ -145,17 +171,23 @@ export default function App() {
       setLoginPassword('');
       Swal.fire({
         icon: 'success',
+        iconColor: '#10b981',
         title: 'Login Berhasil',
         text: 'Selamat datang di Dashboard Admin SMP PGRI Jatiuwung.',
-        timer: 1500,
-        showConfirmButton: false
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        width: '340px'
       });
     } else {
       Swal.fire({
         icon: 'error',
         title: 'Akses Ditolak',
         text: 'Username atau password yang Anda masukkan salah!',
-        confirmButtonColor: '#ef4444'
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false,
+        width: '340px'
       });
     }
   };
@@ -574,7 +606,7 @@ export default function App() {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handlePopupLoginSubmit} className="p-4 space-y-3.5">
+            <form onSubmit={handlePopupLoginSubmit} noValidate className="p-4 space-y-3.5">
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-slate-600 uppercase tracking-wider block">Username</label>
                 <input
@@ -583,7 +615,6 @@ export default function App() {
                   onChange={(e) => setLoginUsername(e.target.value)}
                   placeholder="admin"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
-                  required
                 />
               </div>
 
@@ -596,7 +627,6 @@ export default function App() {
                     onChange={(e) => setLoginPassword(e.target.value)}
                     placeholder="••••••••"
                     className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
-                    required
                   />
                   <button
                     type="button"

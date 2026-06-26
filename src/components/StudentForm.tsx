@@ -93,6 +93,34 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   const fileInputRef = useRef<HTMLInputElement>(null);
   const certInputRef = useRef<HTMLInputElement>(null);
 
+  // Dynamic class list derived from extracurriculars created by teacher/admin
+  const dynamicKelasList = React.useMemo(() => {
+    // Filter active extracurriculars for the current active school year
+    const activeEskuls = eskulList.filter(e => e.tahunPelajaran === tahunPelajaranAktif);
+    // Use the filtered active ones, or fall back to all extracurriculars if none matches
+    const targetEskuls = activeEskuls.length > 0 ? activeEskuls : eskulList;
+    
+    const classesSet = new Set<string>();
+    targetEskuls.forEach(eskul => {
+      if (Array.isArray(eskul.kelasAllowed)) {
+        eskul.kelasAllowed.forEach(k => {
+          if (k && k.trim()) {
+            classesSet.add(k.trim().toUpperCase());
+          }
+        });
+      }
+    });
+
+    const sortedList = Array.from(classesSet);
+    if (sortedList.length === 0) {
+      // Fallback if no classes are defined yet by the teacher
+      return KELAS_LIST;
+    }
+
+    // Sort alphanumeric order nicely (e.g. VII, VIII, IX or 7A, 7B, 8A etc)
+    return sortedList.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [eskulList, tahunPelajaranAktif]);
+
   // Load Provinces on mount
   useEffect(() => {
     async function loadProvinces() {
@@ -189,6 +217,34 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith('image/')) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Format File Salah',
+        text: 'Harap unggah file foto dalam format gambar (JPG/JPEG/PNG).',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px',
+        timer: 5000,
+        timerProgressBar: true
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'File Terlalu Besar',
+        text: 'Maksimal ukuran file pas foto untuk kompresi adalah 5MB.',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px',
+        timer: 5000,
+        timerProgressBar: true
+      });
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      return;
+    }
+
     setOriginalPhotoSize(Math.round(file.size / 1024));
     setIsCompressing(true);
 
@@ -266,7 +322,9 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         title: 'Format File Tidak Didukung',
         text: 'Harap unggah file sertifikat dalam format JPG/JPEG/PNG atau PDF.',
         confirmButtonColor: '#1d4ed8',
-        width: '360px'
+        width: '360px',
+        timer: 5000,
+        timerProgressBar: true
       });
       return;
     }
@@ -278,7 +336,9 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         title: 'Ukuran File Terlalu Besar',
         text: 'Maksimal ukuran file sertifikat adalah 2MB.',
         confirmButtonColor: '#1d4ed8',
-        width: '360px'
+        width: '360px',
+        timer: 5000,
+        timerProgressBar: true
       });
       return;
     }
@@ -359,23 +419,72 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   // Submit Handler with SweetAlert2
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isFormValid()) {
-      if (email.trim() && !email.trim().toLowerCase().endsWith('@gmail.com')) {
+    
+    // Detailed validation to show exact missing / incorrect fields using SweetAlert2
+    const missing: string[] = [];
+    
+    if (!name.trim()) missing.push('Nama Lengkap');
+    if (!photo) missing.push('Pas Foto');
+    if (!kelas) missing.push('Kelas');
+    if (!jenisKelamin) missing.push('Jenis Kelamin');
+    if (!email.trim()) {
+      missing.push('Email Siswa');
+    } else if (!email.trim().toLowerCase().endsWith('@gmail.com')) {
+      missing.push('Email harus @gmail.com');
+    }
+    if (!namaAyah.trim()) missing.push('Nama Ayah');
+    if (!namaIbu.trim()) missing.push('Nama Ibu');
+    if (!hpSiswa.trim()) missing.push('No. HP Siswa');
+    if (!hpOrtu.trim()) missing.push('No. HP Ortu');
+    if (!alamat.trim()) missing.push('Alamat Lengkap');
+    if (!rt.trim()) missing.push('RT');
+    if (!rw.trim()) missing.push('RW');
+    if (!selectedProvinsi) missing.push('Provinsi');
+    if (!selectedKabupaten) missing.push('Kota/Kabupaten');
+    if (!selectedKecamatan) missing.push('Kecamatan');
+    if (!selectedKelurahan) missing.push('Kelurahan/Desa');
+    if (!selectedEskul) missing.push('Pilihan Eskul 1');
+
+    if (hasAchievements) {
+      if (!namaLomba.trim()) missing.push('Nama Lomba');
+      if (!cabangLomba.trim()) missing.push('Cabang Lomba');
+      if (!tingkatLomba) missing.push('Tingkat Lomba');
+      if (!juaraKe) missing.push('Juara Ke');
+      if (!penyelenggara.trim()) missing.push('Penyelenggara');
+    }
+
+    if (missing.length > 0) {
+      const isEmailOnlyError = missing.length === 1 && missing[0] === 'Email harus @gmail.com';
+      if (isEmailOnlyError) {
         Swal.fire({
           icon: 'warning',
-          title: 'Email Harus @gmail.com',
+          title: 'Format Email Salah',
           text: 'Harap gunakan alamat email aktif yang berakhiran @gmail.com.',
           confirmButtonColor: '#1d4ed8',
-          width: '360px'
+          width: '340px',
+          timer: 5000,
+          timerProgressBar: true
         });
         return;
       }
+
+      const formattedList = missing.map(item => `<span class="inline-block bg-red-50 text-red-700 text-[10px] font-semibold px-2 py-1 rounded-md border border-red-100">${item}</span>`).join(' ');
       Swal.fire({
         icon: 'warning',
-        title: 'Formulir Belum Lengkap',
-        text: 'Silakan isi semua kolom wajib (*) yang ditandai.',
+        title: 'Form Belum Lengkap',
+        html: `
+          <div class="text-left text-[11px] text-slate-600 space-y-2">
+            <p class="font-bold text-slate-700">Silakan isi / lengkapi kolom wajib berikut:</p>
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              ${formattedList}
+            </div>
+            <p class="text-[9px] text-slate-400 italic pt-1 text-right">Pemberitahuan ini akan menutup otomatis dalam 5 detik.</p>
+          </div>
+        `,
         confirmButtonColor: '#1d4ed8',
-        width: '360px'
+        width: '340px',
+        timer: 5000,
+        timerProgressBar: true
       });
       return;
     }
@@ -852,10 +961,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
         <div className="max-w-4xl mx-auto flex flex-col items-center justify-center text-center gap-2 relative z-10">
           <div className="flex flex-col items-center text-center">
             <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-wide leading-tight">SMP PGRI JATIUWUNG</h1>
-            <div className="text-xs sm:text-sm md:text-base text-yellow-300 font-extrabold tracking-wide mt-1 flex flex-col sm:flex-row sm:items-center sm:justify-center sm:gap-2">
-              <span>Jl. Gatot Subroto KM. 5 No. 4 Kec. Jatiuwung</span>
-              <span className="hidden sm:inline">•</span>
-              <span>Kota Tangerang</span>
+            <div className="text-xs sm:text-sm md:text-base text-yellow-300 font-bold tracking-wider mt-1">
+              Pendaftaran Ekstrakurikuler
             </div>
             <p className="text-xs sm:text-sm text-blue-200 font-extrabold tracking-wider uppercase mt-1.5 bg-blue-950/40 px-3.5 py-1 rounded-full">
               Tahun Pelajaran: <span className="text-yellow-300 font-mono font-black">{tahunPelajaranAktif}</span>
@@ -866,7 +973,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
 
       {/* Main Registration Form */}
       <div className="max-w-3xl mx-auto px-3 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
-        <form onSubmit={handleSubmit} className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-5 md:p-6 space-y-3.5 sm:space-y-4 md:space-y-5 border border-slate-100">
+        <form onSubmit={handleSubmit} noValidate className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-5 md:p-6 space-y-3.5 sm:space-y-4 md:space-y-5 border border-slate-100">
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4.5 items-start">
             
@@ -963,7 +1070,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       required
                     >
                       <option value="">Pilih...</option>
-                      {KELAS_LIST.map(k => (
+                      {dynamicKelasList.map(k => (
                         <option key={k} value={k}>{k}</option>
                       ))}
                     </select>

@@ -82,13 +82,42 @@ export default function AdminDashboard({
   // Login Handler
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Form Belum Lengkap',
+        text: 'Username wajib diisi!',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
+      return;
+    }
+    if (!password.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Form Belum Lengkap',
+        text: 'Password wajib diisi!',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
+      return;
+    }
+
     if (username === settings.adminUsername && password === settings.adminPassword) {
       setIsLoggedIn(true);
       Swal.fire({
         icon: 'success',
+        iconColor: '#10b981', // Emerald green
         title: 'Login Berhasil',
         text: 'Selamat datang di Dashboard Admin.',
-        timer: 1500,
+        timer: 2000,
+        timerProgressBar: true,
         showConfirmButton: false,
         width: '340px'
       });
@@ -98,7 +127,10 @@ export default function AdminDashboard({
         title: 'Akses Ditolak',
         text: 'Username atau password salah!',
         confirmButtonColor: '#ef4444',
-        width: '340px'
+        width: '340px',
+        timer: 2000,
+        timerProgressBar: true,
+        showConfirmButton: false
       });
     }
   };
@@ -107,7 +139,14 @@ export default function AdminDashboard({
   const handleAddEskulSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newEskulNama.trim() === '') {
-      Swal.fire({ icon: 'warning', title: 'Nama Eskul Wajib diisi', confirmButtonColor: '#1d4ed8', width: '340px' });
+      Swal.fire({
+        icon: 'warning',
+        title: 'Nama Eskul Wajib diisi',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px',
+        timer: 5000,
+        timerProgressBar: true
+      });
       return;
     }
 
@@ -121,7 +160,9 @@ export default function AdminDashboard({
         title: 'Kelas Wajib Diisi', 
         text: 'Masukkan minimal satu kelas (misal: 7.A atau VII).',
         confirmButtonColor: '#1d4ed8',
-        width: '340px'
+        width: '340px',
+        timer: 5000,
+        timerProgressBar: true
       });
       return;
     }
@@ -140,7 +181,15 @@ export default function AdminDashboard({
         width: '340px'
       });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Gagal Menambahkan', text: 'Koneksi API bermasalah.', confirmButtonColor: '#ef4444', width: '340px' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Menambahkan',
+        text: 'Koneksi API bermasalah.',
+        confirmButtonColor: '#ef4444',
+        width: '340px',
+        timer: 5000,
+        timerProgressBar: true
+      });
     } finally {
       setIsAddingEskul(false);
     }
@@ -572,6 +621,19 @@ export default function AdminDashboard({
     setIsSavingSettings(true);
     
     let targetUrl = gasUrlInput ? gasUrlInput.trim() : '';
+    
+    if (targetUrl !== '' && !targetUrl.startsWith('https://script.google.com/')) {
+      Swal.fire({
+        icon: 'error',
+        title: 'URL Tidak Valid',
+        text: 'Format Google Apps Script URL harus dimulai dengan "https://script.google.com/".',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+      setIsSavingSettings(false);
+      return;
+    }
+
     let wasDevUrl = false;
     if (targetUrl.endsWith('/dev')) {
       targetUrl = targetUrl.substring(0, targetUrl.length - 4) + '/exec';
@@ -624,7 +686,7 @@ export default function AdminDashboard({
             <p className="text-xs text-slate-500 font-semibold mt-1">Hanya Guru yang dapat masuk.</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-4 text-left">
+          <form onSubmit={handleLogin} noValidate className="space-y-4 text-left">
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">Username</label>
               <input
@@ -633,7 +695,6 @@ export default function AdminDashboard({
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="admin"
                 className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-700 font-semibold"
-                required
               />
             </div>
 
@@ -646,7 +707,6 @@ export default function AdminDashboard({
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-700 font-semibold"
-                  required
                 />
                 <button
                   type="button"
@@ -771,7 +831,7 @@ export default function AdminDashboard({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn" id="tab-eskul-management">
             
             {/* Form Add New (Left side - 1 col on lg) */}
-            <form onSubmit={handleAddEskulSubmit} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 space-y-4 lg:col-span-1">
+            <form onSubmit={handleAddEskulSubmit} noValidate className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 space-y-4 lg:col-span-1">
               <h2 className="text-[11px] sm:text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
                 <Plus className="w-4 sm:w-4.5 h-4 sm:h-4.5 text-blue-700" />
                 Tambah Ekstrakurikuler Baru
@@ -1086,7 +1146,7 @@ export default function AdminDashboard({
             
             {/* Database Sync parameters (Left side - 2 cols on lg) */}
             <div className="lg:col-span-2">
-              <form onSubmit={handleSaveSettings} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5">
+              <form onSubmit={handleSaveSettings} noValidate className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5">
                 <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
                   <Settings className="w-4.5 h-4.5 text-blue-700" />
                   Konfigurasi Umum & Database API
