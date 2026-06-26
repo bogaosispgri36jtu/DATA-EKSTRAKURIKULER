@@ -13,7 +13,6 @@ import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
 import { Student, Extracurricular } from '../types';
 import { 
-  KELAS_LIST, 
   fetchProvinces, 
   fetchKabupaten, 
   fetchKecamatan, 
@@ -113,8 +112,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
     const sortedList = Array.from(classesSet);
     if (sortedList.length === 0) {
-      // Fallback if no classes are defined yet by the teacher
-      return KELAS_LIST;
+      return [];
     }
 
     // Sort alphanumeric order nicely (e.g. VII, VIII, IX or 7A, 7B, 8A etc)
@@ -1537,7 +1535,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               )}
             </button>
             <p className="text-[8px] sm:text-[9px] text-slate-400 text-center mt-2 font-semibold leading-normal max-w-sm mx-auto">
-              Dengan mengirim pendaftaran, Anda menyatakan bahwa data di atas diisi dengan jujur, benar, dan bersedia mengikuti seluruh kegiatan esktrakurikuller SMP SMP PGRI Jatiuwung.
+              Dengan mengirim pendaftaran, Anda menyatakan bahwa data di atas diisi dengan jujur, benar, dan bersedia mengikuti seluruh kegiatan esktrakurikuller SMP PGRI Jatiuwung.
             </p>
           </div>
         </form>

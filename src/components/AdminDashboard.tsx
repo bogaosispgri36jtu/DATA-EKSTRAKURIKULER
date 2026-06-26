@@ -12,7 +12,7 @@ import {
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import { Student, Extracurricular, AppSettings } from '../types';
-import { TAHUN_PELAJARAN_LIST, KELAS_LIST } from '../data';
+import { TAHUN_PELAJARAN_LIST } from '../data';
 
 interface AdminDashboardProps {
   students: Student[];
@@ -220,6 +220,22 @@ export default function AdminDashboard({
       }
     }
   };
+
+  // Dynamic list of classes derived from active extracurriculars
+  const dynamicKelasList = React.useMemo(() => {
+    const classesSet = new Set<string>();
+    eskulList.forEach(eskul => {
+      if (Array.isArray(eskul.kelasAllowed)) {
+        eskul.kelasAllowed.forEach(k => {
+          if (k && k.trim() !== '') {
+            classesSet.add(k.trim());
+          }
+        });
+      }
+    });
+    const sortedList = Array.from(classesSet);
+    return sortedList.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+  }, [eskulList]);
 
   // Filter students based on query
   const filteredStudents = students.filter(student => {
@@ -749,7 +765,7 @@ export default function AdminDashboard({
           </div>
         </div>
         <div className="flex items-center gap-3.5 self-stretch sm:self-auto justify-between sm:justify-end">
-          <div className="text-right sm:block hidden">
+          <div className="text-left sm:text-right block">
             <span className="text-[9px] text-slate-400 font-bold block uppercase leading-none">Status Database</span>
             {isLive ? (
               <span className="text-xs text-green-400 font-black flex items-center gap-1.5 mt-1 leading-none">
@@ -995,7 +1011,7 @@ export default function AdminDashboard({
                     <select
                       value={filterEskul}
                       onChange={(e) => setFilterEskul(e.target.value)}
-                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
+                      className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
                     >
                       <option value="">Semua Eskul</option>
                       {eskulList.map(e => (
@@ -1009,10 +1025,10 @@ export default function AdminDashboard({
                     <select
                       value={filterKelas}
                       onChange={(e) => setFilterKelas(e.target.value)}
-                      className="w-full px-2 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
+                      className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
                     >
                       <option value="">Semua Kelas</option>
-                      {KELAS_LIST.map(k => (
+                      {dynamicKelasList.map(k => (
                         <option key={k} value={k}>{k}</option>
                       ))}
                     </select>

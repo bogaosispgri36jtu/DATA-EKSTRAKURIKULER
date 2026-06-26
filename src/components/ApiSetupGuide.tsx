@@ -62,12 +62,27 @@ export default function ApiSetupGuide() {
  *    Kolom AE: CreatedAt
  */
 
+// CONFIGURATION: Jika script dibuat secara mandiri (standalone), isi ID Spreadsheet Anda di bawah ini
+// Contoh: var SPREADSHEET_ID = "1bgSnunCItAfESxiLTeKgythJRRWqwQLZLEeZ5AzN5T0";
+var SPREADSHEET_ID = "";
+
+function getSpreadsheet() {
+  if (SPREADSHEET_ID && SPREADSHEET_ID !== "") {
+    return SpreadsheetApp.openById(SPREADSHEET_ID);
+  }
+  try {
+    var active = SpreadsheetApp.getActiveSpreadsheet();
+    if (active) return active;
+  } catch (e) {}
+  throw new Error("Spreadsheet tidak terhubung! Silakan isi SPREADSHEET_ID di bagian paling atas kode Apps Script Anda.");
+}
+
 // Handle Request GET (Mengambil Data)
 function doGet(e) {
   var response = {};
   try {
     var action = e.parameter.action;
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getSpreadsheet();
     
     // Inisialisasi Database jika kosong
     initDatabase(ss);
@@ -96,7 +111,7 @@ function doPost(e) {
   try {
     var postData = JSON.parse(e.postData.contents);
     var action = postData.action;
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss = getSpreadsheet();
     
     initDatabase(ss);
     
