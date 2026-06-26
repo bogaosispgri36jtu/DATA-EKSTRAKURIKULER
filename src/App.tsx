@@ -6,7 +6,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Smartphone, ShieldCheck, Database, FileCode, CheckCircle, 
-  HelpCircle, Sparkles, School, Layers, Users, RefreshCw, Lock, LogOut
+  HelpCircle, Sparkles, School, Layers, Users, RefreshCw, Lock, LogOut,
+  Eye, EyeOff
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { Student, Extracurricular, AppSettings } from './types';
@@ -123,6 +124,7 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   const handleSetIsAdminLoggedIn = (loggedIn: boolean) => {
     setIsAdminLoggedIn(loggedIn);
@@ -459,7 +461,11 @@ export default function App() {
               </div>
               <div className="flex flex-col">
                 <h1 className="text-[10px] sm:text-sm font-black tracking-wider uppercase text-white leading-none">SMP PGRI Jatiuwung</h1>
-                <p className="text-[7px] sm:text-[9px] text-yellow-300 font-bold tracking-widest uppercase mt-0.5 sm:mt-1">Pendaftaran Ekstrakurikuler</p>
+                <div className="text-[7px] sm:text-[9px] text-yellow-300 font-bold tracking-normal uppercase mt-0.5 sm:mt-1 flex flex-col sm:flex-row sm:items-start sm:gap-1">
+                  <span>Jl. Gatot Subroto KM. 5 No. 4 Kec. Jatiuwung</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span>Kota Tangerang</span>
+                </div>
               </div>
             </div>
 
@@ -478,17 +484,10 @@ export default function App() {
               ) : (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => fetchAppData(settings)}
-                    className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-all cursor-pointer border border-slate-700"
-                    title="Segarkan Sinkronisasi Data"
-                  >
-                    <RefreshCw className="w-3.5 h-3.5" />
-                  </button>
-                  <button
                     onClick={() => handleSetIsAdminLoggedIn(false)}
-                    className="px-2.5 py-1 rounded-md sm:rounded-lg text-[9px] sm:text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm cursor-pointer border border-red-700"
+                    className="px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm cursor-pointer border border-red-700 shrink-0 uppercase tracking-wide"
                   >
-                    <LogOut className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5" />
+                    <LogOut className="w-3.5 h-3.5" />
                     <span>Keluar</span>
                   </button>
                 </div>
@@ -528,6 +527,8 @@ export default function App() {
                 onUpdateSettings={handleUpdateSettings}
                 isLoggedIn={isAdminLoggedIn}
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
+                isLive={isLiveConnection}
+                onRefresh={() => fetchAppData(settings)}
               />
             )}
           </div>
@@ -539,6 +540,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-1">
           <p className="font-extrabold text-slate-200 tracking-wider text-[11px] sm:text-xs">SMP PGRI JATIUWUNG</p>
           <p className="font-medium text-slate-400 text-[10px] sm:text-[11px]">Sistem Pendaftaran Ekstrakurikuler</p>
+          <p className="text-[9px] sm:text-[10px] text-slate-500 font-semibold italic">Jl. Gatot Subroto KM. 5 No. 4 Jatiuwung Kota Tangerang</p>
           <p className="text-[10px] text-slate-500">© 2026 all rights reserved</p>
           <p className="text-[10px] text-slate-500 font-semibold mt-0.5">@nawasyiahmed</p>
         </div>
@@ -565,8 +567,8 @@ export default function App() {
                   <Lock className="w-4 h-4 text-blue-900" />
                 </div>
                 <div>
-                  <h3 className="text-xs sm:text-sm font-black tracking-wide uppercase leading-none">Login Administrator</h3>
-                  <p className="text-[8px] text-yellow-300 font-semibold tracking-wider uppercase mt-1 leading-none">SMP Guru & Guru Admin</p>
+                  <h3 className="text-xs sm:text-sm font-black tracking-wide uppercase leading-none">Login Guru</h3>
+                  <p className="text-[8px] text-yellow-300 font-semibold tracking-wider uppercase mt-1 leading-none">Hanya Guru yang dapat masuk.</p>
                 </div>
               </div>
             </div>
@@ -587,14 +589,23 @@ export default function App() {
 
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-slate-600 uppercase tracking-wider block">Password</label>
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
-                  required
-                />
+                <div className="relative">
+                  <input
+                    type={showLoginPassword ? "text" : "password"}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowLoginPassword(!showLoginPassword)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                  >
+                    {showLoginPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
 
               <button
@@ -602,7 +613,7 @@ export default function App() {
                 className="w-full py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
               >
                 <ShieldCheck className="w-4 h-4" />
-                <span>Masuk Dashboard</span>
+                <span>MASUK</span>
               </button>
             </form>
           </div>

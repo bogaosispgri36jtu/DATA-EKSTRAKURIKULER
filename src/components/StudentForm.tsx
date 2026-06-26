@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Camera, School, Users, FileText, Phone, Award, MapPin, 
-  Send, FileCheck, CheckCircle2, RefreshCw, AlertTriangle, X
+  Send, FileCheck, CheckCircle2, RefreshCw, AlertTriangle, X, Mail
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -53,6 +53,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   const [namaIbu, setNamaIbu] = useState('');
   const [hpSiswa, setHpSiswa] = useState('');
   const [hpOrtu, setHpOrtu] = useState('');
+  const [email, setEmail] = useState('');
   
   // Achievements state
   const [hasAchievements, setHasAchievements] = useState(false);
@@ -61,6 +62,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   const [tingkatLomba, setTingkatLomba] = useState('');
   const [juaraKe, setJuaraKe] = useState('');
   const [penyelenggara, setPenyelenggara] = useState('');
+  const [certificateFile, setCertificateFile] = useState('');
+  const [certificateFileName, setCertificateFileName] = useState('');
 
   // Address state
   const [alamat, setAlamat] = useState('');
@@ -88,6 +91,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   const [isSubmitting, setIsSubmitting] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const certInputRef = useRef<HTMLInputElement>(null);
 
   // Load Provinces on mount
   useEffect(() => {
@@ -95,6 +99,13 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       setIsLoadingRegions(true);
       const data = await fetchProvinces();
       setProvinces(data);
+      
+      const banten = data.find(p => p.id === '36' || p.name.toUpperCase() === 'BANTEN');
+      if (banten) {
+        setSelectedProvinsi(banten);
+        const kabs = await fetchKabupaten(banten.id);
+        setKabupatens(kabs);
+      }
       setIsLoadingRegions(false);
     }
     loadProvinces();
@@ -241,6 +252,56 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     }
   };
 
+  const handleCertUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileType = file.type;
+    const isImage = fileType.startsWith('image/');
+    const isPdf = fileType === 'application/pdf';
+
+    if (!isImage && !isPdf) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Format File Tidak Didukung',
+        text: 'Harap unggah file sertifikat dalam format JPG/JPEG/PNG atau PDF.',
+        confirmButtonColor: '#1d4ed8',
+        width: '360px'
+      });
+      return;
+    }
+
+    // Limit to 2MB to keep Base64 strings manageable
+    if (file.size > 2 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Ukuran File Terlalu Besar',
+        text: 'Maksimal ukuran file sertifikat adalah 2MB.',
+        confirmButtonColor: '#1d4ed8',
+        width: '360px'
+      });
+      return;
+    }
+
+    setCertificateFileName(file.name);
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setCertificateFile(result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleCancelCert = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCertificateFile('');
+    setCertificateFileName('');
+    if (certInputRef.current) {
+      certInputRef.current.value = '';
+    }
+  };
+
   // Extract Grade from selected Class
   const getGrade = (selectedClass: string): string => {
     if (selectedClass.startsWith('VII')) return 'VII';
@@ -265,6 +326,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       photo !== '' &&
       kelas !== '' &&
       jenisKelamin !== '' &&
+      email.trim() !== '' &&
+      email.trim().toLowerCase().endsWith('@gmail.com') &&
       namaAyah.trim() !== '' &&
       namaIbu.trim() !== '' &&
       hpSiswa.trim() !== '' &&
@@ -297,6 +360,16 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isFormValid()) {
+      if (email.trim() && !email.trim().toLowerCase().endsWith('@gmail.com')) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Email Harus @gmail.com',
+          text: 'Harap gunakan alamat email aktif yang berakhiran @gmail.com.',
+          confirmButtonColor: '#1d4ed8',
+          width: '360px'
+        });
+        return;
+      }
       Swal.fire({
         icon: 'warning',
         title: 'Formulir Belum Lengkap',
@@ -327,6 +400,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           photo,
           kelas,
           jenisKelamin: jenisKelamin as 'Laki-laki' | 'Perempuan',
+          email: email.trim(),
           namaAyah,
           namaIbu,
           hpSiswa,
@@ -337,6 +411,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           tingkatLomba: hasAchievements ? tingkatLomba : '',
           juaraKe: hasAchievements ? juaraKe : '',
           penyelenggara: hasAchievements ? penyelenggara : '',
+          certificateFile: hasAchievements ? certificateFile : '',
+          certificateFileName: hasAchievements ? certificateFileName : '',
           alamat,
           rt,
           rw,
@@ -433,7 +509,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(100, 116, 139);
       doc.text('Tahun Pelajaran ' + registeredStudent.tahunPelajaran, 114, 22, { align: 'center' });
-      doc.text('Jl. Raya Pajajaran No.1, Gandasari, Kec. Jatiuwung, Kota Tangerang, Banten 15137', 114, 27, { align: 'center' });
+      doc.text('Jl. Gatot Subroto KM. 5 No. 4 Jatiuwung Kota Tangerang', 114, 27, { align: 'center' });
       
       // Divider Line
       doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
@@ -505,6 +581,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       drawField('Nama Lengkap', registeredStudent.name.toUpperCase(), true);
       drawField('Kelas', registeredStudent.kelas);
       drawField('Jenis Kelamin', registeredStudent.jenisKelamin);
+      drawField('Email Siswa', registeredStudent.email || '-');
       drawField('No. HP WhatsApp', registeredStudent.hpSiswa);
 
       // Reset alignment or adjust for photo boundary
@@ -550,6 +627,9 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         drawField('Cabang Lomba', registeredStudent.cabangLomba || '-');
         drawField('Tingkat / Juara', `${registeredStudent.tingkatLomba || '-'} / Juara ${registeredStudent.juaraKe || '-'}`);
         drawField('Penyelenggara', registeredStudent.penyelenggara || '-');
+        if (registeredStudent.certificateFile) {
+          drawField('Sertifikat Lomba', 'Terlampir (Ada)');
+        }
       } else {
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(9.5);
@@ -650,6 +730,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
     setOriginalPhotoSize(null);
     setKelas('');
     setJenisKelamin('');
+    setEmail('');
     setNamaAyah('');
     setNamaIbu('');
     setHpSiswa('');
@@ -660,12 +741,28 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
     setTingkatLomba('');
     setJuaraKe('');
     setPenyelenggara('');
+    setCertificateFile('');
+    setCertificateFileName('');
+    if (certInputRef.current) {
+      certInputRef.current.value = '';
+    }
     setAlamat('');
     setRt('');
     setRw('');
-    setSelectedProvinsi(null);
+    
+    // Reset back to Banten
+    const banten = provinces.find(p => p.id === '36' || p.name.toUpperCase() === 'BANTEN');
+    if (banten) {
+      setSelectedProvinsi(banten);
+      fetchKabupaten(banten.id).then(kabs => setKabupatens(kabs));
+    } else {
+      setSelectedProvinsi(null);
+      setKabupatens([]);
+    }
     setSelectedKabupaten(null);
+    setKecamatans([]);
     setSelectedKecamatan(null);
+    setKelurahans([]);
     setSelectedKelurahan(null);
     setSelectedEskul(null);
     setSelectedEskul2(null);
@@ -755,7 +852,11 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
         <div className="max-w-4xl mx-auto flex flex-col items-center justify-center text-center gap-2 relative z-10">
           <div className="flex flex-col items-center text-center">
             <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-wide leading-tight">SMP PGRI JATIUWUNG</h1>
-            <p className="text-sm sm:text-lg md:text-xl text-yellow-300 font-extrabold tracking-wide mt-1">Pendaftaran Ekstrakurikuler</p>
+            <div className="text-xs sm:text-sm md:text-base text-yellow-300 font-extrabold tracking-wide mt-1 flex flex-col sm:flex-row sm:items-center sm:justify-center sm:gap-2">
+              <span>Jl. Gatot Subroto KM. 5 No. 4 Kec. Jatiuwung</span>
+              <span className="hidden sm:inline">•</span>
+              <span>Kota Tangerang</span>
+            </div>
             <p className="text-xs sm:text-sm text-blue-200 font-extrabold tracking-wider uppercase mt-1.5 bg-blue-950/40 px-3.5 py-1 rounded-full">
               Tahun Pelajaran: <span className="text-yellow-300 font-mono font-black">{tahunPelajaranAktif}</span>
             </p>
@@ -820,7 +921,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       onChange={handlePhotoUpload} 
                       className="hidden" 
                     />
-                    <div className="text-[9px] sm:text-[10px] text-slate-400 font-semibold leading-normal">
+                    <div className="text-[9px] sm:text-[8px] text-slate-400 font-normal leading-normal">
                       <p className="font-bold text-slate-500 mb-0.5">Syarat :</p>
                       <p>• Foto wajib berseragam sekolah.</p>
                       <p>• Maksimal ukuran Foto 1 MB</p>
@@ -884,6 +985,47 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       <option value="Perempuan">Perempuan</option>
                     </select>
                   </div>
+                </div>
+              </div>
+
+              {/* Email Siswa */}
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">EMAIL SISWA <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <Mail className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input 
+                    type="email" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="nama.siswa@gmail.com" 
+                    className="w-full pl-8 pr-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold"
+                    required
+                  />
+                </div>
+                <p className="text-[8px] sm:text-[9px] text-slate-400 font-semibold">
+                  * Harus diisi dengan alamat email aktif berakhiran <span className="text-blue-700 font-bold">@gmail.com</span>
+                </p>
+                {email && !email.toLowerCase().endsWith('@gmail.com') && (
+                  <p className="text-[8px] sm:text-[9px] text-rose-500 font-bold flex items-center gap-1 mt-1 bg-rose-50 border border-rose-100 p-1.5 rounded-md">
+                    <AlertTriangle className="w-3 h-3 text-rose-500 shrink-0" />
+                    Format email harus berakhiran @gmail.com
+                  </p>
+                )}
+              </div>
+
+              {/* No. HP WhatsApp Siswa */}
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">NO. WHATSAPP SISWA <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <Phone className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <input 
+                    type="tel" 
+                    value={hpSiswa} 
+                    onChange={(e) => setHpSiswa(e.target.value)}
+                    placeholder="08xxxxxxxxxx" 
+                    className="w-full pl-8 pr-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold"
+                    required
+                  />
                 </div>
               </div>
 
@@ -981,35 +1123,19 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                 </div>
               </div>
 
-              {/* WhatsApp Numbers */}
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">NO. WHATSAPP SISWA <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Phone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                    <input 
-                      type="tel" 
-                      value={hpSiswa} 
-                      onChange={(e) => setHpSiswa(e.target.value)}
-                      placeholder="08xxxxxxxxxx" 
-                      className="w-full pl-6.5 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">NO. WHATSAPP ORANG TUA / WALI <span className="text-red-500">*</span></label>
-                  <div className="relative">
-                    <Phone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
-                    <input 
-                      type="tel" 
-                      value={hpOrtu} 
-                      onChange={(e) => setHpOrtu(e.target.value)}
-                      placeholder="08xxxxxxxxxx" 
-                      className="w-full pl-6.5 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
-                      required
-                    />
-                  </div>
+              {/* WhatsApp Orang Tua */}
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">NO. WHATSAPP ORANG TUA / WALI <span className="text-red-500">*</span></label>
+                <div className="relative">
+                  <Phone className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+                  <input 
+                    type="tel" 
+                    value={hpOrtu} 
+                    onChange={(e) => setHpOrtu(e.target.value)}
+                    placeholder="08xxxxxxxxxx" 
+                    className="w-full pl-6.5 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold"
+                    required
+                  />
                 </div>
               </div>
 
@@ -1036,8 +1162,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       type="text" 
                       value={rt} 
                       onChange={(e) => setRt(e.target.value)}
-                      placeholder="002" 
-                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
+                      placeholder="000" 
+                      className="w-full px-2.5 py-1 bg-white border border-slate-100 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
                       required
                     />
                   </div>
@@ -1047,8 +1173,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       type="text" 
                       value={rw} 
                       onChange={(e) => setRw(e.target.value)}
-                      placeholder="001" 
-                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
+                      placeholder="000" 
+                      className="w-full px-2.5 py-1 bg-white border border-slate-100 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
                       required
                     />
                   </div>
@@ -1061,7 +1187,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     <select
                       value={selectedProvinsi?.id || ''}
                       onChange={(e) => handleProvinsiChange(e.target.value)}
-                      className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
+                      disabled={true}
+                      className="w-full px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-[11px] text-slate-600 font-semibold cursor-not-allowed"
                       required
                     >
                       <option value="">-- Pilih Provinsi --</option>
@@ -1153,7 +1280,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                 </div>
 
                 {hasAchievements && (
-                  <div className="bg-slate-50/60 p-2.5 sm:p-3 rounded-lg border border-blue-100 space-y-2 transition-all duration-500 animate-fadeIn">
+                  <div className="bg-slate-50/60 p-2.5 sm:p-3 rounded-lg border border-blue-100 space-y-2.5 transition-all duration-500 animate-fadeIn">
                     <div className="space-y-1">
                       <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">NAMA LOMBA <span className="text-red-500">*</span></label>
                       <input 
@@ -1166,66 +1293,113 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">CABANG LOMBA <span className="text-red-500">*</span></label>
-                        <input 
-                          type="text" 
-                          value={cabangLomba} 
-                          onChange={(e) => setCabangLomba(e.target.value)}
-                          placeholder="Contoh: Tanding Kelas C Putra..." 
-                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
-                          required
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">TINGKAT LOMBA <span className="text-red-500">*</span></label>
-                        <select
-                          value={tingkatLomba}
-                          onChange={(e) => setTingkatLomba(e.target.value)}
-                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
-                          required
-                        >
-                          <option value="">Pilih Tingkat...</option>
-                          <option value="Sekolah">Sekolah</option>
-                          <option value="Kecamatan">Kecamatan</option>
-                          <option value="Kota/Kabupaten">Kota/Kabupaten</option>
-                          <option value="Provinsi">Provinsi</option>
-                          <option value="Nasional">Nasional</option>
-                          <option value="Internasional">Internasional</option>
-                        </select>
-                      </div>
+                    <div className="space-y-1">
+                      <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">PENYELENGGARA <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        value={penyelenggara} 
+                        onChange={(e) => setPenyelenggara(e.target.value)}
+                        placeholder="Nama penyelenggara lomba..." 
+                        className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                        required
+                      />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="space-y-1">
-                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">JUARA KE <span className="text-red-500">*</span></label>
-                        <select
-                          value={juaraKe}
-                          onChange={(e) => setJuaraKe(e.target.value)}
-                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
-                          required
-                        >
-                          <option value="">Pilih Juara...</option>
-                          <option value="1">Juara 1</option>
-                          <option value="2">Juara 2</option>
-                          <option value="3">Juara 3</option>
-                          <option value="Harapan 1">Harapan 1</option>
-                          <option value="Harapan 2">Harapan 2</option>
-                          <option value="Harapan 3">Harapan 3</option>
-                          <option value="Lainnya">Lainnya / Partisipan</option>
-                        </select>
+                    <div className="space-y-1">
+                      <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">CABANG LOMBA <span className="text-red-500">*</span></label>
+                      <input 
+                        type="text" 
+                        value={cabangLomba} 
+                        onChange={(e) => setCabangLomba(e.target.value)}
+                        placeholder="Contoh: Tanding Kelas C Putra..." 
+                        className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">TINGKAT LOMBA <span className="text-red-500">*</span></label>
+                      <select
+                        value={tingkatLomba}
+                        onChange={(e) => setTingkatLomba(e.target.value)}
+                        className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
+                        required
+                      >
+                        <option value="">Pilih Tingkat...</option>
+                        <option value="Sekolah">Sekolah</option>
+                        <option value="Kecamatan">Kecamatan</option>
+                        <option value="Kota/Kabupaten">Kota/Kabupaten</option>
+                        <option value="Provinsi">Provinsi</option>
+                        <option value="Nasional">Nasional</option>
+                        <option value="Internasional">Internasional</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">JUARA KE <span className="text-red-500">*</span></label>
+                      <select
+                        value={juaraKe}
+                        onChange={(e) => setJuaraKe(e.target.value)}
+                        className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold cursor-pointer"
+                        required
+                      >
+                        <option value="">Pilih Juara...</option>
+                        <option value="1">Juara 1</option>
+                        <option value="2">Juara 2</option>
+                        <option value="3">Juara 3</option>
+                        <option value="Harapan 1">Harapan 1</option>
+                        <option value="Harapan 2">Harapan 2</option>
+                        <option value="Harapan 3">Harapan 3</option>
+                        <option value="Lainnya">Lainnya / Partisipan</option>
+                      </select>
+                    </div>
+
+                    {/* Lampiran Sertifikat (JPG / PDF) */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">LAMPIRAN SERTIFIKAT JUARA (JPG / PDF)</label>
+                        {certificateFile && (
+                          <span className="text-[8px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase">Terlampir</span>
+                        )}
                       </div>
-                      <div className="space-y-1">
-                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">PENYELENGGARA <span className="text-red-500">*</span></label>
-                        <input 
-                          type="text" 
-                          value={penyelenggara} 
-                          onChange={(e) => setPenyelenggara(e.target.value)}
-                          placeholder="Nama penyelenggara lomba..." 
-                          className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-semibold"
-                          required
+                      <div className="relative border border-dashed border-slate-200 rounded-lg p-2.5 bg-white hover:border-blue-500 transition-colors">
+                        <input
+                          type="file"
+                          ref={certInputRef}
+                          onChange={handleCertUpload}
+                          accept="image/jpeg,image/png,application/pdf"
+                          className="hidden"
+                          id="input-cert"
                         />
+                        {certificateFile ? (
+                          <div className="flex items-center justify-between gap-2 p-1 bg-slate-50 rounded border border-slate-100">
+                            <div className="flex items-center gap-1.5 overflow-hidden">
+                              {certificateFile.startsWith('data:application/pdf') ? (
+                                <FileCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                              ) : (
+                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                              )}
+                              <span className="text-[10px] sm:text-xs font-semibold text-slate-700 truncate">{certificateFileName}</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleCancelCert}
+                              className="w-5 h-5 rounded-full bg-slate-200 hover:bg-rose-500 hover:text-white flex items-center justify-center text-slate-600 transition-all shrink-0 cursor-pointer"
+                              title="Hapus file"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => certInputRef.current?.click()}
+                            className="w-full flex items-center justify-center gap-2 py-1.5 text-[10px] sm:text-xs font-bold text-slate-500 hover:text-blue-700 transition-all cursor-pointer"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Pilih Gambar / PDF (Maks. 2MB)
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

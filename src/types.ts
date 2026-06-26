@@ -14,12 +14,15 @@ export interface Student {
   namaIbu: string;
   hpSiswa: string;
   hpOrtu: string;
+  email?: string;
   prestasiChecked: boolean;
   namaLomba?: string;
   cabangLomba?: string;
   tingkatLomba?: string;
   juaraKe?: string;
   penyelenggara?: string;
+  certificateFile?: string; // Base64 of the uploaded file/image
+  certificateFileName?: string; // Name of the uploaded file
   alamat: string; // Nama Kampung / Perumahan
   rt: string;
   rw: string;

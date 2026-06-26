@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Lock, LayoutDashboard, FileText, Settings, Plus, Trash2, 
   Download, Printer, Search, Filter, ShieldAlert, CheckCircle2,
-  RefreshCcw, Eye, ArrowUpDown, Layers, Database, UserCheck, LogOut
+  RefreshCcw, Eye, EyeOff, ArrowUpDown, Layers, Database, UserCheck, LogOut
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -25,6 +25,8 @@ interface AdminDashboardProps {
   onUpdateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
   isLoggedIn: boolean;
   setIsLoggedIn: (loggedIn: boolean) => void;
+  isLive?: boolean;
+  onRefresh?: () => Promise<void> | void;
 }
 
 export default function AdminDashboard({
@@ -37,7 +39,9 @@ export default function AdminDashboard({
   onResetAllData,
   onUpdateSettings,
   isLoggedIn,
-  setIsLoggedIn
+  setIsLoggedIn,
+  isLive = false,
+  onRefresh
 }: AdminDashboardProps) {
   const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
 
@@ -53,13 +57,14 @@ export default function AdminDashboard({
   // Login State
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<'eskul' | 'laporan' | 'pengaturan'>('laporan');
 
   // New Eskul State
   const [newEskulNama, setNewEskulNama] = useState('');
-  const [newEskulKelas, setNewEskulKelas] = useState<string[]>(['VII', 'VIII', 'IX']);
+  const [newEskulKelas, setNewEskulKelas] = useState('VII, VIII, IX');
   const [newEskulTahun, setNewEskulTahun] = useState(settings.tahunPelajaranAktif);
   const [isAddingEskul, setIsAddingEskul] = useState(false);
 
@@ -82,16 +87,18 @@ export default function AdminDashboard({
       Swal.fire({
         icon: 'success',
         title: 'Login Berhasil',
-        text: 'Selamat datang di Dashboard Admin SMP PGRI Jatiuwung.',
+        text: 'Selamat datang di Dashboard Admin.',
         timer: 1500,
-        showConfirmButton: false
+        showConfirmButton: false,
+        width: '340px'
       });
     } else {
       Swal.fire({
         icon: 'error',
         title: 'Akses Ditolak',
-        text: 'Username atau password yang Anda masukkan salah!',
-        confirmButtonColor: '#ef4444'
+        text: 'Username atau password salah!',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
       });
     }
   };
@@ -100,27 +107,40 @@ export default function AdminDashboard({
   const handleAddEskulSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newEskulNama.trim() === '') {
-      Swal.fire({ icon: 'warning', title: 'Nama Eskul Wajib diisi', confirmButtonColor: '#1d4ed8' });
+      Swal.fire({ icon: 'warning', title: 'Nama Eskul Wajib diisi', confirmButtonColor: '#1d4ed8', width: '340px' });
       return;
     }
-    if (newEskulKelas.length === 0) {
-      Swal.fire({ icon: 'warning', title: 'Pilih minimal satu kriteria kelas', confirmButtonColor: '#1d4ed8' });
+
+    const classesArray = newEskulKelas.split(',')
+      .map(k => k.trim())
+      .filter(k => k !== '');
+
+    if (classesArray.length === 0) {
+      Swal.fire({ 
+        icon: 'warning', 
+        title: 'Kelas Wajib Diisi', 
+        text: 'Masukkan minimal satu kelas (misal: 7.A atau VII).',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px'
+      });
       return;
     }
 
     setIsAddingEskul(true);
     try {
-      await onAddEskul(newEskulNama, newEskulKelas, newEskulTahun);
+      await onAddEskul(newEskulNama, classesArray, newEskulTahun);
       setNewEskulNama('');
+      setNewEskulKelas('VII, VIII, IX');
       Swal.fire({
         icon: 'success',
         title: 'Eskul Ditambahkan',
         text: 'Kategori Ekstrakurikuler baru berhasil tersimpan.',
         timer: 1500,
-        showConfirmButton: false
+        showConfirmButton: false,
+        width: '340px'
       });
     } catch (err) {
-      Swal.fire({ icon: 'error', title: 'Gagal Menambahkan', text: 'Koneksi API bermasalah.', confirmButtonColor: '#ef4444' });
+      Swal.fire({ icon: 'error', title: 'Gagal Menambahkan', text: 'Koneksi API bermasalah.', confirmButtonColor: '#ef4444', width: '340px' });
     } finally {
       setIsAddingEskul(false);
     }
@@ -132,31 +152,23 @@ export default function AdminDashboard({
     
     const result = await Swal.fire({
       title: 'Hapus Ekstrakurikuler?',
-      html: `Apakah Anda yakin ingin menghapus <b>${name}</b>?<br/>${studentCount > 0 ? `<span class="text-red-500 font-bold">PERINGATAN: Ada ${studentCount} siswa yang terdaftar di eskul ini!</span>` : ''}`,
+      html: `<div class="text-xs text-slate-600 leading-relaxed text-left">Apakah Anda yakin ingin menghapus <b>${name}</b>?<br/>${studentCount > 0 ? `<span class="text-red-500 font-bold block mt-2">⚠️ PERINGATAN: Ada ${studentCount} siswa terdaftar di eskul ini!</span>` : ''}</div>`,
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Ya, Hapus!',
       cancelButtonText: 'Batal',
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280'
+      cancelButtonColor: '#6b7280',
+      width: '340px'
     });
 
     if (result.isConfirmed) {
       try {
         await onDeleteEskul(id);
-        Swal.fire({ icon: 'success', title: 'Eskul terhapus', timer: 1200, showConfirmButton: false });
+        Swal.fire({ icon: 'success', title: 'Eskul terhapus', timer: 1200, showConfirmButton: false, width: '340px' });
       } catch (e) {
-        Swal.fire({ icon: 'error', title: 'Gagal menghapus' });
+        Swal.fire({ icon: 'error', title: 'Gagal menghapus', width: '340px' });
       }
-    }
-  };
-
-  // Toggle Class Checkbox helper
-  const handleClassCheckboxChange = (grade: string) => {
-    if (newEskulKelas.includes(grade)) {
-      setNewEskulKelas(newEskulKelas.filter(c => c !== grade));
-    } else {
-      setNewEskulKelas([...newEskulKelas, grade]);
     }
   };
 
@@ -176,13 +188,13 @@ export default function AdminDashboard({
   // Export reports to Excel/CSV format
   const handleExportExcel = () => {
     if (filteredStudents.length === 0) {
-      Swal.fire({ icon: 'info', title: 'Data Kosong', text: 'Tidak ada data siswa untuk diekspor.' });
+      Swal.fire({ icon: 'info', title: 'Data Kosong', text: 'Tidak ada data siswa untuk diekspor.', width: '340px' });
       return;
     }
 
     // Prepare CSV headers
     const headers = [
-      'No. Registrasi', 'Tahun Pelajaran', 'Nama Lengkap', 'Kelas', 'Jenis Kelamin', 
+      'No. Registrasi', 'Tahun Pelajaran', 'Nama Lengkap', 'Kelas', 'Jenis Kelamin', 'Email Siswa',
       'Ekstrakurikuler 1', 'Ekstrakurikuler 2', 'Nama Ayah', 'Nama Ibu', 'No. HP Siswa', 'No. HP Orang Tua',
       'Memiliki Prestasi', 'Nama Lomba', 'Cabang Lomba', 'Tingkat Lomba', 'Juara Ke', 'Penyelenggara',
       'Alamat', 'RT', 'RW', 'Kelurahan', 'Kecamatan', 'Kota/Kabupaten', 'Provinsi', 'Tanggal Daftar'
@@ -194,6 +206,7 @@ export default function AdminDashboard({
       s.name,
       s.kelas,
       s.jenisKelamin,
+      s.email || '',
       s.eskulName,
       s.eskulName2 || '',
       s.namaAyah,
@@ -241,14 +254,15 @@ export default function AdminDashboard({
       icon: 'success',
       title: 'Ekspor Berhasil',
       text: 'File laporan berformat CSV (Excel) telah terunduh.',
-      confirmButtonColor: '#1d4ed8'
+      confirmButtonColor: '#1d4ed8',
+      width: '340px'
     });
   };
 
   // Generate Recap PDF Report
   const handlePrintPDFRecap = () => {
     if (filteredStudents.length === 0) {
-      Swal.fire({ icon: 'info', title: 'Data Kosong', text: 'Tidak ada data siswa untuk dicetak.' });
+      Swal.fire({ icon: 'info', title: 'Data Kosong', text: 'Tidak ada data siswa untuk dicetak.', width: '340px' });
       return;
     }
 
@@ -256,6 +270,7 @@ export default function AdminDashboard({
       title: 'Menyiapkan Dokumen...',
       text: 'Sedang membuat laporan rekapitulasi pendaftaran.',
       allowOutsideClick: false,
+      width: '340px',
       didOpen: () => Swal.showLoading()
     });
 
@@ -274,16 +289,18 @@ export default function AdminDashboard({
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(14);
       doc.setTextColor(29, 78, 216);
-      doc.text('SMP PGRI JATIUWUNG', 114, 14, { align: 'center' });
-      doc.setFontSize(10);
+      doc.text('SMP PGRI JATIUWUNG', 114, 13, { align: 'center' });
+      doc.setFontSize(9.5);
       doc.setTextColor(107, 114, 128);
       doc.setFont('helvetica', 'normal');
-      doc.text(`LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER`, 114, 19, { align: 'center' });
-      doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 114, 24, { align: 'center' });
+      doc.text(`LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER`, 114, 18, { align: 'center' });
+      doc.setFontSize(8.5);
+      doc.text('Jl. Gatot Subroto KM. 5 No. 4 Jatiuwung Kota Tangerang', 114, 22, { align: 'center' });
+      doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 114, 26, { align: 'center' });
       
       doc.setDrawColor(29, 78, 216);
       doc.setLineWidth(0.5);
-      doc.line(15, 28, 195, 28);
+      doc.line(15, 29, 195, 29);
 
       // Section 1: Summary Table per Eskul
       doc.setFont('helvetica', 'bold');
@@ -420,17 +437,17 @@ export default function AdminDashboard({
 
       doc.save(`REKAPITULASI_PENDAFTARAN_JU_${settings.tahunPelajaranAktif.replace(/\//g, '-')}.pdf`);
       Swal.close();
-      Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Rekapitulasi PDF telah terunduh.' });
+      Swal.fire({ icon: 'success', title: 'Berhasil', text: 'Rekapitulasi PDF telah terunduh.', width: '340px' });
     } catch (e) {
       Swal.close();
-      Swal.fire({ icon: 'error', title: 'Gagal cetak PDF' });
+      Swal.fire({ icon: 'error', title: 'Gagal cetak PDF', width: '340px' });
     }
   };
 
   // Reset per Ekstrakurikuler
   const handleResetEskulClick = async () => {
     if (eskulList.length === 0) {
-      Swal.fire({ icon: 'info', title: 'Data Eskul Kosong' });
+      Swal.fire({ icon: 'info', title: 'Data Eskul Kosong', width: '340px' });
       return;
     }
 
@@ -447,6 +464,7 @@ export default function AdminDashboard({
       confirmButtonText: 'Lanjut',
       cancelButtonText: 'Batal',
       confirmButtonColor: '#eab308',
+      width: '340px',
       inputValidator: (value) => {
         if (!value) {
           return 'Anda wajib memilih ekstrakurikuler!';
@@ -460,13 +478,14 @@ export default function AdminDashboard({
 
       const confirm = await Swal.fire({
         title: 'Konfirmasi Penghapusan',
-        html: `Apakah Anda yakin ingin menghapus <b>seluruh data (${studentCount} siswa)</b> yang terdaftar pada eskul <b>${selectedEskul?.nama}</b>? Tindakan ini bersifat permanen!`,
+        html: `<div class="text-xs text-slate-600 leading-relaxed text-left">Apakah Anda yakin ingin menghapus <b>seluruh data (${studentCount} siswa)</b> yang terdaftar pada eskul <b>${selectedEskul?.nama}</b>? Tindakan ini bersifat permanen!</div>`,
         icon: 'warning',
         showCancelButton: true,
         confirmButtonText: 'Ya, Reset Data!',
         cancelButtonText: 'Batal',
         confirmButtonColor: '#ef4444',
-        cancelButtonColor: '#6b7280'
+        cancelButtonColor: '#6b7280',
+        width: '340px'
       });
 
       if (confirm.isConfirmed) {
@@ -475,7 +494,8 @@ export default function AdminDashboard({
           icon: 'success',
           title: 'Reset Berhasil',
           text: `Data siswa pada eskul ${selectedEskul?.nama} telah dikosongkan.`,
-          confirmButtonColor: '#1d4ed8'
+          confirmButtonColor: '#1d4ed8',
+          width: '340px'
         });
       }
     }
@@ -486,20 +506,21 @@ export default function AdminDashboard({
     // Stage 1 Confirmation
     const stage1 = await Swal.fire({
       title: 'Reset Seluruh Database?',
-      html: '<p class="text-red-500 font-bold text-sm">PERINGATAN KRITIS!</p> Tindakan ini akan mengosongkan SELURUH data registrasi siswa dari database pendaftaran saat ini secara permanen untuk menyambut Tahun Pelajaran baru.',
+      html: '<div class="text-xs text-slate-600 leading-relaxed text-left"><p class="text-red-500 font-bold text-sm">⚠️ PERINGATAN KRITIS!</p> Tindakan ini akan mengosongkan SELURUH data registrasi siswa dari database pendaftaran saat ini secara permanen untuk menyambut Tahun Pelajaran baru.</div>',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Ya, Lanjutkan Konfirmasi',
       cancelButtonText: 'Batal',
       confirmButtonColor: '#ef4444',
-      cancelButtonColor: '#6b7280'
+      cancelButtonColor: '#6b7280',
+      width: '340px'
     });
 
     if (stage1.isConfirmed) {
       // Stage 2 Confirmation with explicit text code
       const stage2 = await Swal.fire({
         title: 'Konfirmasi Berlapis',
-        html: 'Untuk menghindari ketidaksengajaan, silakan ketik teks <b>"RESET"</b> di bawah ini untuk mengosongkan seluruh database pendaftaran:',
+        html: '<div class="text-xs text-slate-600 leading-relaxed text-left">Untuk menghindari ketidaksengajaan, silakan ketik teks <b>"RESET"</b> di bawah ini untuk mengosongkan seluruh database pendaftaran:</div>',
         input: 'text',
         inputPlaceholder: 'Ketik RESET di sini...',
         showCancelButton: true,
@@ -507,6 +528,7 @@ export default function AdminDashboard({
         cancelButtonText: 'Batal',
         confirmButtonColor: '#d33',
         cancelButtonColor: '#3085d6',
+        width: '340px',
         inputValidator: (value) => {
           if (value !== 'RESET') {
             return 'Teks yang Anda ketik salah!';
@@ -518,6 +540,7 @@ export default function AdminDashboard({
         Swal.fire({
           title: 'Sedang Mereset...',
           allowOutsideClick: false,
+          width: '340px',
           didOpen: () => Swal.showLoading()
         });
 
@@ -528,13 +551,15 @@ export default function AdminDashboard({
             icon: 'success',
             title: 'Database Bersih',
             text: 'Seluruh data pendaftaran siswa berhasil dibersihkan dengan aman.',
-            confirmButtonColor: '#1d4ed8'
+            confirmButtonColor: '#1d4ed8',
+            width: '340px'
           });
         } catch (e) {
           Swal.close();
           Swal.fire({
             icon: 'error',
-            title: 'Gagal membersihkan database'
+            title: 'Gagal membersihkan database',
+            width: '340px'
           });
         }
       }
@@ -545,20 +570,41 @@ export default function AdminDashboard({
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingSettings(true);
+    
+    let targetUrl = gasUrlInput ? gasUrlInput.trim() : '';
+    let wasDevUrl = false;
+    if (targetUrl.endsWith('/dev')) {
+      targetUrl = targetUrl.substring(0, targetUrl.length - 4) + '/exec';
+      wasDevUrl = true;
+      setGasUrlInput(targetUrl);
+    }
+
     try {
       await onUpdateSettings({
-        googleAppsScriptUrl: gasUrlInput,
+        googleAppsScriptUrl: targetUrl,
         tahunPelajaranAktif: activeYearInput
       });
-      Swal.fire({
-        icon: 'success',
-        title: 'Pengaturan Tersimpan',
-        text: 'Pengaturan Tahun Pelajaran Aktif & API Sync diperbarui.',
-        timer: 1500,
-        showConfirmButton: false
-      });
+      
+      if (wasDevUrl) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'URL Diubah ke /exec',
+          text: 'URL Apps Script yang berakhiran /dev telah otomatis diganti ke /exec agar dapat diakses publik. Harap pastikan Anda sudah melakukan "Deploy Baru" (New Deployment) dengan opsi akses "Anyone" pada editor Apps Script.',
+          confirmButtonColor: '#1d4ed8',
+          width: '340px'
+        });
+      } else {
+        Swal.fire({
+          icon: 'success',
+          title: 'Pengaturan Tersimpan',
+          text: 'Pengaturan Tahun Pelajaran Aktif & API Sync diperbarui.',
+          timer: 1500,
+          showConfirmButton: false,
+          width: '340px'
+        });
+      }
     } catch (e) {
-      Swal.fire({ icon: 'error', title: 'Gagal Menyimpan' });
+      Swal.fire({ icon: 'error', title: 'Gagal Menyimpan', width: '340px' });
     } finally {
       setIsSavingSettings(false);
     }
@@ -574,8 +620,8 @@ export default function AdminDashboard({
           </div>
 
           <div>
-            <h1 className="text-xl font-black text-slate-800">Login Guru / Admin</h1>
-            <p className="text-xs text-slate-400 mt-1">Gunakan kredensial otentikasi administrator Anda untuk mengelola ekstrakurikuler & mengunduh rekap laporan pendaftaran.</p>
+            <h1 className="text-xl font-black text-slate-800 uppercase tracking-wide">LOGIN GURU</h1>
+            <p className="text-xs text-slate-500 font-semibold mt-1">Hanya Guru yang dapat masuk.</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4 text-left">
@@ -593,14 +639,23 @@ export default function AdminDashboard({
 
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-700 font-semibold"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showLoginPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full pl-3.5 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-700 font-semibold"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
@@ -609,7 +664,7 @@ export default function AdminDashboard({
               className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
             >
               <CheckCircle2 className="w-4.5 h-4.5 text-yellow-300" />
-              Masuk Dashboard
+              MASUK
             </button>
           </form>
 
@@ -626,34 +681,43 @@ export default function AdminDashboard({
   return (
     <div className="bg-slate-50 min-h-[calc(100vh-4rem)] w-full flex flex-col justify-start pb-12" id="admin-dashboard-screen">
       {/* Upper header banner */}
-      <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white px-6 py-6 md:py-8 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-yellow-400 rounded-2xl flex items-center justify-center shrink-0 shadow-md">
-            <LayoutDashboard className="w-6.5 h-6.5 text-blue-900" />
-          </div>
+      <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white px-4 py-5 sm:px-6 sm:py-6 md:py-8 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800">
+        <div className="flex items-center gap-2.5">
           <div>
-            <h1 className="text-base sm:text-lg font-black tracking-wide uppercase leading-none font-montserrat">Portal Guru & Dashboard Admin</h1>
-            <p className="text-xs text-yellow-300 font-bold mt-1.5 font-poppins">SMP PGRI Jatiuwung Tangerang</p>
+            <h1 className="text-sm sm:text-base md:text-lg font-black tracking-wide uppercase leading-none font-montserrat">Portal Guru & Dashboard Admin</h1>
+            <p className="text-[10px] sm:text-xs text-yellow-300 font-bold mt-1.5 font-poppins">SMP PGRI Jatiuwung Tangerang</p>
           </div>
         </div>
         <div className="flex items-center gap-3.5 self-stretch sm:self-auto justify-between sm:justify-end">
           <div className="text-right sm:block hidden">
             <span className="text-[9px] text-slate-400 font-bold block uppercase leading-none">Status Database</span>
-            <span className="text-xs text-green-400 font-black flex items-center gap-1.5 mt-1 leading-none">
-              <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span>
-              Koneksi Aktif
-            </span>
+            {isLive ? (
+              <span className="text-xs text-green-400 font-black flex items-center gap-1.5 mt-1 leading-none">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span>
+                Sheets Aktif (Live)
+              </span>
+            ) : settings.googleAppsScriptUrl ? (
+              <span className="text-xs text-rose-400 font-black flex items-center gap-1.5 mt-1 leading-none" title="Gagal terhubung ke Google Sheets API. Pastikan deploy sebagai Web App (Anyone) & tidak memakai URL /dev">
+                <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span>
+                Sheets Gagal (Lokal)
+              </span>
+            ) : (
+              <span className="text-xs text-amber-400 font-black flex items-center gap-1.5 mt-1 leading-none">
+                <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
+                Simulasi Lokal
+              </span>
+            )}
           </div>
-          <button
-            onClick={() => {
-              setIsLoggedIn(false);
-              setPassword('');
-            }}
-            className="text-xs bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-4 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-2"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            Keluar Portal
-          </button>
+          {onRefresh && (
+            <button
+              onClick={onRefresh}
+              className="text-[11px] sm:text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1.5 border border-blue-600/50 shrink-0"
+              title="Segarkan Sinkronisasi Data"
+            >
+              <RefreshCcw className="w-3.5 h-3.5 shrink-0" />
+              <span>Segarkan Data</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -661,10 +725,10 @@ export default function AdminDashboard({
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 md:py-8 flex flex-col gap-6">
         
         {/* Modern Tab Bar Selector */}
-        <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-slate-200/60 flex gap-1 w-full max-w-2xl mx-auto">
+        <div className="bg-white rounded-xl sm:rounded-2xl p-1 sm:p-1.5 shadow-sm border border-slate-200/60 flex gap-1 w-full max-w-2xl mx-auto">
           <button
             onClick={() => setActiveTab('eskul')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'eskul' 
                 ? 'bg-blue-700 text-white shadow-md' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -677,7 +741,7 @@ export default function AdminDashboard({
 
           <button
             onClick={() => setActiveTab('laporan')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'laporan' 
                 ? 'bg-blue-700 text-white shadow-md' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -690,7 +754,7 @@ export default function AdminDashboard({
 
           <button
             onClick={() => setActiveTab('pengaturan')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'pengaturan' 
                 ? 'bg-blue-700 text-white shadow-md' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
@@ -707,31 +771,31 @@ export default function AdminDashboard({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn" id="tab-eskul-management">
             
             {/* Form Add New (Left side - 1 col on lg) */}
-            <form onSubmit={handleAddEskulSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4 lg:col-span-1">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Plus className="w-4.5 h-4.5 text-blue-700" />
+            <form onSubmit={handleAddEskulSubmit} className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 space-y-4 lg:col-span-1">
+              <h2 className="text-[11px] sm:text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Plus className="w-4 sm:w-4.5 h-4 sm:h-4.5 text-blue-700" />
                 Tambah Ekstrakurikuler Baru
               </h2>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">NAMA EKSTRAKURIKULER <span className="text-red-500">*</span></label>
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">NAMA EKSTRAKURIKULER <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   value={newEskulNama}
                   onChange={(e) => setNewEskulNama(e.target.value)}
                   placeholder="Contoh: English Club, Hadroh..."
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                  className="w-full px-3.5 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN</label>
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN</label>
                   <select
                     value={newEskulTahun}
                     onChange={(e) => setNewEskulTahun(e.target.value)}
-                    className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
+                    className="w-full px-2.5 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
                   >
                     {TAHUN_PELAJARAN_LIST.map(y => (
                       <option key={y} value={y}>{y}</option>
@@ -740,36 +804,32 @@ export default function AdminDashboard({
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TINGKAT KELAS DIZINKAN</label>
-                  <div className="flex gap-2.5 pt-2">
-                    {['VII', 'VIII', 'IX'].map(grade => (
-                      <label key={grade} className="flex items-center gap-1.5 text-[11px] font-extrabold text-slate-700 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={newEskulKelas.includes(grade)}
-                          onChange={() => handleClassCheckboxChange(grade)}
-                          className="w-4 h-4 text-blue-700 border-slate-300 rounded focus:ring-blue-500"
-                        />
-                        {grade}
-                      </label>
-                    ))}
-                  </div>
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">ROMBEL KELAS DIIZINKAN <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={newEskulKelas}
+                    onChange={(e) => setNewEskulKelas(e.target.value)}
+                    placeholder="Contoh: 7.A, 8.A, 9.A"
+                    className="w-full px-3.5 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-mono"
+                    required
+                  />
+                  <p className="text-[8px] sm:text-[9px] text-slate-400 font-medium leading-none">Pisahkan dengan koma.</p>
                 </div>
               </div>
 
               <button
                 type="submit"
                 disabled={isAddingEskul}
-                className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-[11px] sm:text-xs font-bold py-2.5 sm:py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
               >
                 {isAddingEskul ? 'Menyimpan...' : 'Tambah Ekstrakurikuler'}
               </button>
             </form>
 
             {/* List Table of Eskuls (Right side - 2 cols on lg) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 lg:col-span-2">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                <Layers className="w-4.5 h-4.5 text-blue-700" />
+            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:col-span-2">
+              <h2 className="text-[11px] sm:text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
+                <Layers className="w-4 sm:w-4.5 h-4 sm:h-4.5 text-blue-700" />
                 Daftar Kategori Ekstrakurikuler Aktif ({eskulList.length})
               </h2>
 
@@ -777,18 +837,18 @@ export default function AdminDashboard({
                 {eskulList.map(eskul => {
                   const numRegistered = students.filter(s => s.eskulId === eskul.id).length;
                   return (
-                    <div key={eskul.id} className="flex items-center justify-between border border-slate-100 p-4 rounded-2xl hover:bg-slate-50 hover:shadow-sm transition-all">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-800 font-montserrat">{eskul.nama}</h4>
-                        <div className="flex flex-wrap gap-1.5 mt-1.5 text-[9px] font-bold">
-                          <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-lg uppercase tracking-wider">Kelas: {eskul.kelasAllowed.join(', ')}</span>
-                          <span className="bg-yellow-400/20 text-yellow-900 px-2 py-0.5 rounded-lg font-mono">{eskul.tahunPelajaran}</span>
-                          <span className="bg-blue-50 text-blue-700 px-2 py-0.5 rounded-lg">{numRegistered} Siswa Terdaftar</span>
+                    <div key={eskul.id} className="flex items-center justify-between border border-slate-100 p-3 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-slate-50 hover:shadow-sm transition-all gap-2">
+                      <div className="min-w-0">
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-800 font-montserrat truncate">{eskul.nama}</h4>
+                        <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-1 sm:mt-1.5 text-[8px] sm:text-[9px] font-bold">
+                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wider">Kelas: {eskul.kelasAllowed.join(', ')}</span>
+                          <span className="bg-yellow-400/20 text-yellow-900 px-1.5 py-0.5 rounded font-mono">{eskul.tahunPelajaran}</span>
+                          <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{numRegistered} Siswa</span>
                         </div>
                       </div>
                       <button
                         onClick={() => handleDeleteEskulClick(eskul.id, eskul.nama)}
-                        className="text-red-500 hover:text-white p-2 rounded-xl bg-red-50 hover:bg-red-600 transition-all cursor-pointer shadow-sm border border-red-100"
+                        className="text-red-500 hover:text-white p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-red-50 hover:bg-red-600 transition-all cursor-pointer shadow-sm border border-red-100 shrink-0"
                         title="Hapus eskul"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -948,10 +1008,14 @@ export default function AdminDashboard({
                       {/* Expanded details */}
                       {isExpanded && (
                         <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-xs text-slate-700 space-y-3 animate-fadeIn">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-b border-slate-200/50 pb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-b border-slate-200/50 pb-3">
                             <div>
                               <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Jenis Kelamin</span>
                               <span className="font-bold text-slate-800 text-xs">{s.jenisKelamin}</span>
+                            </div>
+                            <div>
+                              <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Email Siswa</span>
+                              <span className="font-bold text-slate-800 text-xs">{s.email || '-'}</span>
                             </div>
                             <div>
                               <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">No. HP Siswa (WhatsApp)</span>
@@ -972,9 +1036,25 @@ export default function AdminDashboard({
 
                           {s.prestasiChecked && (
                             <div className="bg-yellow-50/50 p-3 border border-yellow-200/70 rounded-xl text-yellow-900">
-                              <span className="text-[9px] font-black text-yellow-800 block uppercase tracking-wider">★ JALUR PRESTASI KHUSUS</span>
-                              <p className="mt-1 font-extrabold text-xs text-slate-800">{s.namaLomba} ({s.cabangLomba})</p>
-                              <p className="text-[10px] font-semibold text-slate-600 mt-0.5">Tingkat {s.tingkatLomba} | Juara {s.juaraKe} | Penyelenggara: {s.penyelenggara}</p>
+                              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                <div>
+                                  <span className="text-[9px] font-black text-yellow-800 block uppercase tracking-wider">★ JALUR PRESTASI KHUSUS</span>
+                                  <p className="mt-1 font-extrabold text-xs text-slate-800">{s.namaLomba} ({s.cabangLomba})</p>
+                                  <p className="text-[10px] font-semibold text-slate-600 mt-0.5">Tingkat {s.tingkatLomba} | Juara {s.juaraKe} | Penyelenggara: {s.penyelenggara}</p>
+                                </div>
+                                {s.certificateFile && (
+                                  <a
+                                    href={s.certificateFile}
+                                    download={s.certificateFileName || `sertifikat_${s.name}`}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-700 hover:bg-blue-800 text-white font-bold text-[10px] sm:text-xs rounded-lg shadow-sm transition-all duration-300 self-start sm:self-center cursor-pointer"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
+                                    Unduh Sertifikat
+                                  </a>
+                                )}
+                              </div>
                             </div>
                           )}
 
@@ -1041,6 +1121,18 @@ export default function AdminDashboard({
                   <p className="text-[9px] text-slate-400 leading-normal">
                     Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
                   </p>
+                  
+                  {gasUrlInput && gasUrlInput.trim().endsWith('/dev') && (
+                    <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[10px] p-3 rounded-xl leading-relaxed mt-2 space-y-1">
+                      <p className="font-bold text-amber-900 flex items-center gap-1">⚠️ Peringatan: URL Pengembangan (/dev) Terdeteksi</p>
+                      <p>
+                        URL yang berakhiran <b>/dev</b> tidak dapat menerima data dari luar karena Google membatasi aksesnya hanya untuk akun pemilik skrip. Aplikasi pendaftaran ini tidak akan bisa menyimpan data ke Spreadsheet Anda.
+                      </p>
+                      <p>
+                        <b>Solusi:</b> Di Google Apps Script, lakukan <b>Deploy (Terapkan) &gt; New deployment (Terapkan baru)</b>. Pilih jenis <b>Web App</b>, ubah akses "Who has access" menjadi <b>Anyone (Siapa saja)</b>, klik Deploy, lalu salin URL yang berakhiran <b>/exec</b> ke kolom ini.
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <button
