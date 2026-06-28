@@ -58,8 +58,9 @@ export default function ApiSetupGuide() {
  *    Kolom X: KecamatanId, Kolom Y: KecamatanName
  *    Kolom Z: KelurahanId, Kolom AA: KelurahanName
  *    Kolom AB: EskulId, Kolom AC: EskulName
- *    Kolom AD: TahunPelajaran
- *    Kolom AE: CreatedAt
+ *    Kolom AD: EskulId2, Kolom AE: EskulName2
+ *    Kolom AF: TahunPelajaran
+ *    Kolom AG: CreatedAt
  */
 
 // CONFIGURATION: Jika script dibuat secara mandiri (standalone), isi ID Spreadsheet Anda di bawah ini
@@ -179,7 +180,7 @@ function initDatabase(ss) {
       "HpSiswa", "HpOrtu", "PrestasiChecked", "NamaLomba", "CabangLomba", "TingkatLomba", 
       "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
       "KabupatenId", "KabupatenName", "KecamatanId", "KecamatanName", "KelurahanId", 
-      "KelurahanName", "EskulId", "EskulName", "TahunPelajaran", "CreatedAt"
+      "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "TahunPelajaran", "CreatedAt"
     ]);
   }
 }
@@ -202,14 +203,19 @@ function getSettings(ss) {
 // Ambil Daftar Eskul
 function getEskulList(ss) {
   var sheet = ss.getSheetByName("Eskul");
+  if (!sheet) return [];
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  
   var rows = sheet.getDataRange().getValues();
   var eskul = [];
   for (var i = 1; i < rows.length; i++) {
+    if (!rows[i][0]) continue;
     eskul.push({
       id: rows[i][0].toString(),
-      nama: rows[i][1].toString(),
-      kelasAllowed: rows[i][2].toString().split(","),
-      tahunPelajaran: rows[i][3].toString()
+      nama: rows[i][1] ? rows[i][1].toString() : "",
+      kelasAllowed: rows[i][2] ? rows[i][2].toString().split(",") : [],
+      tahunPelajaran: rows[i][3] ? rows[i][3].toString() : ""
     });
   }
   return eskul;
@@ -218,43 +224,81 @@ function getEskulList(ss) {
 // Ambil Daftar Siswa
 function getStudentsList(ss) {
   var sheet = ss.getSheetByName("Siswa");
+  if (!sheet) return [];
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return [];
+  
   var rows = sheet.getDataRange().getValues();
   var students = [];
   for (var i = 1; i < rows.length; i++) {
+    var row = rows[i];
+    if (!row[0]) continue; // Skip baris kosong
+    
+    // Fungsi pembantu untuk mengambil data kolom secara aman
+    var getVal = function(idx) {
+      return (row[idx] !== undefined && row[idx] !== null) ? row[idx].toString() : "";
+    };
+    
+    var eskulId = getVal(27);
+    var eskulName = getVal(28);
+    var eskulId2 = "";
+    var eskulName2 = "";
+    var tahunPelajaran = "";
+    var createdAt = "";
+    
+    // Mendukung sheet dengan format 31 kolom (tanpa eskul pilihan ke-2) maupun 33 kolom (dengan eskul pilihan ke-2)
+    if (row.length <= 31) {
+      tahunPelajaran = getVal(29);
+      createdAt = getVal(30);
+    } else {
+      eskulId2 = getVal(29);
+      eskulName2 = getVal(30);
+      tahunPelajaran = getVal(31);
+      createdAt = getVal(32);
+      
+      // Fallback jika baris diisi format 31 kolom tapi baris memiliki sisa kolom kosong
+      if (tahunPelajaran === "" && eskulId2.indexOf("/") !== -1) {
+        tahunPelajaran = eskulId2;
+        createdAt = eskulName2;
+        eskulId2 = "";
+        eskulName2 = "";
+      }
+    }
+    
     students.push({
-      id: rows[i][0].toString(),
-      regNo: rows[i][1].toString(),
-      name: rows[i][2].toString(),
-      photo: rows[i][3] ? rows[i][3].toString() : "",
-      kelas: rows[i][4].toString(),
-      jenisKelamin: rows[i][5].toString(),
-      namaAyah: rows[i][6].toString(),
-      namaIbu: rows[i][7].toString(),
-      hpSiswa: rows[i][8].toString(),
-      hpOrtu: rows[i][9].toString(),
-      prestasiChecked: rows[i][10] === true || rows[i][10] === "TRUE",
-      namaLomba: rows[i][11] ? rows[i][11].toString() : "",
-      cabangLomba: rows[i][12] ? rows[i][12].toString() : "",
-      tingkatLomba: rows[i][13] ? rows[i][13].toString() : "",
-      juaraKe: rows[i][14] ? rows[i][14].toString() : "",
-      penyelenggara: rows[i][15] ? rows[i][15].toString() : "",
-      alamat: rows[i][16].toString(),
-      rt: rows[i][17].toString(),
-      rw: rows[i][18].toString(),
-      provinsiId: rows[i][19].toString(),
-      provinsiName: rows[i][20].toString(),
-      kabupatenId: rows[i][21].toString(),
-      kabupatenName: rows[i][22].toString(),
-      kecamatanId: rows[i][23].toString(),
-      kecamatanName: rows[i][24].toString(),
-      kelurahanId: rows[i][25].toString(),
-      kelurahanName: rows[i][26].toString(),
-      eskulId: rows[i][27].toString(),
-      eskulName: rows[i][28].toString(),
-      eskulId2: rows[i][29] ? rows[i][29].toString() : "",
-      eskulName2: rows[i][30] ? rows[i][30].toString() : "",
-      tahunPelajaran: rows[i][31].toString(),
-      createdAt: rows[i][32].toString()
+      id: getVal(0),
+      regNo: getVal(1),
+      name: getVal(2),
+      photo: getVal(3),
+      kelas: getVal(4),
+      jenisKelamin: getVal(5),
+      namaAyah: getVal(6),
+      namaIbu: getVal(7),
+      hpSiswa: getVal(8),
+      hpOrtu: getVal(9),
+      prestasiChecked: getVal(10) === "true" || getVal(10) === "TRUE" || row[10] === true,
+      namaLomba: getVal(11),
+      cabangLomba: getVal(12),
+      tingkatLomba: getVal(13),
+      juaraKe: getVal(14),
+      penyelenggara: getVal(15),
+      alamat: getVal(16),
+      rt: getVal(17),
+      rw: getVal(18),
+      provinsiId: getVal(19),
+      provinsiName: getVal(20),
+      kabupatenId: getVal(21),
+      kabupatenName: getVal(22),
+      kecamatanId: getVal(23),
+      kecamatanName: getVal(24),
+      kelurahanId: getVal(25),
+      kelurahanName: getVal(26),
+      eskulId: eskulId,
+      eskulName: eskulName,
+      eskulId2: eskulId2,
+      eskulName2: eskulName2,
+      tahunPelajaran: tahunPelajaran,
+      createdAt: createdAt
     });
   }
   return students;
@@ -271,7 +315,17 @@ function saveStudent(ss, s) {
   var targetYear = s.tahunPelajaran.split("/")[0]; // Ambil tahun awal saja (misal: 2026)
   
   for (var i = 1; i < rows.length; i++) {
-    if (rows[i][29].toString() === s.tahunPelajaran) {
+    var row = rows[i];
+    var rowTahunPelajaran = "";
+    if (row.length <= 31) {
+      rowTahunPelajaran = row[29] ? row[29].toString() : "";
+    } else {
+      rowTahunPelajaran = row[31] ? row[31].toString() : "";
+      if (rowTahunPelajaran === "" && row[29] && row[29].toString().indexOf("/") !== -1) {
+        rowTahunPelajaran = row[29].toString();
+      }
+    }
+    if (rowTahunPelajaran === s.tahunPelajaran) {
       matchCount++;
     }
   }

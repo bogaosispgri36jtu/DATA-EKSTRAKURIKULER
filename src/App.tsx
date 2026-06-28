@@ -293,8 +293,8 @@ export default function App() {
       try {
         const response = await fetch(gasUrl, {
           method: 'POST',
-          mode: 'no-cors', // Trigger simple post if required, or direct JSON depending on execution
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             action: 'registerStudent',
             data: studentData
@@ -350,7 +350,8 @@ export default function App() {
       try {
         await fetch(gasUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             action: 'addEskul',
             data: newEskul
@@ -378,7 +379,8 @@ export default function App() {
       try {
         await fetch(gasUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             action: 'deleteEskul',
             id
@@ -404,7 +406,8 @@ export default function App() {
       try {
         await fetch(gasUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             action: 'resetEskulStudents',
             eskulId
@@ -430,7 +433,8 @@ export default function App() {
       try {
         await fetch(gasUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             action: 'resetAllData'
           })
@@ -458,7 +462,8 @@ export default function App() {
       try {
         await fetch(settings.googleAppsScriptUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({
             action: 'updateSettings',
             data: newSettings
