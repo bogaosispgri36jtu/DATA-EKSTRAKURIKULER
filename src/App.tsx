@@ -121,6 +121,7 @@ export default function App() {
   // Navigation / Frame toggles
   const [activeView, setActiveView] = useState<'student' | 'admin' | 'guide'>('student');
   const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [loggedAdmin, setLoggedAdmin] = useState<{ username: string; status: string } | null>(null);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -132,6 +133,7 @@ export default function App() {
       setActiveView('admin');
     } else {
       setActiveView('student');
+      setLoggedAdmin(null);
     }
   };
 
@@ -163,7 +165,13 @@ export default function App() {
       return;
     }
 
-    if (loginUsername === settings.adminUsername && loginPassword === settings.adminPassword) {
+    const currentAdmins = (admins && admins.length > 0) ? admins : [{ username: 'admin', password: 'admin123', status: 'Admin Utama' }];
+    const matchedAccount = currentAdmins.find(
+      (acc) => acc.username.toLowerCase().trim() === loginUsername.toLowerCase().trim() && acc.password === loginPassword
+    );
+
+    if (matchedAccount) {
+      setLoggedAdmin({ username: matchedAccount.username, status: matchedAccount.status || 'Admin Biasa' });
       setIsAdminLoggedIn(true);
       setActiveView('admin');
       setIsLoginModalOpen(false);
@@ -196,6 +204,7 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>([]);
   const [eskulList, setEskulList] = useState<Extracurricular[]>([]);
   const [classList, setClassList] = useState<string[]>([]);
+  const [admins, setAdmins] = useState<any[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
     googleAppsScriptUrl: '',
     tahunPelajaranAktif: '2026/2027',
@@ -244,17 +253,27 @@ export default function App() {
         if (resJson.status === 'success') {
           setStudents(resJson.students || []);
           setEskulList(resJson.eskul || []);
-          if (resJson.classes && Array.isArray(resJson.classes)) {
+          if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
             setClassList(resJson.classes);
             localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
           } else {
-            setClassList([]);
+            const savedClasses = localStorage.getItem('smp_pgri_classes');
+            if (savedClasses) {
+              setClassList(JSON.parse(savedClasses));
+            } else {
+              setClassList(KELAS_LIST);
+            }
+          }
+          if (resJson.admins && Array.isArray(resJson.admins)) {
+            setAdmins(resJson.admins);
+          } else {
+            setAdmins([{ username: 'admin', password: 'admin123', status: 'Admin Utama' }]);
           }
           setSettings({
             ...currentSettings,
             tahunPelajaranAktif: resJson.settings.tahunPelajaranAktif,
-            adminUsername: resJson.settings.adminUsername,
-            adminPassword: resJson.settings.adminPassword
+            adminUsername: '',
+            adminPassword: ''
           });
           setIsLiveConnection(true);
           setIsLoading(false);
@@ -295,6 +314,9 @@ export default function App() {
       localStorage.setItem('smp_pgri_students', JSON.stringify(SEED_STUDENTS));
       setStudents(SEED_STUDENTS);
     }
+
+    // Load Admin List Fallback
+    setAdmins([{ username: 'admin', password: 'admin123', status: 'Admin Utama' }]);
 
     setIsLoading(false);
   };
@@ -494,6 +516,72 @@ export default function App() {
     fetchAppData(updated);
   };
 
+  // Add Admin Account
+  const handleAddAdmin = async (newAdmin: any): Promise<any> => {
+    const adminWithStatus = {
+      ...newAdmin,
+      status: newAdmin.status || (newAdmin.username.toLowerCase().trim() === 'admin' ? 'Admin Utama' : 'Admin Biasa')
+    };
+
+    const gasUrl = settings.googleAppsScriptUrl;
+    if (isLiveConnection && gasUrl && gasUrl.startsWith('http')) {
+      try {
+        const response = await fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            action: 'addAdmin',
+            data: adminWithStatus
+          })
+        });
+        if (!response.ok) throw new Error('Failed to save admin to Sheets');
+        const resJson = await response.json();
+        if (resJson.status === 'success') {
+          const updatedAdmins = [...admins, resJson.data];
+          setAdmins(updatedAdmins);
+          return resJson.data;
+        }
+      } catch (error) {
+        console.error('Error adding admin to Sheets:', error);
+        throw error;
+      }
+    }
+
+    // Local Fallback
+    const updated = [...admins, adminWithStatus];
+    setAdmins(updated);
+    return adminWithStatus;
+  };
+
+  // Delete Admin Account
+  const handleDeleteAdmin = async (username: string): Promise<void> => {
+    const gasUrl = settings.googleAppsScriptUrl;
+    if (isLiveConnection && gasUrl && gasUrl.startsWith('http')) {
+      try {
+        const response = await fetch(gasUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({
+            action: 'deleteAdmin',
+            username: username
+          })
+        });
+        if (!response.ok) throw new Error('Failed to delete admin from Sheets');
+        const resJson = await response.json();
+        if (resJson.status === 'success') {
+          setAdmins(prev => prev.filter(adm => adm.username.toLowerCase().trim() !== username.toLowerCase().trim()));
+          return;
+        }
+      } catch (error) {
+        console.error('Error deleting admin from Sheets:', error);
+        throw error;
+      }
+    }
+
+    // Local Fallback
+    setAdmins(prev => prev.filter(adm => adm.username.toLowerCase().trim() !== username.toLowerCase().trim()));
+  };
+
   return (
     <div className="bg-slate-50 min-h-screen text-slate-800 flex flex-col font-sans animate-fadeIn">
       
@@ -579,6 +667,10 @@ export default function App() {
                 onResetEskulStudents={handleResetEskulStudents}
                 onResetAllData={handleResetAllData}
                 onUpdateSettings={handleUpdateSettings}
+                onAddAdmin={handleAddAdmin}
+                onDeleteAdmin={handleDeleteAdmin}
+                admins={admins}
+                loggedAdmin={loggedAdmin}
                 isLoggedIn={isAdminLoggedIn}
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
                 isLive={isLiveConnection}
@@ -636,7 +728,7 @@ export default function App() {
                   type="text"
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
-                  placeholder="admin"
+                  placeholder="Username"
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
                 />
               </div>

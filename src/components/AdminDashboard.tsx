@@ -7,7 +7,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Lock, LayoutDashboard, FileText, Settings, Plus, Trash2, 
   Download, Printer, Search, Filter, ShieldAlert, CheckCircle2,
-  RefreshCcw, Eye, EyeOff, ArrowUpDown, Layers, Database, UserCheck, LogOut
+  RefreshCcw, Eye, EyeOff, ArrowUpDown, Layers, Database, UserCheck, LogOut,
+  UserPlus, User, Shield
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -24,6 +25,10 @@ interface AdminDashboardProps {
   onResetEskulStudents: (eskulId: string) => Promise<void>;
   onResetAllData: () => Promise<void>;
   onUpdateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  onAddAdmin?: (newAdmin: any) => Promise<any>;
+  onDeleteAdmin?: (username: string) => Promise<void>;
+  admins?: any[];
+  loggedAdmin?: { username: string; status: string } | null;
   isLoggedIn: boolean;
   setIsLoggedIn: (loggedIn: boolean) => void;
   isLive?: boolean;
@@ -40,6 +45,10 @@ export default function AdminDashboard({
   onResetEskulStudents,
   onResetAllData,
   onUpdateSettings,
+  onAddAdmin,
+  onDeleteAdmin,
+  admins = [],
+  loggedAdmin = null,
   isLoggedIn,
   setIsLoggedIn,
   isLive = false,
@@ -82,6 +91,12 @@ export default function AdminDashboard({
   const [activeYearInput, setActiveYearInput] = useState(settings.tahunPelajaranAktif);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
+  // New Admin Form State
+  const [newAdminUsername, setNewAdminUsername] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [newAdminConfirmPassword, setNewAdminConfirmPassword] = useState('');
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+
   // Login Handler
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,7 +127,20 @@ export default function AdminDashboard({
       return;
     }
 
-    if (username === settings.adminUsername && password === settings.adminPassword) {
+    const savedAdminsStr = localStorage.getItem('smp_pgri_admins');
+    let localAdmins = [{ username: 'admin', password: 'admin123' }];
+    if (savedAdminsStr) {
+      try {
+        localAdmins = JSON.parse(savedAdminsStr);
+      } catch (e) {}
+    }
+    
+    const currentAdmins = (admins && admins.length > 0) ? admins : localAdmins;
+    const isMatched = currentAdmins.some(
+      (acc) => acc.username.toLowerCase().trim() === username.toLowerCase().trim() && acc.password === password
+    );
+
+    if (isMatched) {
       setIsLoggedIn(true);
       Swal.fire({
         icon: 'success',
@@ -699,6 +727,135 @@ export default function AdminDashboard({
     }
   };
 
+  // Submit handler for creating a new admin account
+  const handleCreateAdminSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newAdminUsername.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Form Belum Lengkap',
+        text: 'Nama Lengkap (Username) wajib diisi!',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px'
+      });
+      return;
+    }
+    if (newAdminPassword.length < 6) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Form Belum Lengkap',
+        text: 'Password minimal 6 karakter!',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px'
+      });
+      return;
+    }
+    if (newAdminPassword !== newAdminConfirmPassword) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Password Tidak Cocok',
+        text: 'Password dan Konfirmasi Password tidak cocok!',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+      return;
+    }
+
+    setIsCreatingAdmin(true);
+    try {
+      if (onAddAdmin) {
+        await onAddAdmin({
+          username: newAdminUsername.trim(),
+          password: newAdminPassword
+        });
+        
+        Swal.fire({
+          icon: 'success',
+          iconColor: '#10b981',
+          title: 'Admin Terdaftar',
+          text: `Akun administrator "${newAdminUsername}" berhasil dibuat!`,
+          confirmButtonColor: '#10b981',
+          width: '340px'
+        });
+
+        // Reset form
+        setNewAdminUsername('');
+        setNewAdminPassword('');
+        setNewAdminConfirmPassword('');
+        
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        throw new Error('Metode pendaftaran admin tidak tersedia');
+      }
+    } catch (err) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Menyimpan',
+        text: 'Terjadi kesalahan saat menyimpan data admin baru.',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+    } finally {
+      setIsCreatingAdmin(false);
+    }
+  };
+
+  // Handle Delete Admin with SweetAlert2 confirmation
+  const handleDeleteAdminClick = async (username: string) => {
+    if (username.toLowerCase().trim() === 'admin') {
+      Swal.fire({
+        icon: 'error',
+        title: 'Aksi Ditolak',
+        text: 'Akun administrator utama "admin" tidak dapat dihapus!',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: 'Hapus Administrator?',
+      text: `Apakah Anda yakin ingin menghapus akun "${username}"? Akun ini tidak akan bisa login lagi.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Ya, Hapus',
+      cancelButtonText: 'Batal',
+      width: '360px'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        if (onDeleteAdmin) {
+          await onDeleteAdmin(username);
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil Dihapus',
+            text: `Akun administrator "${username}" berhasil dihapus.`,
+            confirmButtonColor: '#10b981',
+            width: '340px'
+          });
+          if (onRefresh) {
+            onRefresh();
+          }
+        } else {
+          throw new Error('Metode penghapusan admin tidak tersedia');
+        }
+      } catch (error) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal Menghapus',
+          text: 'Terjadi kesalahan saat menghapus data administrator.',
+          confirmButtonColor: '#ef4444',
+          width: '340px'
+        });
+      }
+    }
+  };
+
   // If not logged in, render beautiful login panel
   if (!isLoggedIn) {
     return (
@@ -772,7 +929,18 @@ export default function AdminDashboard({
         <div className="flex items-center gap-2.5">
           <div>
             <h1 className="text-sm sm:text-base md:text-lg font-black tracking-wide uppercase leading-none font-montserrat">Portal Guru & Dashboard Admin</h1>
-            <p className="text-[10px] sm:text-xs text-yellow-300 font-bold mt-1.5 font-poppins">SMP PGRI Jatiuwung Tangerang</p>
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <p className="text-[10px] sm:text-xs text-yellow-300 font-bold font-poppins">SMP PGRI Jatiuwung Tangerang</p>
+              {loggedAdmin && (
+                <>
+                  <span className="text-slate-500 text-xs hidden sm:inline">|</span>
+                  <div className="flex items-center gap-1 bg-blue-800/60 border border-blue-700/60 text-blue-100 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold shadow-inner">
+                    <User className="w-3 h-3 text-blue-300" />
+                    <span>Aktif: <span className="text-white">{loggedAdmin.username}</span></span>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-3.5 self-stretch sm:self-auto justify-between sm:justify-end">
@@ -848,7 +1016,7 @@ export default function AdminDashboard({
             }`}
           >
             <Settings className="w-4 h-4" />
-            <span className="hidden sm:inline">Pengaturan Database</span>
+            <span className="hidden sm:inline">Pengaturan</span>
             <span className="sm:hidden">Setelan</span>
           </button>
         </div>
@@ -1195,15 +1363,37 @@ export default function AdminDashboard({
 
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">GOOGLE APPS SCRIPT WEB APP URL</label>
-                  <div className="relative">
-                    <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                    <input
-                      type="url"
-                      value={gasUrlInput}
-                      onChange={(e) => setGasUrlInput(e.target.value)}
-                      placeholder="https://script.google.com/macros/s/.../exec"
-                      className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
-                    />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="url"
+                        value={gasUrlInput}
+                        onChange={(e) => setGasUrlInput(e.target.value)}
+                        placeholder="https://script.google.com/macros/s/.../exec"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                      />
+                    </div>
+                    {gasUrlInput && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGasUrlInput('');
+                          Swal.fire({
+                            icon: 'info',
+                            title: 'Kolom Dikosongkan',
+                            text: 'Jangan lupa klik "Simpan Pengaturan" di bawah untuk kembali ke mode simulasi lokal.',
+                            confirmButtonColor: '#1d4ed8',
+                            width: '340px'
+                          });
+                        }}
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                        title="Hapus URL"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span className="hidden sm:inline">Hapus URL</span>
+                      </button>
+                    )}
                   </div>
                   <p className="text-[9px] text-slate-400 leading-normal">
                     Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
@@ -1260,6 +1450,124 @@ export default function AdminDashboard({
                     Reset Seluruh Database Pendaftar
                   </button>
                 </div>
+              </div>
+            </div>
+
+            {/* Form Tambah Admin Baru (Aesthetic and Professional) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5 lg:col-span-2">
+              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                <UserPlus className="w-5 h-5 text-blue-700" />
+                Tambah Administrator Baru
+              </h2>
+              <form onSubmit={handleCreateAdminSubmit} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  
+                  {/* Username / Full Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                      Nama Lengkap (Username) <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        required
+                        value={newAdminUsername}
+                        onChange={(e) => setNewAdminUsername(e.target.value)}
+                        placeholder="Contoh: Ahmad Subardjo"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                      Password <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="password"
+                        required
+                        value={newAdminPassword}
+                        onChange={(e) => setNewAdminPassword(e.target.value)}
+                        placeholder="Minimal 6 karakter"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Password Confirmation */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                      Konfirmasi Password <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="password"
+                        required
+                        value={newAdminConfirmPassword}
+                        onChange={(e) => setNewAdminConfirmPassword(e.target.value)}
+                        placeholder="Ulangi password"
+                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                      />
+                    </div>
+                  </div>
+
+                </div>
+
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    disabled={isCreatingAdmin}
+                    className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    <span>{isCreatingAdmin ? 'Mendaftarkan...' : 'Daftarkan Admin Baru'}</span>
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Daftar Admin Aktif */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4 lg:col-span-1">
+              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                <Shield className="w-5 h-5 text-blue-700" />
+                Administrator Terdaftar ({admins && admins.length > 0 ? admins.length : 1})
+              </h2>
+              <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                {(admins && admins.length > 0 ? admins : [{ username: 'admin', status: 'Admin Utama' }]).map((adm: any, idx: number) => {
+                  const isAdminUtama = adm.username.toLowerCase().trim() === 'admin' || (adm.status && adm.status.toLowerCase().includes('utama'));
+                  const roleText = isAdminUtama ? 'Admin Utama' : (adm.status || 'Admin Biasa');
+                  return (
+                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100 gap-2">
+                      <div className="min-w-0 flex items-center gap-2">
+                        <div className="w-7 h-7 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
+                          {adm.username ? adm.username.charAt(0).toUpperCase() : 'A'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-slate-800 truncate">{adm.username}</p>
+                          <p className="text-[9px] text-slate-400 font-bold uppercase">Akses: {roleText}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[9px] bg-green-50 text-green-700 border border-green-200/50 px-2 py-0.5 rounded-full font-bold">Aktif</span>
+                        {!isAdminUtama && (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAdminClick(adm.username)}
+                            className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                            title="Hapus Administrator"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 

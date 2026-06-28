@@ -55,3 +55,9 @@ export interface AppSettings {
   adminUsername: string;
   adminPassword: string;
 }
+
+export interface AdminUser {
+  username: string;
+  password?: string;
+}
+
