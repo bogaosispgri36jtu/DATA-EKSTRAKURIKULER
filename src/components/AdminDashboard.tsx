@@ -13,6 +13,7 @@ import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import { Student, Extracurricular, AppSettings } from '../types';
 import { TAHUN_PELAJARAN_LIST } from '../data';
+import ApiSetupGuide from './ApiSetupGuide';
 
 interface AdminDashboardProps {
   students: Student[];
@@ -1260,6 +1261,11 @@ export default function AdminDashboard({
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* Panduan Integrasi Backend & Spreadsheet */}
+            <div className="lg:col-span-3 mt-6">
+              <ApiSetupGuide />
             </div>
 
           </div>
