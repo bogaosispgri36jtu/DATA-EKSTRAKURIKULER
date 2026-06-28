@@ -25,9 +25,10 @@ interface StudentFormProps {
   tahunPelajaranAktif: string;
   onSubmitRegistration: (studentData: Omit<Student, 'id' | 'regNo' | 'createdAt'>) => Promise<Student>;
   isLive: boolean;
+  classList?: string[];
 }
 
-export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRegistration, isLive }: StudentFormProps) {
+export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRegistration, isLive, classList = [] }: StudentFormProps) {
   const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -118,6 +119,14 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     // Sort alphanumeric order nicely (e.g. VII, VIII, IX or 7A, 7B, 8A etc)
     return sortedList.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }, [eskulList, tahunPelajaranAktif]);
+
+  // Use classList from spreadsheet if available, fallback to dynamic derived list
+  const finalKelasList = React.useMemo(() => {
+    if (classList && classList.length > 0) {
+      return classList;
+    }
+    return dynamicKelasList;
+  }, [classList, dynamicKelasList]);
 
   // Load Provinces on mount
   useEffect(() => {
@@ -362,9 +371,10 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
   // Extract Grade from selected Class
   const getGrade = (selectedClass: string): string => {
-    if (selectedClass.startsWith('VII')) return 'VII';
-    if (selectedClass.startsWith('VIII')) return 'VIII';
-    if (selectedClass.startsWith('IX')) return 'IX';
+    const cls = selectedClass.toUpperCase().trim();
+    if (cls.startsWith('VII') || cls.startsWith('7') || cls.includes('KELAS VII') || cls.includes('KELAS 7')) return 'VII';
+    if (cls.startsWith('VIII') || cls.startsWith('8') || cls.includes('KELAS VIII') || cls.includes('KELAS 8')) return 'VIII';
+    if (cls.startsWith('IX') || cls.startsWith('9') || cls.includes('KELAS IX') || cls.includes('KELAS 9')) return 'IX';
     return '';
   };
 
@@ -1068,7 +1078,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       required
                     >
                       <option value="">Pilih...</option>
-                      {dynamicKelasList.map(k => (
+                      {finalKelasList.map(k => (
                         <option key={k} value={k}>{k}</option>
                       ))}
                     </select>

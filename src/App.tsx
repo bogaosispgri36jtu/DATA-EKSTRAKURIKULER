@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { Student, Extracurricular, AppSettings } from './types';
-import { DEFAULT_EXTRACURRICULARS } from './data';
+import { DEFAULT_EXTRACURRICULARS, KELAS_LIST } from './data';
 import StudentForm from './components/StudentForm';
 import AdminDashboard from './components/AdminDashboard';
 import ApiSetupGuide from './components/ApiSetupGuide';
@@ -195,6 +195,7 @@ export default function App() {
   // Core Data state
   const [students, setStudents] = useState<Student[]>([]);
   const [eskulList, setEskulList] = useState<Extracurricular[]>([]);
+  const [classList, setClassList] = useState<string[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
     googleAppsScriptUrl: '',
     tahunPelajaranAktif: '2026/2027',
@@ -243,6 +244,12 @@ export default function App() {
         if (resJson.status === 'success') {
           setStudents(resJson.students || []);
           setEskulList(resJson.eskul || []);
+          if (resJson.classes && Array.isArray(resJson.classes)) {
+            setClassList(resJson.classes);
+            localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
+          } else {
+            setClassList([]);
+          }
           setSettings({
             ...currentSettings,
             tahunPelajaranAktif: resJson.settings.tahunPelajaranAktif,
@@ -269,6 +276,15 @@ export default function App() {
     } else {
       localStorage.setItem('smp_pgri_eskul', JSON.stringify(DEFAULT_EXTRACURRICULARS));
       setEskulList(DEFAULT_EXTRACURRICULARS);
+    }
+
+    // Load Kelas List
+    const savedClasses = localStorage.getItem('smp_pgri_classes');
+    if (savedClasses) {
+      setClassList(JSON.parse(savedClasses));
+    } else {
+      localStorage.setItem('smp_pgri_classes', JSON.stringify(KELAS_LIST));
+      setClassList(KELAS_LIST);
     }
 
     // Load Students
@@ -550,6 +566,7 @@ export default function App() {
                 tahunPelajaranAktif={settings.tahunPelajaranAktif}
                 onSubmitRegistration={handleRegisterStudent}
                 isLive={isLiveConnection}
+                classList={classList}
               />
             )}
             {activeView === 'admin' && (
@@ -566,6 +583,7 @@ export default function App() {
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
                 isLive={isLiveConnection}
                 onRefresh={() => fetchAppData(settings)}
+                classList={classList}
               />
             )}
           </div>

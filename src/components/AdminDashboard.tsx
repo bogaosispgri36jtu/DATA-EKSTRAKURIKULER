@@ -27,6 +27,7 @@ interface AdminDashboardProps {
   setIsLoggedIn: (loggedIn: boolean) => void;
   isLive?: boolean;
   onRefresh?: () => Promise<void> | void;
+  classList?: string[];
 }
 
 export default function AdminDashboard({
@@ -41,7 +42,8 @@ export default function AdminDashboard({
   isLoggedIn,
   setIsLoggedIn,
   isLive = false,
-  onRefresh
+  onRefresh,
+  classList = []
 }: AdminDashboardProps) {
   const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
 
@@ -236,6 +238,14 @@ export default function AdminDashboard({
     const sortedList = Array.from(classesSet);
     return sortedList.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }, [eskulList]);
+
+  // Use classList from spreadsheet if available, fallback to dynamic derived list
+  const finalKelasList = React.useMemo(() => {
+    if (classList && classList.length > 0) {
+      return classList;
+    }
+    return dynamicKelasList;
+  }, [classList, dynamicKelasList]);
 
   // Filter students based on query
   const filteredStudents = students.filter(student => {
@@ -1028,7 +1038,7 @@ export default function AdminDashboard({
                       className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
                     >
                       <option value="">Semua Kelas</option>
-                      {dynamicKelasList.map(k => (
+                      {finalKelasList.map(k => (
                         <option key={k} value={k}>{k}</option>
                       ))}
                     </select>

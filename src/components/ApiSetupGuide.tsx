@@ -93,7 +93,8 @@ function doGet(e) {
         status: "success",
         settings: getSettings(ss),
         eskul: getEskulList(ss),
-        students: getStudentsList(ss)
+        students: getStudentsList(ss),
+        classes: getClassList(ss)
       };
     } else {
       response = { status: "error", message: "Action tidak ditemukan!" };
@@ -183,6 +184,50 @@ function initDatabase(ss) {
       "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "TahunPelajaran", "CreatedAt"
     ]);
   }
+  
+  var sheetKelas = ss.getSheetByName("Kelas");
+  if (!sheetKelas) {
+    sheetKelas = ss.insertSheet("Kelas");
+    sheetKelas.appendRow(["Nama Kelas"]);
+    sheetKelas.appendRow(["VII-1"]);
+    sheetKelas.appendRow(["VII-2"]);
+    sheetKelas.appendRow(["VII-3"]);
+    sheetKelas.appendRow(["VIII-1"]);
+    sheetKelas.appendRow(["VIII-2"]);
+    sheetKelas.appendRow(["VIII-3"]);
+    sheetKelas.appendRow(["IX-1"]);
+    sheetKelas.appendRow(["IX-2"]);
+    sheetKelas.appendRow(["IX-3"]);
+  }
+}
+
+// Ambil Daftar Kelas dari Sheet Kelas
+function getClassList(ss) {
+  var sheet = ss.getSheetByName("Kelas");
+  if (!sheet) return [];
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 1) return [];
+  
+  var rows = sheet.getDataRange().getValues();
+  var classes = [];
+  var startIdx = 0;
+  
+  // Deteksi header secara cerdas
+  var firstCell = rows[0][0] ? rows[0][0].toString().toLowerCase() : "";
+  if (firstCell === "id" || firstCell === "nama" || firstCell === "kelas" || firstCell === "nama kelas") {
+    startIdx = 1;
+  }
+  
+  for (var i = startIdx; i < rows.length; i++) {
+    var val = rows[i][0];
+    if (val !== undefined && val !== null) {
+      var valStr = val.toString().trim();
+      if (valStr) {
+        classes.push(valStr);
+      }
+    }
+  }
+  return classes;
 }
 
 // Ambil Konfigurasi Settings
