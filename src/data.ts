@@ -31,11 +31,7 @@ export const TAHUN_PELAJARAN_LIST = [
   '2035/2036'
 ];
 
-export const KELAS_LIST = [
-  'VII-1', 'VII-2', 'VII-3', 'VII-4', 'VII-5',
-  'VIII-1', 'VIII-2', 'VIII-3', 'VIII-4', 'VIII-5',
-  'IX-1', 'IX-2', 'IX-3', 'IX-4', 'IX-5'
-];
+// Kelas list is now dynamically synchronized from spreadsheet/local eskul entry instead of using hardcoded values
 
 // High-fidelity local database focusing on Banten (Jatiuwung / Tangerang) and surrounding areas
 export interface RegionItem {

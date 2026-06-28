@@ -206,15 +206,6 @@ function initDatabase(ss) {
   if (!sheetKelas) {
     sheetKelas = ss.insertSheet("Kelas");
     sheetKelas.appendRow(["Nama Kelas"]);
-    sheetKelas.appendRow(["VII-1"]);
-    sheetKelas.appendRow(["VII-2"]);
-    sheetKelas.appendRow(["VII-3"]);
-    sheetKelas.appendRow(["VIII-1"]);
-    sheetKelas.appendRow(["VIII-2"]);
-    sheetKelas.appendRow(["VIII-3"]);
-    sheetKelas.appendRow(["IX-1"]);
-    sheetKelas.appendRow(["IX-2"]);
-    sheetKelas.appendRow(["IX-3"]);
   }
 }
 
@@ -538,6 +529,34 @@ function saveEskul(ss, e) {
     e.kelasAllowed.join(","),
     e.tahunPelajaran
   ]);
+
+  // Tambahkan kelas ke sheet "Kelas" secara dinamis jika belum ada
+  var sheetKelas = ss.getSheetByName("Kelas");
+  if (!sheetKelas) {
+    sheetKelas = ss.insertSheet("Kelas");
+    sheetKelas.appendRow(["Nama Kelas"]);
+  }
+  
+  var existingClasses = getClassList(ss);
+  var classesToSave = e.kelasAllowed;
+  
+  for (var k = 0; k < classesToSave.length; k++) {
+    var clsName = classesToSave[k].toString().trim();
+    if (clsName) {
+      var exists = false;
+      for (var j = 0; j < existingClasses.length; j++) {
+        if (existingClasses[j].toLowerCase().trim() === clsName.toLowerCase().trim()) {
+          exists = true;
+          break;
+        }
+      }
+      if (!exists) {
+        sheetKelas.appendRow([clsName]);
+        existingClasses.push(clsName); // Update local array to handle duplicates in the same batch
+      }
+    }
+  }
+
   e.id = id;
   return e;
 }

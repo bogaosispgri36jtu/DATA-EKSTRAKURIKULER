@@ -204,7 +204,7 @@ export default function AdminDashboard({
     try {
       await onAddEskul(newEskulNama, classesArray, newEskulTahun);
       setNewEskulNama('');
-      setNewEskulKelas('VII, VIII, IX');
+      setNewEskulKelas('');
       Swal.fire({
         icon: 'success',
         title: 'Eskul Ditambahkan',
@@ -1054,37 +1054,35 @@ export default function AdminDashboard({
                   value={newEskulNama}
                   onChange={(e) => setNewEskulNama(e.target.value)}
                   placeholder="Contoh: English Club, Hadroh..."
-                  className="w-full px-3.5 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-200 shadow-sm"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                <div className="space-y-1.5">
-                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN</label>
-                  <select
-                    value={newEskulTahun}
-                    onChange={(e) => setNewEskulTahun(e.target.value)}
-                    className="w-full px-2.5 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
-                  >
-                    {TAHUN_PELAJARAN_LIST.map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN</label>
+                <select
+                  value={newEskulTahun}
+                  onChange={(e) => setNewEskulTahun(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 focus:bg-white cursor-pointer transition-all duration-200 shadow-sm"
+                >
+                  {TAHUN_PELAJARAN_LIST.map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
 
-                <div className="space-y-1.5">
-                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">ROMBEL KELAS DIIZINKAN <span className="text-red-500">*</span></label>
-                  <input
-                    type="text"
-                    value={newEskulKelas}
-                    onChange={(e) => setNewEskulKelas(e.target.value)}
-                    placeholder="Contoh: 7.A, 8.A, 9.A"
-                    className="w-full px-3.5 py-2 sm:py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-mono"
-                    required
-                  />
-                  <p className="text-[8px] sm:text-[9px] text-slate-400 font-medium leading-none">Pisahkan dengan koma.</p>
-                </div>
+              <div className="space-y-1.5">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">ROMBEL KELAS DIIZINKAN <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={newEskulKelas}
+                  onChange={(e) => setNewEskulKelas(e.target.value)}
+                  placeholder="Contoh: 7.A, 8.A, 9.A"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-mono transition-all duration-200 shadow-sm"
+                  required
+                />
+                <p className="text-[8px] sm:text-[9px] text-slate-400 font-medium leading-none">Pisahkan dengan koma (Contoh: VII-1, VII-2, VIII-1).</p>
               </div>
 
               <button
@@ -1229,17 +1227,35 @@ export default function AdminDashboard({
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Kartu Informasi Pendaftar Per Kelas */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 space-y-3.5">
-                <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <UserCheck className="w-4.5 h-4.5 text-blue-700" />
-                  Jumlah Pendaftar per Kelas
-                </h2>
-                <p className="text-[10px] text-slate-400 font-medium leading-normal">
-                  Statistik jumlah pendaftar per kelas untuk tahun ajaran aktif ({settings.tahunPelajaranAktif}). Klik kelas untuk menyaring data pendaftar.
-                </p>
-                <div className="grid grid-cols-2 gap-2 max-h-[220px] overflow-y-auto pr-1">
+            {/* Students List Display (Right side - 2 cols on lg) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 lg:col-span-2 space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-3">
+                <div>
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider font-montserrat">Daftar Siswa Terdaftar</h3>
+                  <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Tahun Pelajaran: {settings.tahunPelajaranAktif}</p>
+                </div>
+                <span className="bg-blue-50 text-blue-800 font-extrabold px-2.5 py-1 rounded-lg font-mono text-[11px] self-start sm:self-auto border border-blue-100">
+                  {filteredStudents.length} siswa ditemukan
+                </span>
+              </div>
+
+              {/* Saringan Berdasarkan Rombel Kelas Terintegrasi */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2.5">
+                <span className="text-[9px] font-black text-slate-500 uppercase tracking-wider block">Saring Berdasarkan Rombel Kelas:</span>
+                <div className="flex flex-wrap gap-2 max-h-[160px] overflow-y-auto pr-1">
+                  <button
+                    type="button"
+                    onClick={() => setFilterKelas('')}
+                    className={`px-3 py-1.5 rounded-xl border text-[11px] font-extrabold transition-all cursor-pointer ${
+                      filterKelas === ''
+                        ? 'bg-blue-700 border-blue-700 text-white shadow-md'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                  >
+                    Semua Kelas ({students.filter(s => s.tahunPelajaran === settings.tahunPelajaranAktif).length})
+                  </button>
                   {classRegistrationStats.map((item, idx) => {
                     const isSelected = filterKelas === item.className;
                     return (
@@ -1253,15 +1269,15 @@ export default function AdminDashboard({
                             setFilterKelas(item.className);
                           }
                         }}
-                        className={`flex items-center justify-between p-2.5 rounded-xl border transition-all text-left cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-xl border text-[11px] font-extrabold transition-all flex items-center gap-2 cursor-pointer ${
                           isSelected
-                            ? 'bg-blue-600 border-blue-600 text-white shadow-sm ring-2 ring-blue-100'
-                            : 'bg-slate-50 border-slate-100 hover:border-slate-300 text-slate-700 hover:bg-slate-100/50'
+                            ? 'bg-blue-700 border-blue-700 text-white shadow-md'
+                            : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                         }`}
                       >
-                        <span className="text-xs font-bold truncate">{item.className}</span>
-                        <span className={`text-[10px] font-mono font-black px-1.5 py-0.5 rounded-md ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-blue-50 text-blue-800'
+                        <span>Kelas {item.className}</span>
+                        <span className={`text-[10px] font-black font-mono px-1.5 py-0.5 rounded-md ${
+                          isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 border border-slate-200/50'
                         }`}>
                           {item.count}
                         </span>
@@ -1269,24 +1285,9 @@ export default function AdminDashboard({
                     );
                   })}
                   {classRegistrationStats.length === 0 && (
-                    <div className="col-span-2 text-center py-4 text-[11px] text-slate-400 font-semibold">
-                      Belum ada data kelas dari Eskul.
-                    </div>
+                    <span className="text-[11px] text-slate-400 font-semibold italic">Tidak ada data kelas dari Eskul.</span>
                   )}
                 </div>
-              </div>
-            </div>
-
-            {/* Students List Display (Right side - 2 cols on lg) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 lg:col-span-2 space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-3">
-                <div>
-                  <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider font-montserrat">Daftar Siswa Terdaftar</h3>
-                  <p className="text-[10px] text-slate-400 font-medium mt-0.5">Tahun Pelajaran: {settings.tahunPelajaranAktif}</p>
-                </div>
-                <span className="bg-blue-50 text-blue-800 font-black px-2.5 py-1 rounded-lg font-mono text-[11px] self-start sm:self-auto">
-                  {filteredStudents.length} baris data ditemukan
-                </span>
               </div>
 
               <div className="overflow-x-auto rounded-xl border border-slate-100">

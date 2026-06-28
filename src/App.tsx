@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { Student, Extracurricular, AppSettings } from './types';
-import { DEFAULT_EXTRACURRICULARS, KELAS_LIST } from './data';
+import { DEFAULT_EXTRACURRICULARS } from './data';
 import StudentForm from './components/StudentForm';
 import AdminDashboard from './components/AdminDashboard';
 import ApiSetupGuide from './components/ApiSetupGuide';
@@ -261,7 +261,20 @@ export default function App() {
             if (savedClasses) {
               setClassList(JSON.parse(savedClasses));
             } else {
-              setClassList(KELAS_LIST);
+              // Extract unique classes dynamically from eskul list if classes sheet is empty
+              const currentEskuls = resJson.eskul || [];
+              const extracted: string[] = [];
+              currentEskuls.forEach((esk: any) => {
+                if (esk && esk.kelasAllowed) {
+                  esk.kelasAllowed.forEach((cls: string) => {
+                    const trimmed = cls.trim();
+                    if (trimmed && !extracted.includes(trimmed)) {
+                      extracted.push(trimmed);
+                    }
+                  });
+                }
+              });
+              setClassList(extracted);
             }
           }
           if (resJson.admins && Array.isArray(resJson.admins)) {
@@ -302,8 +315,21 @@ export default function App() {
     if (savedClasses) {
       setClassList(JSON.parse(savedClasses));
     } else {
-      localStorage.setItem('smp_pgri_classes', JSON.stringify(KELAS_LIST));
-      setClassList(KELAS_LIST);
+      // Dynamic fallback based on unique classes in eskul list
+      const currentEskuls = savedEskul ? JSON.parse(savedEskul) : DEFAULT_EXTRACURRICULARS;
+      const extractedClasses: string[] = [];
+      currentEskuls.forEach((esk: any) => {
+        if (esk && esk.kelasAllowed) {
+          esk.kelasAllowed.forEach((cls: string) => {
+            const trimmed = cls.trim();
+            if (trimmed && !extractedClasses.includes(trimmed)) {
+              extractedClasses.push(trimmed);
+            }
+          });
+        }
+      });
+      localStorage.setItem('smp_pgri_classes', JSON.stringify(extractedClasses));
+      setClassList(extractedClasses);
     }
 
     // Load Students
@@ -407,6 +433,21 @@ export default function App() {
     const updatedList = [createdEskul, ...eskulList];
     setEskulList(updatedList);
     localStorage.setItem('smp_pgri_eskul', JSON.stringify(updatedList));
+
+    // Update Class List dynamically with newly entered classes
+    const updatedClasses = [...classList];
+    let classListChanged = false;
+    kelasAllowed.forEach(cls => {
+      const trimmed = cls.trim();
+      if (trimmed && !updatedClasses.includes(trimmed)) {
+        updatedClasses.push(trimmed);
+        classListChanged = true;
+      }
+    });
+    if (classListChanged) {
+      setClassList(updatedClasses);
+      localStorage.setItem('smp_pgri_classes', JSON.stringify(updatedClasses));
+    }
   };
 
   // Delete Extracurricular
