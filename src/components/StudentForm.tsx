@@ -378,13 +378,48 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     return '';
   };
 
+  // Smart checking if student's selected class fits the eskul's allowed classes list
+  const isClassEligible = (studentClass: string, allowedClasses: string[]): boolean => {
+    if (!studentClass) return true;
+    if (!allowedClasses || allowedClasses.length === 0) return true;
+
+    const normalizedStudentClass = studentClass.trim().toUpperCase();
+    
+    // Extract student grade level
+    const isStudent7 = normalizedStudentClass.startsWith('VII') || normalizedStudentClass.startsWith('7') || normalizedStudentClass.includes('KELAS VII') || normalizedStudentClass.includes('KELAS 7');
+    const isStudent8 = normalizedStudentClass.startsWith('VIII') || normalizedStudentClass.startsWith('8') || normalizedStudentClass.includes('KELAS VIII') || normalizedStudentClass.includes('KELAS 8');
+    const isStudent9 = normalizedStudentClass.startsWith('IX') || normalizedStudentClass.startsWith('9') || normalizedStudentClass.includes('KELAS IX') || normalizedStudentClass.includes('KELAS 9');
+
+    for (const allowed of allowedClasses) {
+      const normAllowed = allowed.trim().toUpperCase();
+      if (!normAllowed) continue;
+      
+      // 1. Exact match
+      if (normalizedStudentClass === normAllowed) return true;
+      
+      // 2. Substring match
+      if (normalizedStudentClass.includes(normAllowed) || normAllowed.includes(normalizedStudentClass)) return true;
+
+      // 3. Smart Roman/Arabic grade level match
+      const isAllowed7 = normAllowed.startsWith('VII') || normAllowed.startsWith('7') || normAllowed.includes('KELAS VII') || normAllowed.includes('KELAS 7');
+      const isAllowed8 = normAllowed.startsWith('VIII') || normAllowed.startsWith('8') || normAllowed.includes('KELAS VIII') || normAllowed.includes('KELAS 8');
+      const isAllowed9 = normAllowed.startsWith('IX') || normAllowed.startsWith('9') || normAllowed.includes('KELAS IX') || normAllowed.includes('KELAS 9');
+
+      if (isStudent7 && isAllowed7) return true;
+      if (isStudent8 && isAllowed8) return true;
+      if (isStudent9 && isAllowed9) return true;
+    }
+
+    return false;
+  };
+
   // Filter extracurricular activities by eligibility and active school year
   const studentGrade = getGrade(kelas);
   const eligibleEskuls = eskulList.filter(eskul => {
     const matchYear = eskul.tahunPelajaran === tahunPelajaranAktif;
     if (!matchYear) return false;
-    if (!studentGrade) return true; // Show all if class not selected yet
-    return eskul.kelasAllowed.includes(studentGrade);
+    if (!kelas) return true; // Show all if class not selected yet
+    return isClassEligible(kelas, eskul.kelasAllowed);
   });
 
   // Check if form is fully valid
@@ -1166,7 +1201,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     <option value="">{kelas ? '-- Pilih Ekstrakurikuler --' : 'Pilih Kelas terlebih dahulu...'}</option>
                     {eligibleEskuls.map(eskul => (
                       <option key={eskul.id} value={eskul.id}>
-                        {eskul.nama} ({eskul.kelasAllowed.join('/')})
+                        {eskul.nama}
                       </option>
                     ))}
                   </select>
@@ -1198,7 +1233,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       .filter(eskul => eskul.id !== selectedEskul?.id)
                       .map(eskul => (
                         <option key={eskul.id} value={eskul.id}>
-                          {eskul.nama} ({eskul.kelasAllowed.join('/')})
+                          {eskul.nama}
                         </option>
                       ))}
                   </select>

@@ -95,6 +95,7 @@ export default function AdminDashboard({
   const [newAdminUsername, setNewAdminUsername] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAdminConfirmPassword, setNewAdminConfirmPassword] = useState('');
+  const [newAdminStatus, setNewAdminStatus] = useState('Admin Biasa');
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
 
   // Login Handler
@@ -766,7 +767,8 @@ export default function AdminDashboard({
       if (onAddAdmin) {
         await onAddAdmin({
           username: newAdminUsername.trim(),
-          password: newAdminPassword
+          password: newAdminPassword,
+          status: newAdminStatus
         });
         
         Swal.fire({
@@ -782,6 +784,7 @@ export default function AdminDashboard({
         setNewAdminUsername('');
         setNewAdminPassword('');
         setNewAdminConfirmPassword('');
+        setNewAdminStatus('Admin Biasa');
         
         if (onRefresh) {
           onRefresh();
@@ -1460,7 +1463,7 @@ export default function AdminDashboard({
                 Tambah Administrator Baru
               </h2>
               <form onSubmit={handleCreateAdminSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   
                   {/* Username / Full Name */}
                   <div className="space-y-1.5">
@@ -1513,6 +1516,28 @@ export default function AdminDashboard({
                         placeholder="Ulangi password"
                         className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
                       />
+                    </div>
+                  </div>
+
+                  {/* Status / Role Selection */}
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                      Status Admin <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <select
+                        required
+                        value={newAdminStatus}
+                        onChange={(e) => setNewAdminStatus(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 appearance-none cursor-pointer"
+                      >
+                        <option value="Admin Biasa">Admin Biasa</option>
+                        <option value="Admin Utama">Admin Utama</option>
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                      </div>
                     </div>
                   </div>
 
