@@ -30,7 +30,7 @@ interface AdminDashboardProps {
   admins?: any[];
   loggedAdmin?: { username: string; status: string } | null;
   isLoggedIn: boolean;
-  setIsLoggedIn: (loggedIn: boolean) => void;
+  setIsLoggedIn: (loggedIn: boolean, adminUser?: { username: string; status: string }) => void;
   isLive?: boolean;
   onRefresh?: () => Promise<void> | void;
   classList?: string[];
@@ -55,6 +55,11 @@ export default function AdminDashboard({
   onRefresh,
   classList = []
 }: AdminDashboardProps) {
+  const isLoggedAdminUtama = !loggedAdmin ? false : (
+    loggedAdmin.username.toLowerCase().trim() === 'admin' || 
+    (loggedAdmin.status && loggedAdmin.status.toLowerCase().includes('utama'))
+  );
+
   const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -65,6 +70,12 @@ export default function AdminDashboard({
       setLogoImgElement(img);
     };
   }, []);
+
+  useEffect(() => {
+    setGasUrlInput(settings.googleAppsScriptUrl || '');
+    setActiveYearInput(settings.tahunPelajaranAktif);
+    setNewEskulTahun(settings.tahunPelajaranAktif);
+  }, [settings]);
 
   // Login State
   const [username, setUsername] = useState('');
@@ -96,11 +107,13 @@ export default function AdminDashboard({
   const [newAdminUsername, setNewAdminUsername] = useState('');
   const [newAdminPassword, setNewAdminPassword] = useState('');
   const [newAdminConfirmPassword, setNewAdminConfirmPassword] = useState('');
-  const [newAdminStatus, setNewAdminStatus] = useState('Admin Biasa');
+  const [newAdminStatus, setNewAdminStatus] = useState('Biasa');
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
+  const [showAdminConfirmPassword, setShowAdminConfirmPassword] = useState(false);
 
   // Login Handler
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
       Swal.fire({
@@ -130,7 +143,7 @@ export default function AdminDashboard({
     }
 
     const savedAdminsStr = localStorage.getItem('smp_pgri_admins');
-    let localAdmins = [{ username: 'admin', password: 'admin123' }];
+    let localAdmins = [{ username: 'admin', password: 'admin123', status: 'Utama' }];
     if (savedAdminsStr) {
       try {
         localAdmins = JSON.parse(savedAdminsStr);
@@ -138,12 +151,44 @@ export default function AdminDashboard({
     }
     
     const currentAdmins = (admins && admins.length > 0) ? admins : localAdmins;
-    const isMatched = currentAdmins.some(
-      (acc) => acc.username.toLowerCase().trim() === username.toLowerCase().trim() && acc.password === password
-    );
+    let matchedAccount = currentAdmins.find((acc) => {
+      const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+      const p = acc.password ? acc.password.toString().trim() : '';
+      return u === username.toLowerCase().trim() && p === password.trim();
+    });
 
-    if (isMatched) {
-      setIsLoggedIn(true);
+    if (!matchedAccount && settings.googleAppsScriptUrl && settings.googleAppsScriptUrl.startsWith('http')) {
+      Swal.fire({
+        title: 'Memverifikasi...',
+        text: 'Sedang mencocokkan data dengan Google Sheet...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+        width: '340px'
+      });
+
+      try {
+        const response = await fetch(`${settings.googleAppsScriptUrl}?action=getData`);
+        if (response.ok) {
+          const resJson = await response.json();
+          if (resJson.status === 'success' && resJson.admins && Array.isArray(resJson.admins)) {
+            localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
+            matchedAccount = resJson.admins.find((acc: any) => {
+              const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+              const p = acc.password ? acc.password.toString().trim() : '';
+              return u === username.toLowerCase().trim() && p === password.trim();
+            });
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to refetch live admins for verification', error);
+      }
+      Swal.close();
+    }
+
+    if (matchedAccount) {
+      setIsLoggedIn(true, { username: matchedAccount.username, status: matchedAccount.status || 'Biasa' });
       Swal.fire({
         icon: 'success',
         iconColor: '#10b981', // Emerald green
@@ -155,15 +200,24 @@ export default function AdminDashboard({
         width: '340px'
       });
     } else {
+      const activeAdmins = (admins && admins.length > 0) ? admins : localAdmins;
+      const loadedUsernames = activeAdmins.map((acc: any) => acc.username || '').filter(Boolean);
+      const usernamesListHtml = loadedUsernames.length > 0 
+        ? `<div class="mt-2 text-[10px] bg-blue-50 text-blue-800 p-2 rounded-lg font-bold"><b>Daftar Akun Terdaftar Saat Ini:</b><br/>${loadedUsernames.join(', ')}</div>`
+        : '';
+
       Swal.fire({
         icon: 'error',
         title: 'Akses Ditolak',
-        text: 'Username atau password salah!',
+        html: `<div class="text-xs text-slate-600 leading-relaxed text-center space-y-1.5">
+          <div>Username atau password salah!</div>
+          ${usernamesListHtml}
+          <div class="mt-2 text-[10px] bg-slate-100 p-2 rounded-lg text-slate-500 font-semibold text-left">
+            <b>Tips:</b> Jika baru menambahkan admin di Spreadsheet, pastikan Anda sudah melakukan <b>Deploy Ulang (New Deployment)</b> di Google Apps Script agar perubahan tersinkronisasi.
+          </div>
+        </div>`,
         confirmButtonColor: '#ef4444',
-        width: '340px',
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false
+        width: '340px'
       });
     }
   };
@@ -775,6 +829,17 @@ export default function AdminDashboard({
     }
 
     setIsCreatingAdmin(true);
+    Swal.fire({
+      title: 'Mendaftarkan Admin...',
+      text: `Sedang memproses pendaftaran akun "${newAdminUsername.trim()}" ke Google Sheet...`,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showConfirmButton: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
       if (onAddAdmin) {
         await onAddAdmin({
@@ -796,11 +861,7 @@ export default function AdminDashboard({
         setNewAdminUsername('');
         setNewAdminPassword('');
         setNewAdminConfirmPassword('');
-        setNewAdminStatus('Admin Biasa');
-        
-        if (onRefresh) {
-          onRefresh();
-        }
+        setNewAdminStatus('Biasa');
       } else {
         throw new Error('Metode pendaftaran admin tidak tersedia');
       }
@@ -843,6 +904,17 @@ export default function AdminDashboard({
     });
 
     if (result.isConfirmed) {
+      Swal.fire({
+        title: 'Menghapus Admin...',
+        text: `Sedang memproses penghapusan akun "${username}" dari Google Sheet...`,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
       try {
         if (onDeleteAdmin) {
           await onDeleteAdmin(username);
@@ -853,9 +925,6 @@ export default function AdminDashboard({
             confirmButtonColor: '#10b981',
             width: '340px'
           });
-          if (onRefresh) {
-            onRefresh();
-          }
         } else {
           throw new Error('Metode penghapusan admin tidak tersedia');
         }
@@ -940,17 +1009,17 @@ export default function AdminDashboard({
   return (
     <div className="bg-slate-50 min-h-[calc(100vh-4rem)] w-full flex flex-col justify-start pb-12" id="admin-dashboard-screen">
       {/* Upper header banner */}
-      <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white px-4 py-5 sm:px-6 sm:py-6 md:py-8 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-800">
-        <div className="flex items-center gap-2.5">
+      <div className="bg-gradient-to-r from-blue-900 to-slate-900 text-white px-4 py-3.5 sm:px-5 sm:py-4 md:py-5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-800 animate-fadeIn">
+        <div className="flex items-center gap-2">
           <div>
-            <h1 className="text-sm sm:text-base md:text-lg font-black tracking-wide uppercase leading-none font-montserrat">Portal Guru & Dashboard Admin</h1>
-            <div className="flex flex-wrap items-center gap-2 mt-2">
-              <p className="text-[10px] sm:text-xs text-yellow-300 font-bold font-poppins">SMP PGRI Jatiuwung Tangerang</p>
+            <h1 className="text-xs sm:text-sm md:text-base font-black tracking-wide uppercase leading-none font-montserrat">Portal Guru & Dashboard Admin</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-1.5">
+              <p className="text-[9px] sm:text-[11px] text-yellow-300 font-bold font-poppins">SMP PGRI Jatiuwung Tangerang</p>
               {loggedAdmin && (
                 <>
                   <span className="text-slate-500 text-xs hidden sm:inline">|</span>
-                  <div className="flex items-center gap-1 bg-blue-800/60 border border-blue-700/60 text-blue-100 px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-bold shadow-inner">
-                    <User className="w-3 h-3 text-blue-300" />
+                  <div className="flex items-center gap-1 bg-blue-800/60 border border-blue-700/60 text-blue-100 px-2 py-0.5 rounded-full text-[9px] sm:text-[11px] font-bold shadow-inner">
+                    <User className="w-2.5 h-2.5 text-blue-300" />
                     <span>Aktif: <span className="text-white">{loggedAdmin.username}</span></span>
                   </div>
                 </>
@@ -958,75 +1027,70 @@ export default function AdminDashboard({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3.5 self-stretch sm:self-auto justify-between sm:justify-end">
+        <div className="flex items-center gap-3 self-stretch sm:self-auto justify-between sm:justify-end">
           <div className="text-left sm:text-right block">
-            <span className="text-[9px] text-slate-400 font-bold block uppercase leading-none">Status Database</span>
+            <span className="text-[8px] text-slate-400 font-bold block uppercase leading-none">Status Database</span>
             {isLive ? (
-              <span className="text-xs text-green-400 font-black flex items-center gap-1.5 mt-1 leading-none">
-                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-ping"></span>
-                Sheets Aktif (Live)
-              </span>
-            ) : settings.googleAppsScriptUrl ? (
-              <span className="text-xs text-rose-400 font-black flex items-center gap-1.5 mt-1 leading-none" title="Gagal terhubung ke Google Sheets API. Pastikan deploy sebagai Web App (Anyone) & tidak memakai URL /dev">
-                <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span>
-                Sheets Gagal (Lokal)
+              <span className="text-[11px] text-green-400 font-black flex items-center gap-1 mt-1 leading-none">
+                <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></span>
+                Terhubung
               </span>
             ) : (
-              <span className="text-xs text-amber-400 font-black flex items-center gap-1.5 mt-1 leading-none">
-                <span className="w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
-                Simulasi Lokal
+              <span className="text-[11px] text-rose-400 font-black flex items-center gap-1 mt-1 leading-none">
+                <span className="w-1.5 h-1.5 bg-rose-500 rounded-full animate-pulse"></span>
+                Tidak Terhubung
               </span>
             )}
           </div>
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="text-[11px] sm:text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1.5 border border-blue-600/50 shrink-0"
+              className="text-[10px] sm:text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-lg transition-all shadow-md cursor-pointer flex items-center gap-1 border border-blue-600/50 shrink-0"
               title="Segarkan Sinkronisasi Data"
             >
-              <RefreshCcw className="w-3.5 h-3.5 shrink-0" />
-              <span>Segarkan Data</span>
+              <RefreshCcw className="w-3 h-3 shrink-0" />
+              <span>Segarkan</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Main Container */}
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 md:py-8 flex flex-col gap-6">
+      <div className="max-w-7xl mx-auto w-full px-3 sm:px-4 lg:px-6 py-4 md:py-5 flex flex-col gap-4">
         
         {/* Modern Tab Bar Selector */}
-        <div className="bg-white rounded-xl sm:rounded-2xl p-1 sm:p-1.5 shadow-sm border border-slate-200/60 flex gap-1 w-full max-w-2xl mx-auto">
+        <div className="bg-white rounded-lg p-0.5 sm:p-1 shadow-sm border border-slate-200/60 flex gap-0.5 w-full max-w-xl mx-auto">
           <button
             onClick={() => setActiveTab('eskul')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 sm:py-2 px-1.5 sm:px-3 rounded-md text-[9px] sm:text-[11px] font-bold transition-all cursor-pointer ${
               activeTab === 'eskul' 
-                ? 'bg-blue-700 text-white shadow-md' 
+                ? 'bg-blue-700 text-white shadow-sm' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
             }`}
           >
-            <Layers className="w-4 h-4" />
+            <Layers className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Kelola Ekstrakurikuler</span>
             <span className="sm:hidden">Kategori</span>
           </button>
 
           <button
             onClick={() => setActiveTab('laporan')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 sm:py-2 px-1.5 sm:px-3 rounded-md text-[9px] sm:text-[11px] font-bold transition-all cursor-pointer ${
               activeTab === 'laporan' 
-                ? 'bg-blue-700 text-white shadow-md' 
+                ? 'bg-blue-700 text-white shadow-sm' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
             }`}
           >
-            <FileText className="w-4 h-4" />
+            <FileText className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Laporan & Rekap Siswa</span>
             <span className="sm:hidden">Laporan</span>
           </button>
 
           <button
             onClick={() => setActiveTab('pengaturan')}
-            className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 sm:py-3 px-2 sm:px-4 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 sm:py-2 px-1.5 sm:px-3 rounded-md text-[9px] sm:text-[11px] font-bold transition-all cursor-pointer ${
               activeTab === 'pengaturan' 
-                ? 'bg-blue-700 text-white shadow-md' 
+                ? 'bg-blue-700 text-white shadow-sm' 
                 : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
             }`}
           >
@@ -1095,17 +1159,17 @@ export default function AdminDashboard({
             </form>
 
             {/* List Table of Eskuls (Right side - 2 cols on lg) */}
-            <div className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 lg:col-span-2">
-              <h2 className="text-[11px] sm:text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3 mb-4">
-                <Layers className="w-4 sm:w-4.5 h-4 sm:h-4.5 text-blue-700" />
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 lg:col-span-2">
+              <h2 className="text-[10px] sm:text-[11px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5 mb-3.5">
+                <Layers className="w-3.5 h-3.5 text-blue-700" />
                 Daftar Kategori Ekstrakurikuler Aktif ({eskulList.length})
               </h2>
 
-              <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                 {eskulList.map(eskul => {
                   const numRegistered = students.filter(s => s.eskulId === eskul.id).length;
                   return (
-                    <div key={eskul.id} className="flex items-center justify-between border border-slate-100 p-3 sm:p-4 rounded-xl sm:rounded-2xl hover:bg-slate-50 hover:shadow-sm transition-all gap-2">
+                    <div key={eskul.id} className="flex items-center justify-between border border-slate-100 p-2.5 sm:p-3 rounded-xl hover:bg-slate-50 hover:shadow-sm transition-all gap-2">
                       <div className="min-w-0">
                         <h4 className="text-xs sm:text-sm font-bold text-slate-800 font-montserrat truncate">{eskul.nama}</h4>
                         <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-1 sm:mt-1.5 text-[8px] sm:text-[9px] font-bold">
@@ -1136,74 +1200,74 @@ export default function AdminDashboard({
 
         {/* ===================== TAB 2: LAPORAN PENDAFTAR ===================== */}
         {activeTab === 'laporan' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn" id="tab-reports-list">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 items-start animate-fadeIn" id="tab-reports-list">
             
             {/* Filter & Quick Actions Panel (Left side - 1 col on lg) */}
-            <div className="space-y-4 lg:col-span-1">
+            <div className="space-y-3.5 lg:col-span-1">
               
               {/* Quick Action Counters */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-blue-900 text-white rounded-2xl p-4 shadow-md border border-blue-950 relative overflow-hidden">
-                  <span className="text-[9px] font-bold text-blue-300 uppercase block tracking-wider font-poppins">Total Siswa ({settings.tahunPelajaranAktif})</span>
-                  <span className="text-3xl font-black font-mono block mt-1.5">{students.filter(s => s.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
-                  <div className="absolute right-3 bottom-3 bg-white/10 p-2 rounded-xl text-yellow-300">
-                    <UserCheck className="w-5.5 h-5.5" />
+              <div className="grid grid-cols-2 gap-2.5">
+                <div className="bg-blue-900 text-white rounded-xl p-3 shadow-md border border-blue-950 relative overflow-hidden">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-blue-300 uppercase block tracking-wider font-poppins">Total Siswa ({settings.tahunPelajaranAktif})</span>
+                  <span className="text-xl sm:text-2xl font-black font-mono block mt-1">{students.filter(s => s.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
+                  <div className="absolute right-2 bottom-2 bg-white/10 p-1.5 rounded-lg text-yellow-300">
+                    <UserCheck className="w-4 h-4" />
                   </div>
                 </div>
 
-                <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 relative overflow-hidden">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase block tracking-wider font-poppins">Kategori Eskul</span>
-                  <span className="text-3xl font-black font-mono text-slate-800 block mt-1.5">{eskulList.filter(e => e.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
-                  <div className="absolute right-3 bottom-3 bg-yellow-400/20 p-2 rounded-xl text-blue-800">
-                    <Layers className="w-5.5 h-5.5" />
+                <div className="bg-white rounded-xl p-3 shadow-sm border border-slate-100 relative overflow-hidden">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-400 uppercase block tracking-wider font-poppins">Kategori Eskul</span>
+                  <span className="text-xl sm:text-2xl font-black font-mono text-slate-800 block mt-1">{eskulList.filter(e => e.tahunPelajaran === settings.tahunPelajaranAktif).length}</span>
+                  <div className="absolute right-2 bottom-2 bg-yellow-400/20 p-1.5 rounded-lg text-blue-800">
+                    <Layers className="w-4 h-4" />
                   </div>
                 </div>
               </div>
 
               {/* Print & Export buttons */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   onClick={handlePrintPDFRecap}
-                  className="bg-red-700 hover:bg-red-800 text-white text-xs font-bold py-3 px-3 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all border border-red-800"
+                  className="bg-red-700 hover:bg-red-800 text-white text-[10px] sm:text-xs font-bold py-2 px-2 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-red-800"
                 >
-                  <Printer className="w-4 h-4 text-white animate-pulse" />
+                  <Printer className="w-3.5 h-3.5 text-white animate-pulse" />
                   Cetak PDF Rekap
                 </button>
                 
                 <button
                   onClick={handleExportExcel}
-                  className="bg-green-700 hover:bg-green-800 text-white text-xs font-bold py-3 px-3 rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all border border-green-800"
+                  className="bg-green-700 hover:bg-green-800 text-white text-[10px] sm:text-xs font-bold py-2 px-2 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-green-800"
                 >
-                  <Download className="w-4 h-4 text-white" />
+                  <Download className="w-3.5 h-3.5 text-white" />
                   Ekspor Excel (CSV)
                 </button>
               </div>
 
               {/* Filter Form */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 space-y-4">
-                <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
-                  <Filter className="w-4 h-4 text-blue-700" />
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 space-y-3">
+                <h2 className="text-[10px] sm:text-[11px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2">
+                  <Filter className="w-3.5 h-3.5 text-blue-700" />
                   Saring Data Pendaftar
                 </h2>
 
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Cari nama, no. registrasi, HP..."
-                    className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                    className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-2.5">
                   <div className="space-y-1">
-                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Ekstrakurikuler</span>
+                    <span className="text-[8px] sm:text-[9px] font-extrabold text-slate-400 block uppercase tracking-wider">Ekstrakurikuler</span>
                     <select
                       value={filterEskul}
                       onChange={(e) => setFilterEskul(e.target.value)}
-                      className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
+                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
                     >
                       <option value="">Semua Eskul</option>
                       {eskulList.map(e => (
@@ -1213,11 +1277,11 @@ export default function AdminDashboard({
                   </div>
 
                   <div className="space-y-1">
-                    <span className="text-[9px] font-bold text-slate-400 block uppercase">Tingkat Kelas</span>
+                    <span className="text-[8px] sm:text-[9px] font-extrabold text-slate-400 block uppercase tracking-wider">Tingkat Kelas</span>
                     <select
                       value={filterKelas}
                       onChange={(e) => setFilterKelas(e.target.value)}
-                      className="w-full px-2.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
+                      className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-700 focus:outline-none focus:border-blue-700 cursor-pointer"
                     >
                       <option value="">Semua Kelas</option>
                       {finalKelasList.map(k => (
@@ -1230,7 +1294,7 @@ export default function AdminDashboard({
             </div>
 
             {/* Students List Display (Right side - 2 cols on lg) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 lg:col-span-2 space-y-4">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 lg:col-span-2 space-y-3">
               <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-slate-100 pb-3">
                 <div>
                   <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider font-montserrat">Daftar Siswa Terdaftar</h3>
@@ -1370,268 +1434,305 @@ export default function AdminDashboard({
 
         {/* ===================== TAB 3: PENGATURAN & DATABASE ===================== */}
         {activeTab === 'pengaturan' && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start animate-fadeIn" id="tab-app-settings">
-            
-            {/* Database Sync parameters (Left side - 2 cols on lg) */}
-            <div className="lg:col-span-2">
-              <form onSubmit={handleSaveSettings} noValidate className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5">
-                <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                  <Settings className="w-4.5 h-4.5 text-blue-700" />
-                  Konfigurasi Umum & Database API
-                </h2>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN AKTIF</label>
-                  <select
-                    value={activeYearInput}
-                    onChange={(e) => setActiveYearInput(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
-                  >
-                    {TAHUN_PELAJARAN_LIST.map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
-                  <p className="text-[9px] text-slate-400 leading-normal">Mengatur tahun aktif pendaftaran untuk formulir publik secara instan.</p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">GOOGLE APPS SCRIPT WEB APP URL</label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Database className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="url"
-                        value={gasUrlInput}
-                        onChange={(e) => setGasUrlInput(e.target.value)}
-                        placeholder="https://script.google.com/macros/s/.../exec"
-                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
-                      />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 items-start animate-fadeIn" id="tab-app-settings">
+              
+              {/* Database Sync parameters (Left side - 2 cols on lg) */}
+              <div className="lg:col-span-2">
+                <form onSubmit={handleSaveSettings} noValidate className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5 space-y-4">
+                  <h2 className="text-[10px] sm:text-[11px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                    <Settings className="w-4 h-4 text-blue-700" />
+                    Konfigurasi Umum & Database API
+                  </h2>
+  
+                  <div className="space-y-1">
+                    <label className="text-[8px] sm:text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN AKTIF</label>
+                    <select
+                      value={activeYearInput}
+                      onChange={(e) => setActiveYearInput(e.target.value)}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
+                    >
+                      {TAHUN_PELAJARAN_LIST.map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    <p className="text-[8px] sm:text-[9px] text-slate-400 leading-normal">Mengatur tahun aktif pendaftaran untuk formulir publik secara instan.</p>
+                  </div>
+  
+                  <div className="space-y-1">
+                    <label className="text-[8px] sm:text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider">GOOGLE APPS SCRIPT WEB APP URL</label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Database className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                        <input
+                          type="url"
+                          value={gasUrlInput}
+                          onChange={(e) => setGasUrlInput(e.target.value)}
+                          placeholder="https://script.google.com/macros/s/.../exec"
+                          className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                        />
+                      </div>
+                      {gasUrlInput && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setGasUrlInput('');
+                            if (onUpdateSettings) {
+                              await onUpdateSettings({ googleAppsScriptUrl: '' });
+                            }
+                            Swal.fire({
+                              icon: 'success',
+                              title: 'URL Dihapus',
+                              text: 'Google Apps Script URL berhasil dihapus. Status Database beralih ke Mode Simulasi Lokal (Tidak Terhubung).',
+                              confirmButtonColor: '#ef4444',
+                              width: '340px'
+                            });
+                          }}
+                          className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                          title="Hapus URL"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          <span className="hidden sm:inline">Hapus URL</span>
+                        </button>
+                      )}
                     </div>
-                    {gasUrlInput && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGasUrlInput('');
-                          Swal.fire({
-                            icon: 'info',
-                            title: 'Kolom Dikosongkan',
-                            text: 'Jangan lupa klik "Simpan Pengaturan" di bawah untuk kembali ke mode simulasi lokal.',
-                            confirmButtonColor: '#1d4ed8',
-                            width: '340px'
-                          });
-                        }}
-                        className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                        title="Hapus URL"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                        <span className="hidden sm:inline">Hapus URL</span>
-                      </button>
+                    <p className="text-[9px] text-slate-400 leading-normal">
+                      Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
+                    </p>
+                    
+                    {gasUrlInput && gasUrlInput.trim().endsWith('/dev') && (
+                      <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[10px] p-3 rounded-xl leading-relaxed mt-2 space-y-1">
+                        <p className="font-bold text-amber-900 flex items-center gap-1">⚠️ Peringatan: URL Pengembangan (/dev) Terdeteksi</p>
+                        <p>
+                          URL yang berakhiran <b>/dev</b> tidak dapat menerima data dari luar karena Google membatasi aksesnya hanya untuk akun pemilik skrip. Aplikasi pendaftaran ini tidak akan bisa menyimpan data ke Spreadsheet Anda.
+                        </p>
+                        <p>
+                          <b>Solusi:</b> Di Google Apps Script, lakukan <b>Deploy (Terapkan) &gt; New deployment (Terapkan baru)</b>. Pilih jenis <b>Web App</b>, ubah akses "Who has access" menjadi <b>Anyone (Siapa saja)</b>, klik Deploy, lalu salin URL yang berakhiran <b>/exec</b> ke kolom ini.
+                        </p>
+                      </div>
                     )}
                   </div>
-                  <p className="text-[9px] text-slate-400 leading-normal">
-                    Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
-                  </p>
-                  
-                  {gasUrlInput && gasUrlInput.trim().endsWith('/dev') && (
-                    <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[10px] p-3 rounded-xl leading-relaxed mt-2 space-y-1">
-                      <p className="font-bold text-amber-900 flex items-center gap-1">⚠️ Peringatan: URL Pengembangan (/dev) Terdeteksi</p>
-                      <p>
-                        URL yang berakhiran <b>/dev</b> tidak dapat menerima data dari luar karena Google membatasi aksesnya hanya untuk akun pemilik skrip. Aplikasi pendaftaran ini tidak akan bisa menyimpan data ke Spreadsheet Anda.
-                      </p>
-                      <p>
-                        <b>Solusi:</b> Di Google Apps Script, lakukan <b>Deploy (Terapkan) &gt; New deployment (Terapkan baru)</b>. Pilih jenis <b>Web App</b>, ubah akses "Who has access" menjadi <b>Anyone (Siapa saja)</b>, klik Deploy, lalu salin URL yang berakhiran <b>/exec</b> ke kolom ini.
-                      </p>
-                    </div>
-                  )}
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSavingSettings}
-                  className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  {isSavingSettings ? 'Menyimpan...' : 'Simpan Pengaturan'}
-                </button>
-              </form>
-            </div>
-
-            {/* Reset Database Actions (Right side - 1 col on lg) */}
-            <div className="lg:col-span-1">
-              <div className="bg-red-50/50 border border-red-200 rounded-2xl p-6 space-y-4">
-                <h2 className="text-xs font-black text-red-800 uppercase tracking-wider flex items-center gap-2 border-b border-red-200/50 pb-3">
-                  <ShieldAlert className="w-5 h-5 text-red-700" />
-                  Zona Bahaya
-                </h2>
-                <p className="text-[10px] text-red-700 leading-relaxed">
-                  Tindakan ini bersifat destruktif dan permanen. Pastikan Anda telah mengekspor rekap Excel terlebih dahulu sebelum melakukan penghapusan data.
-                </p>
-
-                <div className="space-y-3 pt-2">
-                  <button
-                    onClick={handleResetEskulClick}
-                    className="w-full bg-white hover:bg-yellow-50 text-yellow-800 hover:text-yellow-900 border border-yellow-300 hover:border-yellow-400 text-xs font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <RefreshCcw className="w-4 h-4 text-yellow-700" />
-                    Reset Per Ekstrakurikuler
-                  </button>
-
-                  <button
-                    onClick={handleResetAllDataClick}
-                    className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
-                  >
-                    <Trash2 className="w-4 h-4 text-white animate-pulse" />
-                    Reset Seluruh Database Pendaftar
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Form Tambah Admin Baru (Aesthetic and Professional) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5 lg:col-span-2">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                <UserPlus className="w-5 h-5 text-blue-700" />
-                Tambah Administrator Baru
-              </h2>
-              <form onSubmit={handleCreateAdminSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  
-                  {/* Username / Full Name */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
-                      Nama Lengkap (Username) <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="text"
-                        required
-                        value={newAdminUsername}
-                        onChange={(e) => setNewAdminUsername(e.target.value)}
-                        placeholder="Contoh: Ahmad Subardjo"
-                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Password */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
-                      Password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="password"
-                        required
-                        value={newAdminPassword}
-                        onChange={(e) => setNewAdminPassword(e.target.value)}
-                        placeholder="Minimal 6 karakter"
-                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Password Confirmation */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
-                      Konfirmasi Password <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <input
-                        type="password"
-                        required
-                        value={newAdminConfirmPassword}
-                        onChange={(e) => setNewAdminConfirmPassword(e.target.value)}
-                        placeholder="Ulangi password"
-                        className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Status / Role Selection */}
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
-                      Status Admin <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                      <select
-                        required
-                        value={newAdminStatus}
-                        onChange={(e) => setNewAdminStatus(e.target.value)}
-                        className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 appearance-none cursor-pointer"
-                      >
-                        <option value="Admin Biasa">Admin Biasa</option>
-                        <option value="Admin Utama">Admin Utama</option>
-                      </select>
-                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
-                        <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
-                      </div>
-                    </div>
-                  </div>
-
-                </div>
-
-                <div className="flex justify-end">
+  
                   <button
                     type="submit"
-                    disabled={isCreatingAdmin}
-                    className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    disabled={isSavingSettings}
+                    className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                   >
-                    <UserPlus className="w-4 h-4" />
-                    <span>{isCreatingAdmin ? 'Mendaftarkan...' : 'Daftarkan Admin Baru'}</span>
+                    {isSavingSettings ? 'Menyimpan...' : 'Simpan Pengaturan'}
                   </button>
+                </form>
+              </div>
+  
+              {/* Reset Database Actions (Right side - 1 col on lg) */}
+              <div className="lg:col-span-1">
+                {!isLoggedAdminUtama ? (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center space-y-3 min-h-[220px] flex flex-col justify-center items-center">
+                    <ShieldAlert className="w-10 h-10 text-slate-400 mx-auto" />
+                    <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Zona Bahaya Terkunci</h2>
+                    <p className="text-[10px] text-slate-500 leading-relaxed max-w-[200px]">
+                      Fitur penghapusan atau reset database hanya dapat diakses oleh Admin Utama.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="bg-red-50/50 border border-red-200 rounded-2xl p-6 space-y-4">
+                    <h2 className="text-xs font-black text-red-800 uppercase tracking-wider flex items-center gap-2 border-b border-red-200/50 pb-3">
+                      <ShieldAlert className="w-5 h-5 text-red-700" />
+                      Zona Bahaya
+                    </h2>
+                    <p className="text-[10px] text-red-700 leading-relaxed">
+                      Tindakan ini bersifat destruktif dan permanen. Pastikan Anda telah mengekspor rekap Excel terlebih dahulu sebelum melakukan penghapusan data.
+                    </p>
+    
+                    <div className="space-y-3 pt-2">
+                      <button
+                        onClick={handleResetEskulClick}
+                        className="w-full bg-white hover:bg-yellow-50 text-yellow-800 hover:text-yellow-900 border border-yellow-300 hover:border-yellow-400 text-xs font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <RefreshCcw className="w-4 h-4 text-yellow-700" />
+                        Reset Per Ekstrakurikuler
+                      </button>
+    
+                      <button
+                        onClick={handleResetAllDataClick}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white text-xs font-bold py-3 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                      >
+                        <Trash2 className="w-4 h-4 text-white animate-pulse" />
+                        Reset Seluruh Database Pendaftar
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+  
+              {/* Form Tambah Admin Baru (Aesthetic and Professional) */}
+              {!isLoggedAdminUtama ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 text-center space-y-2 lg:col-span-2 flex flex-col justify-center items-center">
+                  <UserPlus className="w-10 h-10 text-slate-400 mx-auto animate-pulse" />
+                  <h2 className="text-xs font-black text-slate-700 uppercase tracking-wider">Registrasi Admin Terkunci</h2>
+                  <p className="text-[10px] text-slate-500 leading-relaxed max-w-sm">
+                    Pendaftaran administrator baru hanya dapat dilakukan oleh akun dengan status Admin Utama.
+                  </p>
                 </div>
-              </form>
-            </div>
-
-            {/* Daftar Admin Aktif */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-4 lg:col-span-1">
-              <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Shield className="w-5 h-5 text-blue-700" />
-                Administrator Terdaftar ({admins && admins.length > 0 ? admins.length : 1})
-              </h2>
-              <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                {(admins && admins.length > 0 ? admins : [{ username: 'admin', status: 'Admin Utama' }]).map((adm: any, idx: number) => {
-                  const isAdminUtama = adm.username.toLowerCase().trim() === 'admin' || (adm.status && adm.status.toLowerCase().includes('utama'));
-                  const roleText = isAdminUtama ? 'Admin Utama' : (adm.status || 'Admin Biasa');
-                  return (
-                    <div key={idx} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-xl border border-slate-100 gap-2">
-                      <div className="min-w-0 flex items-center gap-2">
-                        <div className="w-7 h-7 bg-blue-100 text-blue-700 rounded-lg flex items-center justify-center font-bold text-xs shrink-0">
-                          {adm.username ? adm.username.charAt(0).toUpperCase() : 'A'}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-bold text-slate-800 truncate">{adm.username}</p>
-                          <p className="text-[9px] text-slate-400 font-bold uppercase">Akses: {roleText}</p>
+              ) : (
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 space-y-5 lg:col-span-2">
+                  <h2 className="text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
+                    <UserPlus className="w-5 h-5 text-blue-700" />
+                    Tambah Administrator Baru
+                  </h2>
+                  <form onSubmit={handleCreateAdminSubmit} className="space-y-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                      
+                      {/* Username / Full Name */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                          Nama Lengkap (Username) <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type="text"
+                            required
+                            value={newAdminUsername}
+                            onChange={(e) => setNewAdminUsername(e.target.value)}
+                            placeholder="Contoh: Ahmad Subardjo"
+                            className="w-full pl-9 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all"
+                          />
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-[9px] bg-green-50 text-green-700 border border-green-200/50 px-2 py-0.5 rounded-full font-bold">Aktif</span>
-                        {!isAdminUtama && (
+     
+                      {/* Status / Role Selection */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                          Status Admin <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Shield className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <select
+                            required
+                            value={newAdminStatus}
+                            onChange={(e) => setNewAdminStatus(e.target.value)}
+                            className="w-full pl-9 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 appearance-none cursor-pointer transition-all"
+                          >
+                            <option value="Biasa">Biasa</option>
+                            <option value="Utama">Utama</option>
+                          </select>
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/></svg>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Password */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                          Password <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type={showAdminPassword ? "text" : "password"}
+                            required
+                            value={newAdminPassword}
+                            onChange={(e) => setNewAdminPassword(e.target.value)}
+                            placeholder="Minimal 6 karakter"
+                            className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all"
+                          />
                           <button
                             type="button"
-                            onClick={() => handleDeleteAdminClick(adm.username)}
-                            className="text-red-500 hover:text-red-700 p-1 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
-                            title="Hapus Administrator"
+                            onClick={() => setShowAdminPassword(!showAdminPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {showAdminPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
-                        )}
+                        </div>
                       </div>
+     
+                      {/* Password Confirmation */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-bold text-slate-700 block uppercase tracking-wider">
+                          Konfirmasi Password <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                          <input
+                            type={showAdminConfirmPassword ? "text" : "password"}
+                            required
+                            value={newAdminConfirmPassword}
+                            onChange={(e) => setNewAdminConfirmPassword(e.target.value)}
+                            placeholder="Ulangi password"
+                            className="w-full pl-9 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminConfirmPassword(!showAdminConfirmPassword)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                          >
+                            {showAdminConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          </button>
+                        </div>
+                      </div>
+     
                     </div>
-                  );
-                })}
+     
+                    <div className="flex justify-end pt-2">
+                      <button
+                        type="submit"
+                        disabled={isCreatingAdmin}
+                        className="w-full sm:w-auto bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-6 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        <span>{isCreatingAdmin ? 'Mendaftarkan...' : 'Daftarkan Admin Baru'}</span>
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              )}
+  
+              {/* Daftar Admin Aktif */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5 space-y-3 lg:col-span-1">
+                <h2 className="text-[10px] sm:text-[11px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
+                  <Shield className="w-4 h-4 text-blue-700" />
+                  Administrator Terdaftar ({admins && admins.length > 0 ? admins.length : 1})
+                </h2>
+                <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                  {(admins && admins.length > 0 ? admins : [{ username: 'admin', status: 'Utama' }]).map((adm: any, idx: number) => {
+                    const isAdminUtama = adm.username.toLowerCase().trim() === 'admin' || (adm.status && adm.status.toLowerCase().includes('utama'));
+                    const roleText = isAdminUtama ? 'Utama' : (adm.status || 'Biasa');
+                    return (
+                      <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100 gap-2 animate-fadeIn">
+                        <div className="min-w-0 flex items-center gap-1.5">
+                          <div className="w-6.5 h-6.5 bg-blue-100 text-blue-700 rounded-md flex items-center justify-center font-bold text-[10px] shrink-0">
+                            {adm.username ? adm.username.charAt(0).toUpperCase() : 'A'}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] font-bold text-slate-800 truncate leading-none">{adm.username}</p>
+                            <p className="text-[8px] text-slate-400 font-extrabold uppercase mt-0.5">Akses: {roleText}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-[8px] bg-green-50 text-green-700 border border-green-200/30 px-1.5 py-0.5 rounded-full font-bold">Aktif</span>
+                          {!isAdminUtama && isLoggedAdminUtama && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAdminClick(adm.username)}
+                              className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Hapus Administrator"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
+  
+              {/* Panduan Integrasi Backend & Spreadsheet */}
+              <div className="lg:col-span-3 mt-6">
+                <ApiSetupGuide />
+              </div>
+  
             </div>
-
-            {/* Panduan Integrasi Backend & Spreadsheet */}
-            <div className="lg:col-span-3 mt-6">
-              <ApiSetupGuide />
-            </div>
-
-          </div>
         )}
 
       </div>

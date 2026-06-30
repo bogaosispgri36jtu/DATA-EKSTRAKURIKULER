@@ -126,18 +126,42 @@ export default function App() {
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [isGasUrlConfigOpen, setIsGasUrlConfigOpen] = useState(false);
+  const [tempGasUrl, setTempGasUrl] = useState('');
 
-  const handleSetIsAdminLoggedIn = (loggedIn: boolean) => {
+  const handleSetIsAdminLoggedIn = (loggedIn: boolean, adminUser?: { username: string; status: string }) => {
     setIsAdminLoggedIn(loggedIn);
     if (loggedIn) {
       setActiveView('admin');
+      if (adminUser) {
+        setLoggedAdmin(adminUser);
+      } else {
+        setLoggedAdmin({ username: 'admin', status: 'Utama' });
+      }
     } else {
       setActiveView('student');
       setLoggedAdmin(null);
     }
   };
 
-  const handlePopupLoginSubmit = (e: React.FormEvent) => {
+  const handleLogoutClick = () => {
+    Swal.fire({
+      title: 'Yakin ingin Keluar ??',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonColor: '#ef4444',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'IYA',
+      cancelButtonText: 'TIDAK',
+      width: '340px'
+    }).then((result) => {
+      if (result.isConfirmed) {
+        handleSetIsAdminLoggedIn(false);
+      }
+    });
+  };
+
+  const handlePopupLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!loginUsername.trim()) {
       Swal.fire({
@@ -165,13 +189,76 @@ export default function App() {
       return;
     }
 
-    const currentAdmins = (admins && admins.length > 0) ? admins : [{ username: 'admin', password: 'admin123', status: 'Admin Utama' }];
-    const matchedAccount = currentAdmins.find(
-      (acc) => acc.username.toLowerCase().trim() === loginUsername.toLowerCase().trim() && acc.password === loginPassword
-    );
+    const savedAdminsStr = localStorage.getItem('smp_pgri_admins');
+    let localAdmins = [{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }];
+    if (savedAdminsStr) {
+      try {
+        localAdmins = JSON.parse(savedAdminsStr);
+      } catch (e) {}
+    }
+    const currentAdmins = (admins && admins.length > 0) ? admins : localAdmins;
+    let matchedAccount = currentAdmins.find((acc) => {
+      const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+      const p = acc.password ? acc.password.toString().trim() : '';
+      return u === loginUsername.toLowerCase().trim() && p === loginPassword.trim();
+    });
+
+    const checkGasUrl = (tempGasUrl && tempGasUrl.trim().startsWith('http')) 
+      ? tempGasUrl.trim() 
+      : settings.googleAppsScriptUrl;
+
+    if (!matchedAccount && checkGasUrl && checkGasUrl.startsWith('http')) {
+      Swal.fire({
+        title: 'Memverifikasi...',
+        text: 'Sedang mencocokkan data dengan Google Sheet...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
+        width: '340px'
+      });
+
+      try {
+        const response = await fetch(`${checkGasUrl}?action=getData`);
+        if (response.ok) {
+          const resJson = await response.json();
+          if (resJson.status === 'success') {
+            // Save the URL since it connects successfully
+            const newSettings = {
+              ...settings,
+              googleAppsScriptUrl: checkGasUrl
+            };
+            setSettings(newSettings);
+            localStorage.setItem('smp_pgri_settings', JSON.stringify(newSettings));
+
+            // Sync other data as well
+            setStudents(resJson.students || []);
+            setEskulList(resJson.eskul || []);
+            if (resJson.classes && Array.isArray(resJson.classes)) {
+              setClassList(resJson.classes);
+              localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
+            }
+            if (resJson.admins && Array.isArray(resJson.admins)) {
+              setAdmins(resJson.admins);
+              localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
+              
+              matchedAccount = resJson.admins.find((acc: any) => {
+                const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+                const p = acc.password ? acc.password.toString().trim() : '';
+                return u === loginUsername.toLowerCase().trim() && p === loginPassword.trim();
+              });
+            }
+            setIsLiveConnection(true);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to refetch live admins for verification', error);
+      }
+      Swal.close();
+    }
 
     if (matchedAccount) {
-      setLoggedAdmin({ username: matchedAccount.username, status: matchedAccount.status || 'Admin Biasa' });
+      setLoggedAdmin({ username: matchedAccount.username, status: matchedAccount.status || 'Biasa' });
       setIsAdminLoggedIn(true);
       setActiveView('admin');
       setIsLoginModalOpen(false);
@@ -188,13 +275,106 @@ export default function App() {
         width: '340px'
       });
     } else {
+      const activeAdmins = (admins && admins.length > 0) ? admins : localAdmins;
+      const loadedUsernames = activeAdmins.map((acc: any) => acc.username || '').filter(Boolean);
+      const usernamesListHtml = loadedUsernames.length > 0 
+        ? `<div class="mt-2 text-[10px] bg-blue-50 text-blue-800 p-2 rounded-lg font-bold"><b>Daftar Akun Terdaftar Saat Ini:</b><br/>${loadedUsernames.join(', ')}</div>`
+        : '';
+
       Swal.fire({
         icon: 'error',
         title: 'Akses Ditolak',
-        text: 'Username atau password yang Anda masukkan salah!',
-        timer: 2000,
-        timerProgressBar: true,
-        showConfirmButton: false,
+        html: `<div class="text-xs text-slate-600 leading-relaxed text-center space-y-1.5">
+          <div>Username atau password yang Anda masukkan salah!</div>
+          ${usernamesListHtml}
+          <div class="mt-2 text-[10px] bg-slate-100 p-2 rounded-lg text-slate-500 font-semibold text-left">
+            <b>Tips:</b> Jika baru menambahkan admin di Spreadsheet, pastikan Anda sudah melakukan <b>Deploy Ulang (New Deployment)</b> di Google Apps Script agar perubahan tersinkronisasi.
+          </div>
+        </div>`,
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+    }
+  };
+
+  const handleSaveGasUrlFromLogin = async () => {
+    if (!tempGasUrl.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'URL Kosong',
+        text: 'Silakan masukkan URL Google Apps Script Web App terlebih dahulu.',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px'
+      });
+      return;
+    }
+
+    if (!tempGasUrl.trim().startsWith('http')) {
+      Swal.fire({
+        icon: 'error',
+        title: 'URL Tidak Valid',
+        text: 'URL harus diawali dengan http:// atau https://',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Menghubungkan...',
+      text: 'Sedang mencoba mengambil data dari Google Sheets...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+      width: '340px'
+    });
+
+    const newSettings = {
+      ...settings,
+      googleAppsScriptUrl: tempGasUrl.trim()
+    };
+
+    try {
+      const response = await fetch(`${newSettings.googleAppsScriptUrl}?action=getData`);
+      if (!response.ok) throw new Error('Response not OK');
+      const resJson = await response.json();
+      
+      if (resJson.status === 'success') {
+        setSettings(newSettings);
+        localStorage.setItem('smp_pgri_settings', JSON.stringify(newSettings));
+        
+        setStudents(resJson.students || []);
+        setEskulList(resJson.eskul || []);
+        if (resJson.classes && Array.isArray(resJson.classes)) {
+          setClassList(resJson.classes);
+          localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
+        }
+        if (resJson.admins && Array.isArray(resJson.admins)) {
+          setAdmins(resJson.admins);
+          localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
+        }
+        setIsLiveConnection(true);
+
+        Swal.fire({
+          icon: 'success',
+          iconColor: '#10b981',
+          title: 'Koneksi Berhasil!',
+          text: 'Database & Akun Admin berhasil disinkronkan dari Google Sheets!',
+          confirmButtonColor: '#1d4ed8',
+          width: '340px'
+        });
+        setIsGasUrlConfigOpen(false);
+      } else {
+        throw new Error('Invalid JSON format from API');
+      }
+    } catch (error) {
+      console.error(error);
+      Swal.fire({
+        icon: 'error',
+        title: 'Koneksi Gagal',
+        html: '<div class="text-xs text-slate-600 leading-relaxed text-center space-y-1.5"><div>Tidak dapat terhubung ke Google Apps Script Web App.</div><div class="mt-2 text-[10px] bg-slate-100 p-2 rounded-lg text-slate-500 font-semibold text-left"><b>Pastikan:</b><br/>1. URL yang ditempel sudah benar.<br/>2. Anda sudah melakukan <b>Deploy sebagai Web App</b> di Google Apps Script.<br/>3. Akses diset ke <b>"Anyone"</b> agar dapat diakses publik.</div></div>',
+        confirmButtonColor: '#ef4444',
         width: '340px'
       });
     }
@@ -206,7 +386,7 @@ export default function App() {
   const [classList, setClassList] = useState<string[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
-    googleAppsScriptUrl: '',
+    googleAppsScriptUrl: 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec',
     tahunPelajaranAktif: '2026/2027',
     adminUsername: 'admin',
     adminPassword: 'admin123'
@@ -215,28 +395,42 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isLiveConnection, setIsLiveConnection] = useState(false);
 
-  // Initialize and load data (from Sheets API if exists, otherwise localStorage)
+  // Initialize and load data (from backend API or local storage fallback)
   useEffect(() => {
-    // 1. Load basic settings from local storage to check for GAS URL
-    const savedSettings = localStorage.getItem('smp_pgri_settings');
-    let activeSettings = {
-      googleAppsScriptUrl: '',
-      tahunPelajaranAktif: '2026/2027',
-      adminUsername: 'admin',
-      adminPassword: 'admin123'
+    const initializeApp = async () => {
+      let activeSettings = {
+        googleAppsScriptUrl: 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec',
+        tahunPelajaranAktif: '2026/2027',
+        adminUsername: 'admin',
+        adminPassword: 'admin123'
+      };
+
+      try {
+        const response = await fetch('/api/settings');
+        if (response.ok) {
+          const serverSettings = await response.json();
+          activeSettings = { ...activeSettings, ...serverSettings };
+        }
+      } catch (e) {
+        console.warn('Failed to fetch settings from backend API, falling back to local storage', e);
+        const savedSettings = localStorage.getItem('smp_pgri_settings');
+        if (savedSettings) {
+          try {
+            const parsed = JSON.parse(savedSettings);
+            activeSettings = { ...activeSettings, ...parsed };
+          } catch (err) {}
+        }
+      }
+
+      if (!activeSettings.googleAppsScriptUrl || activeSettings.googleAppsScriptUrl.trim() === '') {
+        activeSettings.googleAppsScriptUrl = 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec';
+      }
+
+      setSettings(activeSettings);
+      fetchAppData(activeSettings);
     };
 
-    if (savedSettings) {
-      try {
-        activeSettings = { ...activeSettings, ...JSON.parse(savedSettings) };
-        setSettings(activeSettings);
-      } catch (e) {
-        console.error('Failed to parse settings');
-      }
-    }
-
-    // 2. Fetch data
-    fetchAppData(activeSettings);
+    initializeApp();
   }, []);
 
   const fetchAppData = async (currentSettings: AppSettings) => {
@@ -279,8 +473,11 @@ export default function App() {
           }
           if (resJson.admins && Array.isArray(resJson.admins)) {
             setAdmins(resJson.admins);
+            localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
           } else {
-            setAdmins([{ username: 'admin', password: 'admin123', status: 'Admin Utama' }]);
+            const defaultAdmins = [{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }];
+            setAdmins(defaultAdmins);
+            localStorage.setItem('smp_pgri_admins', JSON.stringify(defaultAdmins));
           }
           setSettings({
             ...currentSettings,
@@ -342,7 +539,18 @@ export default function App() {
     }
 
     // Load Admin List Fallback
-    setAdmins([{ username: 'admin', password: 'admin123', status: 'Admin Utama' }]);
+    const savedAdmins = localStorage.getItem('smp_pgri_admins');
+    if (savedAdmins) {
+      try {
+        setAdmins(JSON.parse(savedAdmins));
+      } catch (e) {
+        setAdmins([{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }]);
+      }
+    } else {
+      const defaultAdmins = [{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }];
+      localStorage.setItem('smp_pgri_admins', JSON.stringify(defaultAdmins));
+      setAdmins(defaultAdmins);
+    }
 
     setIsLoading(false);
   };
@@ -421,7 +629,6 @@ export default function App() {
             data: newEskul
           })
         });
-        setTimeout(() => fetchAppData(settings), 1500);
       } catch (e) {
         console.error(e);
       }
@@ -465,7 +672,6 @@ export default function App() {
             id
           })
         });
-        setTimeout(() => fetchAppData(settings), 1500);
       } catch (e) {
         console.error(e);
       }
@@ -530,11 +736,54 @@ export default function App() {
     localStorage.setItem('smp_pgri_students', JSON.stringify([]));
   };
 
+  // Verify connection in background without full-screen loading overlay
+  const checkLiveConnectionSilently = async (url: string) => {
+    if (!url || !url.startsWith('http')) {
+      setIsLiveConnection(false);
+      return;
+    }
+    try {
+      const response = await fetch(`${url}?action=getData`);
+      if (response.ok) {
+        const resJson = await response.json();
+        if (resJson.status === 'success') {
+          setIsLiveConnection(true);
+          if (resJson.students) setStudents(resJson.students);
+          if (resJson.eskul) setEskulList(resJson.eskul);
+          if (resJson.admins) {
+            setAdmins(resJson.admins);
+            localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
+          }
+          if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
+            setClassList(resJson.classes);
+            localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
+          }
+          return;
+        }
+      }
+      setIsLiveConnection(false);
+    } catch (e) {
+      console.warn('Silent live connection test failed, using local database mode');
+      setIsLiveConnection(false);
+    }
+  };
+
   // Update Settings
   const handleUpdateSettings = async (newSettings: Partial<AppSettings>) => {
     const updated = { ...settings, ...newSettings };
     setSettings(updated);
     localStorage.setItem('smp_pgri_settings', JSON.stringify(updated));
+
+    // Save to shared backend settings
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updated)
+      });
+    } catch (e) {
+      console.error('Failed to save settings to backend:', e);
+    }
 
     // If cloud link is active, update settings on sheet
     if (isLiveConnection && settings.googleAppsScriptUrl) {
@@ -553,15 +802,34 @@ export default function App() {
       }
     }
 
-    // Trigger complete data refresh
-    fetchAppData(updated);
+    // Hapus sinkronisasi Database (blocking loading) apabila mengedit atau menghapus URL
+    if (newSettings.googleAppsScriptUrl !== undefined) {
+      if (!updated.googleAppsScriptUrl || !updated.googleAppsScriptUrl.trim().startsWith('http')) {
+        setIsLiveConnection(false);
+        // Load local state data immediately
+        const savedEskul = localStorage.getItem('smp_pgri_eskul');
+        if (savedEskul) setEskulList(JSON.parse(savedEskul));
+        const savedStudents = localStorage.getItem('smp_pgri_students');
+        if (savedStudents) setStudents(JSON.parse(savedStudents));
+        const savedAdmins = localStorage.getItem('smp_pgri_admins');
+        if (savedAdmins) setAdmins(JSON.parse(savedAdmins));
+      } else {
+        // Silent update/verification in the background (no full-screen spinner)
+        checkLiveConnectionSilently(updated.googleAppsScriptUrl);
+      }
+    } else {
+      // Trigger complete data refresh if they only updated the active school year
+      fetchAppData(updated);
+    }
   };
 
   // Add Admin Account
   const handleAddAdmin = async (newAdmin: any): Promise<any> => {
     const adminWithStatus = {
+      id: 'admin-' + Math.random().toString(36).substring(2, 11),
       ...newAdmin,
-      status: newAdmin.status || (newAdmin.username.toLowerCase().trim() === 'admin' ? 'Admin Utama' : 'Admin Biasa')
+      status: newAdmin.status || (newAdmin.username.toLowerCase().trim() === 'admin' ? 'Utama' : 'Biasa'),
+      createdAt: new Date().toISOString()
     };
 
     const gasUrl = settings.googleAppsScriptUrl;
@@ -591,6 +859,7 @@ export default function App() {
     // Local Fallback
     const updated = [...admins, adminWithStatus];
     setAdmins(updated);
+    localStorage.setItem('smp_pgri_admins', JSON.stringify(updated));
     return adminWithStatus;
   };
 
@@ -620,7 +889,9 @@ export default function App() {
     }
 
     // Local Fallback
-    setAdmins(prev => prev.filter(adm => adm.username.toLowerCase().trim() !== username.toLowerCase().trim()));
+    const filtered = admins.filter(adm => adm.username.toLowerCase().trim() !== username.toLowerCase().trim());
+    setAdmins(filtered);
+    localStorage.setItem('smp_pgri_admins', JSON.stringify(filtered));
   };
 
   return (
@@ -657,7 +928,11 @@ export default function App() {
             <div className="flex items-center gap-2 sm:gap-4">
               {!isAdminLoggedIn ? (
                 <button
-                  onClick={() => setIsLoginModalOpen(true)}
+                  onClick={() => {
+                    setIsLoginModalOpen(true);
+                    setTempGasUrl(settings.googleAppsScriptUrl || '');
+                    setIsGasUrlConfigOpen(false);
+                  }}
                   className="px-2.5 py-1 text-[10px] sm:text-xs font-black bg-yellow-400 hover:bg-yellow-500 text-slate-950 rounded-md sm:rounded-lg flex items-center gap-1 cursor-pointer transition-all shadow-sm shrink-0 uppercase tracking-wider"
                 >
                   <Lock className="w-3 h-3 text-slate-950" />
@@ -666,7 +941,7 @@ export default function App() {
               ) : (
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={() => handleSetIsAdminLoggedIn(false)}
+                    onClick={handleLogoutClick}
                     className="px-2.5 py-1.5 rounded-xl text-[10px] sm:text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-all flex items-center gap-1 sm:gap-1.5 shadow-sm cursor-pointer border border-red-700 shrink-0 uppercase tracking-wide"
                   >
                     <LogOut className="w-3.5 h-3.5" />

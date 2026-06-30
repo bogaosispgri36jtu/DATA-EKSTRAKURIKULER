@@ -57,7 +57,10 @@ export interface AppSettings {
 }
 
 export interface AdminUser {
+  id?: string;
   username: string;
   password?: string;
+  status?: string;
+  createdAt?: string;
 }
 

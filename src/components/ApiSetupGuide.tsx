@@ -14,21 +14,22 @@ export default function ApiSetupGuide() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const gsCode = `/**
+ /**
  * =========================================================================
- * GOOGLE APPS SCRIPT WEB APP API - BACKEND PENDAFTARAN EKSTAKURIKULER
+ * GOOGLE APPS SCRIPT WEB APP API - BACKEND PENDAFTARAN EKSTRAKURIKULER
  * SMP PGRI JATIUWUNG TANGERANG - BANTEN
  * =========================================================================
  * 
  * PETUNJUK PEMBUATAN SPREADSHEET:
- * Buat 1 Google Spreadsheet baru dengan 4 Sheet (Lembar) berikut:
+ * Buat 1 Google Spreadsheet baru dengan 4 Lembar (Sheet) berikut:
  * 
  * 1. Sheet bernama "Settings"
  *    Kolom A: Key, Kolom B: Value
  *    Baris 1: Key=TahunPelajaranAktif, Value=2026/2027
  * 
  * 2. Sheet bernama "Admin"
- *    Kolom A: Username, Kolom B: Password, Kolom C: Status
- *    Baris 1: Username=admin, Password=admin123, Status=Admin Utama (Secara default)
+ *    Kolom A: ID, Kolom B: Username, Kolom C: Password, Kolom D: Status, Kolom E: CreatedAt
+ *    Baris 1: Username=admin, Password=admin123, Status=Utama (Secara default)
  * 
  * 3. Sheet bernama "Eskul"
  *    Kolom A: ID
@@ -36,11 +37,11 @@ export default function ApiSetupGuide() {
  *    Kolom C: KelasAllowed (Kombinasi dipisahkan koma, contoh: VII,VIII,IX)
  *    Kolom D: TahunPelajaran
  * 
- * 3. Sheet bernama "Siswa"
+ * 4. Sheet bernama "Siswa"
  *    Kolom A: ID
  *    Kolom B: RegNo
  *    Kolom C: Nama
- *    Kolom D: Photo (Base64)
+ *    Kolom D: Photo (Base64 / kosongkan)
  *    Kolom E: Kelas
  *    Kolom F: JenisKelamin
  *    Kolom G: NamaAyah
@@ -64,11 +65,14 @@ export default function ApiSetupGuide() {
  *    Kolom AD: EskulId2, Kolom AE: EskulName2
  *    Kolom AF: TahunPelajaran
  *    Kolom AG: CreatedAt
+ * 
+ * 5. Sheet bernama "Kelas" (Opsional, untuk kustomisasi daftar kelas di luar VII, VIII, IX)
+ *    Kolom A: Nama Kelas (Baris 1 berisi judul "Nama Kelas", baris berikutnya berisi nama-nama kelas)
  */
 
-// CONFIGURATION: Jika script dibuat secara mandiri (standalone), isi ID Spreadsheet Anda di bawah ini
-// Contoh: var SPREADSHEET_ID = "1bgSnunCItAfESxiLTeKgythJRRWqwQLZLEeZ5AzN5T0";
-var SPREADSHEET_ID = "";
+// KOSONGKAN jika script ini ditautkan langsung di Spreadsheet Anda (Extensions -> Apps Script).
+// Jika berupa Script Standalone (terpisah), isi dengan ID Spreadsheet Anda.
+var SPREADSHEET_ID = ""; 
 
 function getSpreadsheet() {
   if (SPREADSHEET_ID && SPREADSHEET_ID !== "") {
@@ -88,7 +92,7 @@ function doGet(e) {
     var action = e.parameter.action;
     var ss = getSpreadsheet();
     
-    // Inisialisasi Database jika kosong
+    // Inisialisasi Lembar/Sheet jika masih kosong
     initDatabase(ss);
     
     if (action === "getData") {
@@ -176,15 +180,14 @@ function initDatabase(ss) {
   var sheetAdmin = ss.getSheetByName("Admin");
   if (!sheetAdmin) {
     sheetAdmin = ss.insertSheet("Admin");
-    sheetAdmin.appendRow(["Username", "Password", "Status"]);
-    sheetAdmin.appendRow(["admin", "admin123", "Admin Utama"]);
+    sheetAdmin.appendRow(["ID", "Username", "Password", "Status", "CreatedAt"]);
+    sheetAdmin.appendRow(["admin-default", "admin", "admin123", "Utama", new Date().toISOString()]);
   }
   
   var sheetEskul = ss.getSheetByName("Eskul");
   if (!sheetEskul) {
     sheetEskul = ss.insertSheet("Eskul");
-    sheetEskul.appendRow(["ID", "Nama", "KelasAllowed", "TahunPelajaran"]);
-    // Seed awal
+    sheetEskul.appendRow(["ID", "NamaEskul", "KelasAllowed", "TahunPelajaran"]);
     sheetEskul.appendRow(["eskul-1", "Pramuka (Wajib)", "VII,VIII,IX", "2026/2027"]);
     sheetEskul.appendRow(["eskul-2", "Paskibra", "VII,VIII,IX", "2026/2027"]);
     sheetEskul.appendRow(["eskul-3", "Futsal", "VII,VIII,IX", "2026/2027"]);
@@ -206,6 +209,12 @@ function initDatabase(ss) {
   if (!sheetKelas) {
     sheetKelas = ss.insertSheet("Kelas");
     sheetKelas.appendRow(["Nama Kelas"]);
+    sheetKelas.appendRow(["VII-1"]);
+    sheetKelas.appendRow(["VII-2"]);
+    sheetKelas.appendRow(["VIII-1"]);
+    sheetKelas.appendRow(["VIII-2"]);
+    sheetKelas.appendRow(["IX-1"]);
+    sheetKelas.appendRow(["IX-2"]);
   }
 }
 
@@ -220,7 +229,6 @@ function getClassList(ss) {
   var classes = [];
   var startIdx = 0;
   
-  // Deteksi header secara cerdas
   var firstCell = rows[0][0] ? rows[0][0].toString().toLowerCase() : "";
   if (firstCell === "id" || firstCell === "nama" || firstCell === "kelas" || firstCell === "nama kelas") {
     startIdx = 1;
@@ -251,113 +259,25 @@ function getSettings(ss) {
   };
 }
 
-// Ambil Daftar Admin dari Sheet Admin
-function getAdminsList(ss) {
-  var sheet = ss.getSheetByName("Admin");
-  if (!sheet) return [{ username: "admin", password: "admin123", status: "Admin Utama" }];
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [{ username: "admin", password: "admin123", status: "Admin Utama" }];
-  
-  var rows = sheet.getDataRange().getValues();
-  var admins = [];
-  for (var i = 1; i < rows.length; i++) {
-    var u = rows[i][0] ? rows[i][0].toString().trim() : "";
-    var p = rows[i][1] ? rows[i][1].toString().trim() : "";
-    var s = rows[i][2] ? rows[i][2].toString().trim() : "Admin Biasa";
-    if (u) {
-      if (u.toLowerCase() === "admin") {
-        s = "Admin Utama";
-      }
-      admins.push({ username: u, password: p, status: s });
-    }
-  }
-  return admins;
-}
-
 // Ambil Daftar Eskul
 function getEskulList(ss) {
   var sheet = ss.getSheetByName("Eskul");
-  if (!sheet) return [];
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 1) return [];
-  
   var rows = sheet.getDataRange().getValues();
-  if (rows.length === 0) return [];
-  
   var eskul = [];
-  var startIdx = 1;
-  
-  // Deteksi header secara cerdas
-  var headers = rows[0].map(function(h) { return h ? h.toString().toLowerCase().trim() : ""; });
-  var idColIdx = headers.indexOf("id");
-  var namaColIdx = headers.indexOf("nama");
-  if (namaColIdx === -1) namaColIdx = headers.indexOf("nama eskul");
-  if (namaColIdx === -1) namaColIdx = headers.indexOf("ekstrakurikuler");
-  var kelasColIdx = headers.indexOf("kelasallowed");
-  if (kelasColIdx === -1) kelasColIdx = headers.indexOf("kelas");
-  if (kelasColIdx === -1) kelasColIdx = headers.indexOf("rombel");
-  var tahunColIdx = headers.indexOf("tahunpelajaran");
-  if (tahunColIdx === -1) tahunColIdx = headers.indexOf("tahun");
-  
-  // Jika tidak ada baris header yang cocok sama sekali
-  var firstCell = rows[0][0] ? rows[0][0].toString().toLowerCase() : "";
-  if (firstCell !== "id" && firstCell !== "nama" && firstCell !== "nama eskul" && firstCell !== "ekstrakurikuler") {
-    startIdx = 0;
-  }
-  
-  // Fallback index kolom
-  if (namaColIdx === -1) {
-    idColIdx = 0;
-    namaColIdx = 1;
-    kelasColIdx = 2;
-    tahunColIdx = 3;
-  }
-  
-  for (var i = startIdx; i < rows.length; i++) {
-    var row = rows[i];
-    if (!row) continue;
+  for (var i = 1; i < rows.length; i++) {
+    var idVal = rows[i][0];
+    var namaVal = rows[i][1];
+    var kelasAllowedVal = rows[i][2];
+    var tpVal = rows[i][3];
     
-    // Ambil nama eskul
-    var namaVal = "";
-    if (namaColIdx < row.length && row[namaColIdx]) {
-      namaVal = row[namaColIdx].toString().trim();
-    } else if (row[0] && idColIdx === -1) {
-      namaVal = row[0].toString().trim();
+    if (idVal && namaVal) {
+      eskul.push({
+        id: idVal.toString(),
+        nama: namaVal.toString(),
+        kelasAllowed: kelasAllowedVal ? kelasAllowedVal.toString().split(",") : [],
+        tahunPelajaran: tpVal ? tpVal.toString() : "2026/2027"
+      });
     }
-    
-    if (!namaVal) continue; // Lewati baris jika nama eskul kosong
-    
-    // Ambil ID atau buat otomatis
-    var idVal = "";
-    if (idColIdx !== -1 && idColIdx < row.length && row[idColIdx]) {
-      idVal = row[idColIdx].toString().trim();
-    }
-    if (!idVal) {
-      idVal = "eskul-" + i;
-    }
-    
-    // Ambil rombel kelas
-    var kelasVal = [];
-    if (kelasColIdx !== -1 && kelasColIdx < row.length && row[kelasColIdx]) {
-      var kStr = row[kelasColIdx].toString().trim();
-      kelasVal = kStr.split(/[,/]/).map(function(x) { return x.trim().toUpperCase(); }).filter(Boolean);
-    }
-    if (kelasVal.length === 0) {
-      kelasVal = ["VII", "VIII", "IX"]; // Fallback jika kosong
-    }
-    
-    // Ambil tahun pelajaran
-    var tahunVal = "2026/2027";
-    if (tahunColIdx !== -1 && tahunColIdx < row.length && row[tahunColIdx]) {
-      tahunVal = row[tahunColIdx].toString().trim();
-    }
-    
-    eskul.push({
-      id: idVal,
-      nama: namaVal,
-      kelasAllowed: kelasVal,
-      tahunPelajaran: tahunVal
-    });
   }
   return eskul;
 }
@@ -365,256 +285,225 @@ function getEskulList(ss) {
 // Ambil Daftar Siswa
 function getStudentsList(ss) {
   var sheet = ss.getSheetByName("Siswa");
-  if (!sheet) return [];
-  var lastRow = sheet.getLastRow();
-  if (lastRow < 2) return [];
-  
   var rows = sheet.getDataRange().getValues();
   var students = [];
   for (var i = 1; i < rows.length; i++) {
-    var row = rows[i];
-    if (!row[0]) continue; // Skip baris kosong
-    
-    // Fungsi pembantu untuk mengambil data kolom secara aman
-    var getVal = function(idx) {
-      return (row[idx] !== undefined && row[idx] !== null) ? row[idx].toString() : "";
-    };
-    
-    var eskulId = getVal(27);
-    var eskulName = getVal(28);
-    var eskulId2 = "";
-    var eskulName2 = "";
-    var tahunPelajaran = "";
-    var createdAt = "";
-    
-    // Mendukung sheet dengan format 31 kolom (tanpa eskul pilihan ke-2) maupun 33 kolom (dengan eskul pilihan ke-2)
-    if (row.length <= 31) {
-      tahunPelajaran = getVal(29);
-      createdAt = getVal(30);
-    } else {
-      eskulId2 = getVal(29);
-      eskulName2 = getVal(30);
-      tahunPelajaran = getVal(31);
-      createdAt = getVal(32);
-      
-      // Fallback jika baris diisi format 31 kolom tapi baris memiliki sisa kolom kosong
-      if (tahunPelajaran === "" && eskulId2.indexOf("/") !== -1) {
-        tahunPelajaran = eskulId2;
-        createdAt = eskulName2;
-        eskulId2 = "";
-        eskulName2 = "";
-      }
+    if (rows[i][0]) {
+      students.push({
+        id: rows[i][0].toString(),
+        regNo: rows[i][1].toString(),
+        nama: rows[i][2].toString(),
+        photo: rows[i][3] ? rows[i][3].toString() : "",
+        kelas: rows[i][4].toString(),
+        jenisKelamin: rows[i][5].toString(),
+        namaAyah: rows[i][6].toString(),
+        namaIbu: rows[i][7].toString(),
+        hpSiswa: rows[i][8].toString(),
+        hpOrtu: rows[i][9].toString(),
+        prestasiChecked: rows[i][10] === true || rows[i][10] === "TRUE",
+        namaLomba: rows[i][11] ? rows[i][11].toString() : "",
+        cabangLomba: rows[i][12] ? rows[i][12].toString() : "",
+        tingkatLomba: rows[i][13] ? rows[i][13].toString() : "",
+        juaraKe: rows[i][14] ? rows[i][14].toString() : "",
+        penyelenggara: rows[i][15] ? rows[i][15].toString() : "",
+        alamat: rows[i][16] ? rows[i][16].toString() : "",
+        rt: rows[i][17] ? rows[i][17].toString() : "",
+        rw: rows[i][18] ? rows[i][18].toString() : "",
+        provinsiId: rows[i][19] ? rows[i][19].toString() : "",
+        provinsiName: rows[i][20] ? rows[i][20].toString() : "",
+        kabupatenId: rows[i][21] ? rows[i][21].toString() : "",
+        kabupatenName: rows[i][22] ? rows[i][22].toString() : "",
+        kecamatanId: rows[i][23] ? rows[i][23].toString() : "",
+        kecamatanName: rows[i][24] ? rows[i][24].toString() : "",
+        kelurahanId: rows[i][25] ? rows[i][25].toString() : "",
+        kelurahanName: rows[i][26] ? rows[i][26].toString() : "",
+        eskulId: rows[i][27] ? rows[i][27].toString() : "",
+        eskulName: rows[i][28] ? rows[i][28].toString() : "",
+        eskulId2: rows[i][29] ? rows[i][29].toString() : "",
+        eskulName2: rows[i][30] ? rows[i][30].toString() : "",
+        tahunPelajaran: rows[i][31] ? rows[i][31].toString() : "",
+        createdAt: rows[i][32] ? rows[i][32].toString() : ""
+      });
     }
-    
-    students.push({
-      id: getVal(0),
-      regNo: getVal(1),
-      name: getVal(2),
-      photo: getVal(3),
-      kelas: getVal(4),
-      jenisKelamin: getVal(5),
-      namaAyah: getVal(6),
-      namaIbu: getVal(7),
-      hpSiswa: getVal(8),
-      hpOrtu: getVal(9),
-      prestasiChecked: getVal(10) === "true" || getVal(10) === "TRUE" || row[10] === true,
-      namaLomba: getVal(11),
-      cabangLomba: getVal(12),
-      tingkatLomba: getVal(13),
-      juaraKe: getVal(14),
-      penyelenggara: getVal(15),
-      alamat: getVal(16),
-      rt: getVal(17),
-      rw: getVal(18),
-      provinsiId: getVal(19),
-      provinsiName: getVal(20),
-      kabupatenId: getVal(21),
-      kabupatenName: getVal(22),
-      kecamatanId: getVal(23),
-      kecamatanName: getVal(24),
-      kelurahanId: getVal(25),
-      kelurahanName: getVal(26),
-      eskulId: eskulId,
-      eskulName: eskulName,
-      eskulId2: eskulId2,
-      eskulName2: eskulName2,
-      tahunPelajaran: tahunPelajaran,
-      createdAt: createdAt
-    });
   }
   return students;
 }
 
-// Simpan Data Siswa Pendaftar Baru & Generate No. Registrasi
-function saveStudent(ss, s) {
-  var sheet = ss.getSheetByName("Siswa");
-  var lastRow = sheet.getLastRow();
-  
-  // Hitung jumlah pendaftar di tahun pelajaran yang sama untuk nomor urut
+// Ambil Daftar Admin
+function getAdminsList(ss) {
+  var sheet = ss.getSheetByName("Admin");
   var rows = sheet.getDataRange().getValues();
-  var matchCount = 0;
-  var targetYear = s.tahunPelajaran.split("/")[0]; // Ambil tahun awal saja (misal: 2026)
+  if (rows.length === 0) return [];
   
-  for (var i = 1; i < rows.length; i++) {
-    var row = rows[i];
-    var rowTahunPelajaran = "";
-    if (row.length <= 31) {
-      rowTahunPelajaran = row[29] ? row[29].toString() : "";
+  var admins = [];
+  var headers = rows[0].map(function(h) { return h ? h.toString().toLowerCase().trim() : ""; });
+  
+  // Cari indeks masing-masing kolom berdasarkan nama header secara cerdas
+  var idIdx = headers.indexOf("id");
+  
+  var userIdx = headers.indexOf("username");
+  if (userIdx === -1) userIdx = headers.indexOf("nama pengguna");
+  if (userIdx === -1) userIdx = headers.indexOf("user");
+  if (userIdx === -1) userIdx = headers.indexOf("nama");
+  if (userIdx === -1) userIdx = headers.indexOf("akun");
+  
+  var passIdx = headers.indexOf("password");
+  if (passIdx === -1) passIdx = headers.indexOf("kata sandi");
+  if (passIdx === -1) passIdx = headers.indexOf("pass");
+  if (passIdx === -1) passIdx = headers.indexOf("sandi");
+  if (passIdx === -1) passIdx = headers.indexOf("pin");
+  
+  var statusIdx = headers.indexOf("status");
+  if (statusIdx === -1) statusIdx = headers.indexOf("role");
+  
+  var createdIdx = headers.indexOf("createdat");
+  if (createdIdx === -1) createdIdx = headers.indexOf("created at");
+  if (createdIdx === -1) createdIdx = headers.indexOf("tanggal dibuat");
+  
+  var startIdx = 1;
+  
+  // JIKA TIDAK ADA HEADER YANG COCOK SAMA SEKALI
+  // Kita coba deteksi otomatis posisi kolom berdasarkan struktur data
+  if (userIdx === -1 && passIdx === -1) {
+    startIdx = 0; // Berarti baris pertama langsung berupa DATA (bukan nama kolom)
+    
+    var numCols = rows[0].length;
+    if (numCols === 1) {
+      userIdx = 0;
+    } else if (numCols === 2) {
+      userIdx = 0;
+      passIdx = 1;
+    } else if (numCols === 3) {
+      userIdx = 0;
+      passIdx = 1;
+      statusIdx = 2;
     } else {
-      rowTahunPelajaran = row[31] ? row[31].toString() : "";
-      if (rowTahunPelajaran === "" && row[29] && row[29].toString().indexOf("/") !== -1) {
-        rowTahunPelajaran = row[29].toString();
-      }
+      idIdx = 0;
+      userIdx = 1;
+      passIdx = 2;
+      statusIdx = 3;
+      createdIdx = 4;
     }
-    if (rowTahunPelajaran === s.tahunPelajaran) {
-      matchCount++;
-    }
+  } else {
+    // Jika ada header tapi beberapa indeks tidak terdeteksi, berikan fallback aman
+    if (userIdx === -1) userIdx = (idIdx === 0) ? 1 : 0;
+    if (passIdx === -1) passIdx = (userIdx === 1) ? 2 : 1;
   }
   
-  // Format nomor urut: REG/TAHUN/00X (Contoh: REG/2026/001)
-  var urutan = ("00" + (matchCount + 1)).slice(-3);
-  var regNo = "REG/" + targetYear + "/" + urutan;
-  var id = "student-" + Utilities.getUuid();
+  for (var i = startIdx; i < rows.length; i++) {
+    var row = rows[i];
+    if (!row) continue;
+    
+    var u = (userIdx !== -1 && userIdx < row.length) ? row[userIdx].toString().trim() : "";
+    var p = (passIdx !== -1 && passIdx < row.length) ? row[passIdx].toString().trim() : "";
+    
+    if (u) {
+      var id = (idIdx !== -1 && idIdx < row.length && row[idIdx]) ? row[idIdx].toString().trim() : "admin-" + i;
+      var s = (statusIdx !== -1 && statusIdx < row.length && row[statusIdx]) ? row[statusIdx].toString().trim() : "Biasa";
+      var c = (createdIdx !== -1 && createdIdx < row.length && row[createdIdx]) ? row[createdIdx].toString().trim() : new Date().toISOString();
+      
+      if (u.toLowerCase() === "admin") {
+        s = "Utama";
+      }
+      
+      admins.push({
+        id: id,
+        username: u,
+        password: p,
+        status: s,
+        createdAt: c
+      });
+    }
+  }
+  return admins;
+}
+
+// Simpan Data Pendaftaran Siswa Baru
+function saveStudent(ss, s) {
+  var sheet = ss.getSheetByName("Siswa");
+  var id = "REG-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+  var regNo = "REG/" + new Date().getFullYear() + "/" + Math.floor(1000 + Math.random() * 9000);
   var createdAt = new Date().toISOString();
   
   sheet.appendRow([
     id,
     regNo,
-    s.name,
-    s.photo,
+    s.nama,
+    s.photo || "",
     s.kelas,
     s.jenisKelamin,
     s.namaAyah,
     s.namaIbu,
     s.hpSiswa,
     s.hpOrtu,
-    s.prestasiChecked,
-    s.namaLomba,
-    s.cabangLomba,
-    s.tingkatLomba,
-    s.juaraKe,
-    s.penyelenggara,
-    s.alamat,
-    s.rt,
-    s.rw,
-    s.provinsiId,
-    s.provinsiName,
-    s.kabupatenId,
-    s.kabupatenName,
-    s.kecamatanId,
-    s.kecamatanName,
-    s.kelurahanId,
-    s.kelurahanName,
-    s.eskulId,
-    s.eskulName,
+    s.prestasiChecked ? "TRUE" : "FALSE",
+    s.namaLomba || "",
+    s.cabangLomba || "",
+    s.tingkatLomba || "",
+    s.juaraKe || "",
+    s.penyelenggara || "",
+    s.alamat || "",
+    s.rt || "",
+    s.rw || "",
+    s.provinsiId || "",
+    s.provinsiName || "",
+    s.kabupatenId || "",
+    s.kabupatenName || "",
+    s.kecamatanId || "",
+    s.kecamatanName || "",
+    s.kelurahanId || "",
+    s.kelurahanName || "",
+    s.eskulId || "",
+    s.eskulName || "",
     s.eskulId2 || "",
     s.eskulName2 || "",
     s.tahunPelajaran,
     createdAt
   ]);
   
-  s.id = id;
-  s.regNo = regNo;
-  s.createdAt = createdAt;
-  return s;
+  return { id: id, regNo: regNo, createdAt: createdAt, ...s };
 }
 
-// Simpan Data Eskul Baru
+// Simpan Ekstrakurikuler Baru
 function saveEskul(ss, e) {
   var sheet = ss.getSheetByName("Eskul");
-  var id = "eskul-" + Utilities.getUuid();
+  var id = "eskul-" + Date.now();
   sheet.appendRow([
     id,
     e.nama,
     e.kelasAllowed.join(","),
     e.tahunPelajaran
   ]);
-
-  // Tambahkan kelas ke sheet "Kelas" secara dinamis jika belum ada
-  var sheetKelas = ss.getSheetByName("Kelas");
-  if (!sheetKelas) {
-    sheetKelas = ss.insertSheet("Kelas");
-    sheetKelas.appendRow(["Nama Kelas"]);
-  }
-  
-  var existingClasses = getClassList(ss);
-  var classesToSave = e.kelasAllowed;
-  
-  for (var k = 0; k < classesToSave.length; k++) {
-    var clsName = classesToSave[k].toString().trim();
-    if (clsName) {
-      var exists = false;
-      for (var j = 0; j < existingClasses.length; j++) {
-        if (existingClasses[j].toLowerCase().trim() === clsName.toLowerCase().trim()) {
-          exists = true;
-          break;
-        }
-      }
-      if (!exists) {
-        sheetKelas.appendRow([clsName]);
-        existingClasses.push(clsName); // Update local array to handle duplicates in the same batch
-      }
-    }
-  }
-
-  e.id = id;
-  return e;
+  return { id: id, ...e };
 }
 
-// Simpan Data Admin Baru
-function saveAdmin(ss, admin) {
-  var sheet = ss.getSheetByName("Admin");
-  if (!sheet) {
-    sheet = ss.insertSheet("Admin");
-    sheet.appendRow(["Username", "Password", "Status"]);
-  }
-  var statusVal = admin.status || "Admin Biasa";
-  sheet.appendRow([
-    admin.username,
-    admin.password,
-    statusVal
-  ]);
-  return { username: admin.username, password: admin.password, status: statusVal };
-}
-
-// Hapus Admin
-function deleteAdmin(ss, username) {
-  var sheet = ss.getSheetByName("Admin");
-  if (!sheet) return;
-  var rows = sheet.getDataRange().getValues();
-  for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0] && rows[i][0].toString().toLowerCase().trim() === username.toLowerCase().trim()) {
-      sheet.deleteRow(i + 1);
-      break;
-    }
-  }
-}
-
-// Hapus Eskul
+// Hapus Ekstrakurikuler
 function deleteEskul(ss, id) {
   var sheet = ss.getSheetByName("Eskul");
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0].toString() === id) {
+    if (rows[i][0].toString() === id.toString()) {
       sheet.deleteRow(i + 1);
       break;
     }
   }
 }
 
-// Reset Pendaftar per Eskul tertentu
+// Reset Pendaftar Per Eskul
 function resetEskulStudents(ss, eskulId) {
   var sheet = ss.getSheetByName("Siswa");
   var rows = sheet.getDataRange().getValues();
-  // Lakukan iterasi dari bawah agar penghapusan baris tidak merusak indeks loop
+  // Loop terbalik agar indeks baris tidak bergeser saat dihapus
   for (var i = rows.length - 1; i >= 1; i--) {
-    if (rows[i][27].toString() === eskulId) {
+    var eskul1 = rows[i][27] ? rows[i][27].toString() : "";
+    var eskul2 = rows[i][29] ? rows[i][29].toString() : "";
+    if (eskul1 === eskulId || eskul2 === eskulId) {
       sheet.deleteRow(i + 1);
     }
   }
 }
 
-// Reset Seluruh Data Siswa (Clean Database)
+// Reset Seluruh Database Siswa Pendaftar
 function resetAllData(ss) {
   var sheet = ss.getSheetByName("Siswa");
   var lastRow = sheet.getLastRow();
@@ -623,16 +512,48 @@ function resetAllData(ss) {
   }
 }
 
-// Perbarui Konfigurasi Settings
+// Update Konfigurasi Settings
 function updateSettings(ss, config) {
   var sheet = ss.getSheetByName("Settings");
+  var lastRow = sheet.getLastRow();
   var rows = sheet.getDataRange().getValues();
   
-  if (config.tahunPelajaranAktif) {
-    for (var i = 1; i < rows.length; i++) {
-      if (rows[i][0] === "TahunPelajaranAktif") {
-        sheet.getRange(i + 1, 2).setValue(config.tahunPelajaranAktif);
-      }
+  var activeTpUpdated = false;
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0] === "TahunPelajaranAktif") {
+      sheet.getRange(i + 1, 2).setValue(config.tahunPelajaranAktif);
+      activeTpUpdated = true;
+      break;
+    }
+  }
+  if (!activeTpUpdated) {
+    sheet.appendRow(["TahunPelajaranAktif", config.tahunPelajaranAktif]);
+  }
+}
+
+// Simpan Admin Baru ke Sheet
+function saveAdmin(ss, admin) {
+  var sheet = ss.getSheetByName("Admin");
+  var id = "admin-" + Date.now();
+  var createdAt = new Date().toISOString();
+  sheet.appendRow([
+    id,
+    admin.username,
+    admin.password,
+    admin.status || "Biasa",
+    createdAt
+  ]);
+  return { id: id, username: admin.username, password: admin.password, status: admin.status || "Biasa", createdAt: createdAt };
+}
+
+// Hapus Admin dari Sheet
+function deleteAdmin(ss, username) {
+  var sheet = ss.getSheetByName("Admin");
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][1].toString().toLowerCase().trim() === username.toLowerCase().trim()) {
+      sheet.deleteRow(i + 1);
+      break;
     }
   }
 }
@@ -715,7 +636,7 @@ function updateSettings(ss, config) {
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Salin kode Google Apps Script (`kode.gs`) di bawah ini, lalu buka menu <b>Ekstensi</b> → <b>Apps Script</b> di Google Spreadsheet Anda, hapus semua kode bawaan, dan tempelkan kode ini. Jangan lupa klik tombol Simpan (ikon disket).
+                Salin kode Google Apps Script (<code>kode.gs</code>) di bawah ini, lalu buka menu <b>Ekstensi</b> → <b>Apps Script</b> di Google Spreadsheet Anda, hapus semua kode bawaan, dan tempelkan kode ini. Jangan lupa klik tombol Simpan (ikon disket).
               </p>
 
               <div className="relative bg-slate-900 rounded-xl overflow-hidden mt-3 border border-slate-800 max-h-48 overflow-y-auto">

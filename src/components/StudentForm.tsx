@@ -238,11 +238,11 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.size > 15 * 1024 * 1024) {
       Swal.fire({
         icon: 'warning',
         title: 'File Terlalu Besar',
-        text: 'Maksimal ukuran file pas foto untuk kompresi adalah 5MB.',
+        text: 'Maksimal ukuran file pas foto untuk kompresi adalah 15MB.',
         confirmButtonColor: '#1d4ed8',
         width: '340px',
         timer: 5000,
@@ -277,24 +277,35 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           }
         }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Start compression quality loop
+        // Start compression quality and dimension scaling loop to guarantee < 200 kb
         let quality = 0.8;
         let dataUrl = '';
         let sizeInKb = 999;
+        let scale = 1.0;
 
-        do {
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
-          // Calculate length in KB
-          const head = 'data:image/jpeg;base64,'.length;
-          sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-          quality -= 0.1;
-        } while (sizeInKb > 195 && quality > 0.1);
+        while (sizeInKb > 195 && scale > 0.1) {
+          const currentWidth = Math.round(width * scale);
+          const currentHeight = Math.round(height * scale);
+          canvas.width = currentWidth;
+          canvas.height = currentHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, currentWidth, currentHeight);
+            ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
+          }
+
+          quality = 0.8;
+          do {
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const head = 'data:image/jpeg;base64,'.length;
+            sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+            quality -= 0.1;
+          } while (sizeInKb > 195 && quality > 0.1);
+
+          if (sizeInKb > 195) {
+            scale -= 0.15; // scale down dimensions further if quality adjustment alone is insufficient
+          }
+        }
 
         setPhoto(dataUrl);
         setPhotoSize(sizeInKb);
@@ -336,12 +347,12 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       return;
     }
 
-    // Limit to 2MB to keep Base64 strings manageable
-    if (file.size > 2 * 1024 * 1024) {
+    // Limit to 100kb to keep Base64 strings manageable and fit requested limit
+    if (file.size > 100 * 1024) {
       Swal.fire({
         icon: 'warning',
         title: 'Ukuran File Terlalu Besar',
-        text: 'Maksimal ukuran file sertifikat adalah 2MB.',
+        text: 'Maksimal ukuran file sertifikat adalah 100kb.',
         confirmButtonColor: '#1d4ed8',
         width: '360px',
         timer: 5000,
@@ -521,10 +532,9 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
             <div class="flex flex-wrap gap-1.5 pt-1">
               ${formattedList}
             </div>
-            <p class="text-[9px] text-slate-400 italic pt-1 text-right">Pemberitahuan ini akan menutup otomatis dalam 5 detik.</p>
           </div>
         `,
-        confirmButtonColor: '#1d4ed8',
+        showConfirmButton: false,
         width: '340px',
         timer: 5000,
         timerProgressBar: true
@@ -996,18 +1006,18 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
   return (
     <div className="bg-slate-50 min-h-[calc(100vh-4rem)] pb-12 w-full" id="student-form-screen">
       {/* Top Banner Header */}
-      <div className="bg-gradient-to-br from-blue-800 via-blue-900 to-slate-950 text-white pt-8 pb-14 sm:pt-10 sm:pb-16 px-3.5 sm:px-8 relative overflow-hidden shadow-md border-b border-slate-800">
+      <div className="bg-gradient-to-br from-blue-800 via-blue-900 to-slate-950 text-white pt-6 pb-12 sm:pt-8 sm:pb-14 px-3.5 sm:px-6 relative overflow-hidden shadow-md border-b border-slate-800">
         {/* Yellow artistic highlight */}
         <div className="absolute -top-12 -right-12 w-64 h-64 bg-yellow-400 opacity-15 rounded-full blur-3xl"></div>
         <div className="absolute -bottom-8 -left-8 w-48 h-48 bg-blue-500 opacity-20 rounded-full blur-2xl"></div>
         
-        <div className="max-w-4xl mx-auto flex flex-col items-center justify-center text-center gap-2 relative z-10">
+        <div className="max-w-4xl mx-auto flex flex-col items-center justify-center text-center gap-1.5 relative z-10">
           <div className="flex flex-col items-center text-center">
-            <h1 className="text-xl sm:text-3xl md:text-4xl font-black tracking-wide leading-tight">SMP PGRI JATIUWUNG</h1>
-            <div className="text-xs sm:text-sm md:text-base text-yellow-300 font-bold tracking-wider mt-1">
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-black tracking-wide leading-tight">SMP PGRI JATIUWUNG</h1>
+            <div className="text-[10px] sm:text-xs md:text-sm text-yellow-300 font-bold tracking-wider mt-0.5">
               Pendaftaran Ekstrakurikuler
             </div>
-            <p className="text-xs sm:text-sm text-blue-200 font-extrabold tracking-wider uppercase mt-1.5 bg-blue-950/40 px-3.5 py-1 rounded-full">
+            <p className="text-[10px] sm:text-xs text-blue-200 font-extrabold tracking-wider uppercase mt-1 bg-blue-950/40 px-2.5 py-0.5 rounded-full inline-block">
               Tahun Pelajaran: <span className="text-yellow-300 font-mono font-black">{tahunPelajaranAktif}</span>
             </p>
           </div>
@@ -1015,8 +1025,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       </div>
 
       {/* Main Registration Form */}
-      <div className="max-w-3xl mx-auto px-3 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
-        <form onSubmit={handleSubmit} noValidate className="bg-white rounded-xl sm:rounded-2xl shadow-xl p-3 sm:p-5 md:p-6 space-y-3.5 sm:space-y-4 md:space-y-5 border border-slate-100">
+      <div className="max-w-3xl mx-auto px-3 sm:px-6 -mt-5 sm:-mt-6 relative z-20">
+        <form onSubmit={handleSubmit} noValidate className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2.5 sm:p-4 md:p-5 space-y-3 sm:space-y-3.5 border border-slate-100">
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4.5 items-start">
             
@@ -1072,9 +1082,9 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       className="hidden" 
                     />
                     <div className="text-[9px] sm:text-[8px] text-slate-400 font-normal leading-normal">
-                      <p className="font-bold text-slate-500 mb-0.5">Syarat :</p>
+                      <p className="font-bold text-slate-500 mb-0.5">Syarat foto :</p>
                       <p>• Foto wajib berseragam sekolah.</p>
-                      <p>• Maksimal ukuran Foto 1 MB</p>
+                      <p>• Maksimal ukuran Foto 200 kb</p>
                     </div>
                   </div>
                 </div>
@@ -1547,7 +1557,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                             className="w-full flex items-center justify-center gap-2 py-1.5 text-[10px] sm:text-xs font-bold text-slate-500 hover:text-blue-700 transition-all cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5" />
-                            Pilih Gambar / PDF (Maks. 2MB)
+                            Pilih Gambar / PDF (Maks. 100kb)
                           </button>
                         )}
                       </div>
