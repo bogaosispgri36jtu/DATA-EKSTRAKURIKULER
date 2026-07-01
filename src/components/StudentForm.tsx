@@ -1383,9 +1383,9 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
 
               {/* Section: Alamat Lengkap */}
               <div className="space-y-2 bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200/60">
-                {/* Kampung/Perumahan */}
+                {/* Kampung/Perumahan  dan Blok */}
                 <div className="space-y-1">
-                  <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KAMPUNG / PERUMAHAN <span className="text-red-500">*</span></label>
+                  <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KAMPUNG / PERUMAHAN dan BLOK <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     value={alamat} 

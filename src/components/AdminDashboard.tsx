@@ -56,7 +56,7 @@ export default function AdminDashboard({
   classList = []
 }: AdminDashboardProps) {
   const isLoggedAdminUtama = !loggedAdmin ? false : (
-    loggedAdmin.username.toLowerCase().trim() === 'admin' || 
+    (loggedAdmin.username || '').toLowerCase().trim() === 'admin' || 
     (loggedAdmin.status && loggedAdmin.status.toLowerCase().includes('utama'))
   );
 
@@ -400,23 +400,29 @@ export default function AdminDashboard({
   // Calculate statistics per class (classes created by teachers in active school year)
   const classRegistrationStats = React.useMemo(() => {
     return finalKelasList.map(cls => {
-      const count = students.filter(s => 
-        s.kelas.toLowerCase().trim() === cls.toLowerCase().trim() && 
-        s.tahunPelajaran === settings.tahunPelajaranAktif
-      ).length;
+      const clsStr = (cls || '').toString().toLowerCase().trim();
+      const count = students.filter(s => {
+        const sKelas = (s?.kelas || '').toString().toLowerCase().trim();
+        const sTahun = s?.tahunPelajaran || '';
+        return sKelas === clsStr && sTahun === (settings.tahunPelajaranAktif || '');
+      }).length;
       return { className: cls, count };
     });
   }, [finalKelasList, students, settings.tahunPelajaranAktif]);
 
   // Filter students based on query
   const filteredStudents = students.filter(student => {
+    const sName = (student?.name || '').toString().toLowerCase();
+    const sRegNo = (student?.regNo || '').toString().toLowerCase();
+    const sHp = (student?.hpSiswa || '').toString();
+
     const matchSearch = 
-      student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.regNo.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      student.hpSiswa.includes(searchQuery);
+      sName.includes(searchQuery.toLowerCase()) ||
+      sRegNo.includes(searchQuery.toLowerCase()) ||
+      sHp.includes(searchQuery);
     
-    const matchEskul = filterEskul ? student.eskulId === filterEskul : true;
-    const matchKelas = filterKelas ? student.kelas === filterKelas : true;
+    const matchEskul = filterEskul ? student?.eskulId === filterEskul : true;
+    const matchKelas = filterKelas ? student?.kelas === filterKelas : true;
 
     return matchSearch && matchEskul && matchKelas;
   });
