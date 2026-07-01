@@ -1045,22 +1045,25 @@ export default function App() {
                 />
               ) : (
                 <div className="max-w-2xl mx-auto px-4 py-16 sm:py-24 text-center">
-                  <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 sm:p-12 space-y-6 animate-fadeIn relative overflow-hidden">
+                  <div className="bg-white rounded-3xl shadow-xl border border-blue-500 p-8 sm:p-12 space-y-6 animate-fadeIn relative overflow-hidden">
                     {/* Background decoration */}
-                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500"></div>
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-blue-800 via-blue-500 to-blue-800"></div>
                     
                     {/* Icon */}
-                    <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-amber-600 animate-spin mx-auto" />
+                    <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-blue-500 animate-spin mx-auto" />
                     
                     <div className="space-y-3">
-                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-800">
-                        Pendaftaran sudah di tutup
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-black uppercase tracking-widest bg-blue-100 text-blue-800">
+                        Mohon Maaf ...
                       </span>
-                      <h2 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">
-                        Pendaftaran Esktrakurikuller Sudah ditutup
+                      <h2 className="text-[16px] font-bold text-slate-800 leading-tight">
+                        Pendaftaran Esktrakurikuller Sudah di tutup
                       </h2>
-                      <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed max-w-md mx-auto">
+                      <p className="text-[12px] font-base text-slate-800 leading-tight">
                         Tahun Pelajaran {settings.tahunPelajaranAktif || '2026/2027'}
+                      </p>
+                      <p className="text-[12px] font-base text-slate-800 leading-tight">
+                        Silahkan Menghubungi Pak Ahmed 082175787863
                       </p>
                     </div>
                   </div>
