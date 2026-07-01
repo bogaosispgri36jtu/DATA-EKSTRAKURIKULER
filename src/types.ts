@@ -56,6 +56,7 @@ export interface AppSettings {
   tahunPelajaranAktif: string;
   adminUsername: string;
   adminPassword: string;
+  isPublished?: boolean;
 }
 
 export interface AdminUser {

@@ -7,7 +7,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Smartphone, ShieldCheck, Database, FileCode, CheckCircle, 
   HelpCircle, Sparkles, School, Layers, Users, RefreshCw, Lock, LogOut,
-  Eye, EyeOff
+  Eye, EyeOff, Calendar, Loader2
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { Student, Extracurricular, AppSettings } from './types';
@@ -119,9 +119,34 @@ const SEED_STUDENTS: Student[] = [
 
 export default function App() {
   // Navigation / Frame toggles
-  const [activeView, setActiveView] = useState<'student' | 'admin' | 'guide'>('student');
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [loggedAdmin, setLoggedAdmin] = useState<{ username: string; status: string } | null>(null);
+  const [activeView, setActiveView] = useState<'student' | 'admin' | 'guide'>(() => {
+    const saved = localStorage.getItem('smp_pgri_active_view');
+    return (saved as 'student' | 'admin' | 'guide') || 'student';
+  });
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState<boolean>(() => {
+    return localStorage.getItem('smp_pgri_admin_logged_in') === 'true';
+  });
+  const [loggedAdmin, setLoggedAdmin] = useState<{ username: string; status: string } | null>(() => {
+    const saved = localStorage.getItem('smp_pgri_admin_user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('smp_pgri_active_view', activeView);
+  }, [activeView]);
+
+  useEffect(() => {
+    localStorage.setItem('smp_pgri_admin_logged_in', isAdminLoggedIn ? 'true' : 'false');
+  }, [isAdminLoggedIn]);
+
+  useEffect(() => {
+    if (loggedAdmin) {
+      localStorage.setItem('smp_pgri_admin_user', JSON.stringify(loggedAdmin));
+    } else {
+      localStorage.removeItem('smp_pgri_admin_user');
+    }
+  }, [loggedAdmin]);
+
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
@@ -155,8 +180,52 @@ export default function App() {
       confirmButtonText: 'IYA',
       cancelButtonText: 'TIDAK',
       width: '340px'
-    }).then((result) => {
+    }).then(async (result) => {
       if (result.isConfirmed) {
+        // Show reloading database loader
+        Swal.fire({
+          html: `
+            <div class="flex flex-col items-center justify-center py-4">
+              <div class="relative w-12 h-12 flex items-center justify-center">
+                <div class="absolute inset-0 rounded-full border-4 border-slate-100"></div>
+                <div class="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></div>
+              </div>
+              <p class="text-xs sm:text-[13px] text-slate-500 font-bold tracking-wider mt-4">
+                Memuat Ulang Database...
+              </p>
+            </div>
+          `,
+          showConfirmButton: false,
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          customClass: {
+            popup: 'rounded-2xl shadow-xl border border-slate-100 max-w-[260px] sm:max-w-xs'
+          }
+        });
+
+        // 1. Fetch latest settings from server
+        let activeSettings = settings;
+        try {
+          const response = await fetch('/api/settings');
+          if (response.ok) {
+            const serverSettings = await response.json();
+            activeSettings = { ...activeSettings, ...serverSettings };
+            setSettings(activeSettings);
+            localStorage.setItem('smp_pgri_settings', JSON.stringify(activeSettings));
+          }
+        } catch (e) {
+          console.warn('Failed to fetch settings on logout', e);
+        }
+
+        // 2. Perform database reload
+        try {
+          await fetchAppData(activeSettings);
+        } catch (e) {
+          console.error(e);
+        }
+
+        // Close loading modal and log out
+        Swal.close();
         handleSetIsAdminLoggedIn(false);
       }
     });
@@ -372,7 +441,8 @@ export default function App() {
     googleAppsScriptUrl: '',
     tahunPelajaranAktif: '2026/2027',
     adminUsername: 'admin',
-    adminPassword: 'admin123'
+    adminPassword: 'admin123',
+    isPublished: true
   });
 
   const [isLoading, setIsLoading] = useState(false);
@@ -385,7 +455,8 @@ export default function App() {
         googleAppsScriptUrl: '',
         tahunPelajaranAktif: '2026/2027',
         adminUsername: 'admin',
-        adminPassword: 'admin123'
+        adminPassword: 'admin123',
+        isPublished: true
       };
 
       try {
@@ -410,6 +481,7 @@ export default function App() {
       }
 
       setSettings(activeSettings);
+      localStorage.setItem('smp_pgri_settings', JSON.stringify(activeSettings));
       fetchAppData(activeSettings);
     };
 
@@ -766,9 +838,9 @@ export default function App() {
     }
 
     // If cloud link is active, update settings on sheet
-    if (isLiveConnection && settings.googleAppsScriptUrl) {
+    if (isLiveConnection && updated.googleAppsScriptUrl) {
       try {
-        await fetch(settings.googleAppsScriptUrl, {
+        await fetch(updated.googleAppsScriptUrl, {
           method: 'POST',
           mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },
@@ -801,6 +873,23 @@ export default function App() {
       // Trigger complete data refresh if they only updated the active school year
       fetchAppData(updated);
     }
+  };
+
+  // Synchronized refresh handler (fetching settings first, then app data)
+  const handleRefresh = async () => {
+    let currentSettings = settings;
+    try {
+      const response = await fetch('/api/settings');
+      if (response.ok) {
+        const serverSettings = await response.json();
+        currentSettings = { ...currentSettings, ...serverSettings };
+        setSettings(currentSettings);
+        localStorage.setItem('smp_pgri_settings', JSON.stringify(currentSettings));
+      }
+    } catch (e) {
+      console.warn('Failed to fetch settings from backend API on refresh', e);
+    }
+    await fetchAppData(currentSettings);
   };
 
   // Add Admin Account
@@ -945,14 +1034,38 @@ export default function App() {
         ) : (
           <div className="animate-fadeIn">
             {activeView === 'student' && (
-              <StudentForm 
-                eskulList={eskulList} 
-                tahunPelajaranAktif={settings.tahunPelajaranAktif}
-                onSubmitRegistration={handleRegisterStudent}
-                isLive={isLiveConnection}
-                classList={classList}
-                isLoading={isLoading}
-              />
+              settings.isPublished !== false ? (
+                <StudentForm 
+                  eskulList={eskulList} 
+                  tahunPelajaranAktif={settings.tahunPelajaranAktif}
+                  onSubmitRegistration={handleRegisterStudent}
+                  isLive={isLiveConnection}
+                  classList={classList}
+                  isLoading={isLoading}
+                />
+              ) : (
+                <div className="max-w-2xl mx-auto px-4 py-16 sm:py-24 text-center">
+                  <div className="bg-white rounded-3xl shadow-xl border border-slate-100 p-8 sm:p-12 space-y-6 animate-fadeIn relative overflow-hidden">
+                    {/* Background decoration */}
+                    <div className="absolute top-0 left-0 right-0 h-2 bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500"></div>
+                    
+                    {/* Icon */}
+                    <Loader2 className="w-10 h-10 sm:w-12 sm:h-12 text-amber-600 animate-spin mx-auto" />
+                    
+                    <div className="space-y-3">
+                      <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-800">
+                        Pendaftaran Belum Dibuka
+                      </span>
+                      <h2 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">
+                        Pendaftaran Esktrakurikuller belum di buka, mohon di tunggu
+                      </h2>
+                      <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed max-w-md mx-auto">
+                        Tahun Pelajaran {settings.tahunPelajaranAktif || '2026/2027'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )
             )}
             {activeView === 'admin' && (
               <AdminDashboard 
@@ -971,7 +1084,7 @@ export default function App() {
                 isLoggedIn={isAdminLoggedIn}
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
                 isLive={isLiveConnection && !!settings.googleAppsScriptUrl}
-                onRefresh={() => fetchAppData(settings)}
+                onRefresh={handleRefresh}
                 classList={classList}
               />
             )}

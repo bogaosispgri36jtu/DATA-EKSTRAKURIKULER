@@ -133,6 +133,37 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     return [];
   }, [classList, dynamicKelasList]);
 
+  // Show SweetAlert2 loading popup when loading data from spreadsheet initially
+  useEffect(() => {
+    if (isLoading && finalKelasList.length === 0) {
+      Swal.fire({
+        html: `
+          <div class="flex flex-col items-center justify-center py-4">
+            <!-- Elegant Loading Spinner -->
+            <div class="relative w-12 h-12 flex items-center justify-center">
+              <div class="absolute inset-0 rounded-full border-4 border-slate-100"></div>
+              <div class="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></div>
+            </div>
+            <!-- Aesthetic Description below spinner -->
+            <p class="text-xs sm:text-[13px] text-slate-500 font-bold tracking-wider mt-4">
+              Mohon Tunggu Sebentar
+            </p>
+          </div>
+        `,
+        showConfirmButton: false,
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        customClass: {
+          popup: 'rounded-2xl shadow-xl border border-slate-100 max-w-[260px] sm:max-w-xs'
+        }
+      });
+    } else {
+      if (Swal.isVisible() && !isLoading) {
+        Swal.close();
+      }
+    }
+  }, [isLoading, finalKelasList.length]);
+
   // Auto-select Pramuka as soon as a class is selected
   useEffect(() => {
     if (kelas) {
@@ -1060,21 +1091,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
 
       {/* Main Registration Form */}
       <div className="max-w-3xl mx-auto px-3 sm:px-6 -mt-5 sm:-mt-6 relative z-20">
-        {isLoading && finalKelasList.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-lg p-10 sm:p-14 text-center border border-slate-100 space-y-4">
-            <div className="relative w-12 h-12 mx-auto">
-              <span className="absolute inset-0 rounded-full border-4 border-slate-100"></span>
-              <span className="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></span>
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wider">Menghubungkan ke Database...</h3>
-              <p className="text-[10px] sm:text-xs text-slate-400 font-medium leading-relaxed">
-                Sedang memuat data kelas dan pilihan ekstrakurikuler langsung dari Spreadsheet. Silakan tunggu sebentar.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit} noValidate className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2.5 sm:p-4 md:p-5 space-y-3 sm:space-y-3.5 border border-slate-100">
+        <form onSubmit={handleSubmit} noValidate className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2.5 sm:p-4 md:p-5 space-y-3 sm:space-y-3.5 border border-slate-100">
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4.5 items-start">
             
@@ -1659,7 +1676,6 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
             </p>
           </div>
           </form>
-        )}
       </div>
     </div>
   );

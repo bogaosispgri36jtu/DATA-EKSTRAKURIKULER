@@ -75,6 +75,7 @@ export default function AdminDashboard({
     setGasUrlInput(settings.googleAppsScriptUrl || '');
     setActiveYearInput(settings.tahunPelajaranAktif);
     setNewEskulTahun(settings.tahunPelajaranAktif);
+    setIsPublishedInput(settings.isPublished !== false);
   }, [settings]);
 
   // Login State
@@ -150,6 +151,7 @@ export default function AdminDashboard({
   // Settings State
   const [gasUrlInput, setGasUrlInput] = useState(settings.googleAppsScriptUrl);
   const [activeYearInput, setActiveYearInput] = useState(settings.tahunPelajaranAktif);
+  const [isPublishedInput, setIsPublishedInput] = useState(settings.isPublished !== false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   // New Admin Form State
@@ -800,6 +802,125 @@ export default function AdminDashboard({
     }
   };
 
+  // Toggle Publication status with SweetAlert2 confirmation
+  const handleTogglePublication = async () => {
+    if (!isLoggedAdminUtama) return;
+
+    if (isPublishedInput) {
+      // Confirm closing registration
+      const result = await Swal.fire({
+        title: 'Tutup Pendaftaran?',
+        text: 'Apakah Anda yakin ingin menutup pendaftaran? Siswa tidak akan dapat mengakses formulir pendaftaran ekstrakurikuler setelah ini ditutup.',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444', // Red
+        cancelButtonColor: '#64748b', // Slate
+        confirmButtonText: 'Ya, Tutup Pendaftaran',
+        cancelButtonText: 'Batal',
+        width: '360px',
+        customClass: {
+          popup: 'rounded-2xl',
+          title: 'text-sm font-black text-slate-800',
+          htmlContainer: 'text-xs text-slate-500 font-medium'
+        }
+      });
+      if (result.isConfirmed) {
+        // Show loading
+        Swal.fire({
+          title: 'Menyimpan...',
+          html: 'Sedang menonaktifkan form pendaftaran...',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+          width: '300px',
+          customClass: { popup: 'rounded-2xl' }
+        });
+
+        try {
+          await onUpdateSettings({ isPublished: false });
+          setIsPublishedInput(false);
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil Ditutup',
+            text: 'Form pendaftaran siswa kini telah ditutup.',
+            timer: 1500,
+            showConfirmButton: false,
+            width: '340px',
+            customClass: { popup: 'rounded-2xl' }
+          });
+        } catch (error) {
+          console.error(error);
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal Menyimpan',
+            text: 'Gagal menonaktifkan pendaftaran. Silakan coba lagi.',
+            confirmButtonColor: '#ef4444',
+            width: '340px',
+            customClass: { popup: 'rounded-2xl' }
+          });
+        }
+      }
+    } else {
+      // Confirm opening registration
+      const result = await Swal.fire({
+        title: 'Buka Pendaftaran?',
+        text: 'Apakah Anda yakin ingin membuka pendaftaran? Formulir pendaftaran akan aktif kembali dan dapat diakses secara publik oleh seluruh siswa.',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#1d4ed8', // Blue
+        cancelButtonColor: '#64748b', // Slate
+        confirmButtonText: 'Ya, Buka Pendaftaran',
+        cancelButtonText: 'Batal',
+        width: '360px',
+        customClass: {
+          popup: 'rounded-2xl',
+          title: 'text-sm font-black text-slate-800',
+          htmlContainer: 'text-xs text-slate-500 font-medium'
+        }
+      });
+      if (result.isConfirmed) {
+        // Show loading
+        Swal.fire({
+          title: 'Menyimpan...',
+          html: 'Sedang mengaktifkan form pendaftaran...',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+          width: '300px',
+          customClass: { popup: 'rounded-2xl' }
+        });
+
+        try {
+          await onUpdateSettings({ isPublished: true });
+          setIsPublishedInput(true);
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil Dibuka',
+            text: 'Form pendaftaran siswa kini aktif kembali.',
+            timer: 1500,
+            showConfirmButton: false,
+            width: '340px',
+            customClass: { popup: 'rounded-2xl' }
+          });
+        } catch (error) {
+          console.error(error);
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal Menyimpan',
+            text: 'Gagal mengaktifkan pendaftaran. Silakan coba lagi.',
+            confirmButtonColor: '#ef4444',
+            width: '340px',
+            customClass: { popup: 'rounded-2xl' }
+          });
+        }
+      }
+    }
+  };
+
   // Save Settings handler
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -829,7 +950,8 @@ export default function AdminDashboard({
     try {
       await onUpdateSettings({
         googleAppsScriptUrl: targetUrl,
-        tahunPelajaranAktif: activeYearInput
+        tahunPelajaranAktif: isLoggedAdminUtama ? activeYearInput : settings.tahunPelajaranAktif,
+        isPublished: isLoggedAdminUtama ? isPublishedInput : (settings.isPublished !== false)
       });
       
       if (wasDevUrl) {
@@ -1590,18 +1712,61 @@ export default function AdminDashboard({
                     Konfigurasi Umum & Database API
                   </h2>
   
+                  {/* Status Publikasi */}
+                  <div className="space-y-1 bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5 pr-2">
+                        <label className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider block">
+                          Status Publikasi Form Pendaftaran
+                        </label>
+                        <p className="text-[8px] sm:text-[10px] text-slate-400 leading-normal font-medium">
+                          {isPublishedInput 
+                            ? "Formulir pendaftaran saat ini AKTIF dan dapat diakses publik oleh siswa." 
+                            : "Formulir pendaftaran saat ini DITUTUP. Siswa akan melihat informasi bahwa pendaftaran belum dibuka."}
+                        </p>
+                      </div>
+                      <div className="flex items-center shrink-0">
+                        <button
+                          type="button"
+                          disabled={!isLoggedAdminUtama}
+                          onClick={handleTogglePublication}
+                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                            !isLoggedAdminUtama ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                          } ${isPublishedInput ? 'bg-blue-700' : 'bg-slate-300'}`}
+                        >
+                          <span
+                            className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              isPublishedInput ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+                    {!isLoggedAdminUtama && (
+                      <p className="text-[8px] text-amber-600 font-extrabold uppercase mt-1">
+                        * PENGATURAN INI DIKUNCI (HANYA UNTUK ADMIN UTAMA)
+                      </p>
+                    )}
+                  </div>
+
                   <div className="space-y-1">
                     <label className="text-[8px] sm:text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider">TAHUN PELAJARAN AKTIF</label>
                     <select
                       value={activeYearInput}
                       onChange={(e) => setActiveYearInput(e.target.value)}
-                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 cursor-pointer"
+                      disabled={!isLoggedAdminUtama}
+                      className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
                     >
                       {TAHUN_PELAJARAN_LIST.map(y => (
                         <option key={y} value={y}>{y}</option>
                       ))}
                     </select>
                     <p className="text-[8px] sm:text-[9px] text-slate-400 leading-normal">Mengatur tahun aktif pendaftaran untuk formulir publik secara instan.</p>
+                    {!isLoggedAdminUtama && (
+                      <p className="text-[8px] text-amber-600 font-extrabold uppercase mt-1">
+                        * PENGATURAN INI DIKUNCI (HANYA UNTUK ADMIN UTAMA)
+                      </p>
+                    )}
                   </div>
   
                   <div className="space-y-1">

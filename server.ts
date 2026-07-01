@@ -15,7 +15,8 @@ async function startServer() {
     googleAppsScriptUrl: "",
     tahunPelajaranAktif: "2026/2027",
     adminUsername: "admin",
-    adminPassword: "admin123"
+    adminPassword: "admin123",
+    isPublished: true
   };
 
   // API Route to get shared settings
