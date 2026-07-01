@@ -361,6 +361,8 @@ export default function App() {
     }
   };
 
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec';
+
   // Core Data state
   const [students, setStudents] = useState<Student[]>([]);
   const [eskulList, setEskulList] = useState<Extracurricular[]>([]);
@@ -416,7 +418,8 @@ export default function App() {
 
   const fetchAppData = async (currentSettings: AppSettings) => {
     setIsLoading(true);
-    const gasUrl = currentSettings.googleAppsScriptUrl;
+    // FALLBACK TO DEFAULT SPREADSHEET URL FOR THE PUBLIC STUDENT REGISTRATION FORM
+    const gasUrl = currentSettings.googleAppsScriptUrl || DEFAULT_GAS_URL;
 
     if (gasUrl && gasUrl.startsWith('http')) {
       try {
@@ -536,7 +539,7 @@ export default function App() {
 
   // Submit Student Registration
   const handleRegisterStudent = async (studentData: Omit<Student, 'id' | 'regNo' | 'createdAt'>): Promise<Student> => {
-    const gasUrl = settings.googleAppsScriptUrl;
+    const gasUrl = settings.googleAppsScriptUrl || DEFAULT_GAS_URL;
     
     if (isLiveConnection && gasUrl) {
       try {
@@ -966,7 +969,7 @@ export default function App() {
                 loggedAdmin={loggedAdmin}
                 isLoggedIn={isAdminLoggedIn}
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
-                isLive={isLiveConnection}
+                isLive={isLiveConnection && !!settings.googleAppsScriptUrl}
                 onRefresh={() => fetchAppData(settings)}
                 classList={classList}
               />
