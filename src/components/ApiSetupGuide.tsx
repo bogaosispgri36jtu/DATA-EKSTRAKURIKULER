@@ -201,7 +201,7 @@ function initDatabase(ss) {
       "HpSiswa", "HpOrtu", "PrestasiChecked", "NamaLomba", "CabangLomba", "TingkatLomba", 
       "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
       "KabupatenId", "KabupatenName", "KecamatanId", "KecamatanName", "KelurahanId", 
-      "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "TahunPelajaran", "CreatedAt"
+      "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "EskulId3", "EskulName3", "TahunPelajaran", "CreatedAt"
     ]);
   }
   
@@ -321,8 +321,10 @@ function getStudentsList(ss) {
         eskulName: rows[i][28] ? rows[i][28].toString() : "",
         eskulId2: rows[i][29] ? rows[i][29].toString() : "",
         eskulName2: rows[i][30] ? rows[i][30].toString() : "",
-        tahunPelajaran: rows[i][31] ? rows[i][31].toString() : "",
-        createdAt: rows[i][32] ? rows[i][32].toString() : ""
+        eskulId3: rows[i][31] ? rows[i][31].toString() : "",
+        eskulName3: rows[i][32] ? rows[i][32].toString() : "",
+        tahunPelajaran: rows[i][33] ? rows[i][33].toString() : "",
+        createdAt: rows[i][34] ? rows[i][34].toString() : ""
       });
     }
   }
@@ -457,6 +459,8 @@ function saveStudent(ss, s) {
     s.eskulName || "",
     s.eskulId2 || "",
     s.eskulName2 || "",
+    s.eskulId3 || "",
+    s.eskulName3 || "",
     s.tahunPelajaran,
     createdAt
   ]);

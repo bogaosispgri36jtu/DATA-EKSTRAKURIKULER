@@ -38,6 +38,8 @@ export interface Student {
   eskulName: string;
   eskulId2?: string;
   eskulName2?: string;
+  eskulId3?: string;
+  eskulName3?: string;
   tahunPelajaran: string;
   createdAt: string; // ISO string or date
 }

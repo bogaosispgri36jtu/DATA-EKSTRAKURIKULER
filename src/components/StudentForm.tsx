@@ -85,6 +85,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   // Extracurricular state
   const [selectedEskul, setSelectedEskul] = useState<Extracurricular | null>(null);
   const [selectedEskul2, setSelectedEskul2] = useState<Extracurricular | null>(null);
+  const [selectedEskul3, setSelectedEskul3] = useState<Extracurricular | null>(null);
 
   // Result state
   const [registeredStudent, setRegisteredStudent] = useState<Student | null>(null);
@@ -120,13 +121,46 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     return sortedList.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }, [eskulList, tahunPelajaranAktif]);
 
-  // Use classList from spreadsheet if available, fallback to dynamic derived list
+  // Use classList from spreadsheet if available, fallback to dynamic derived list, and finally default classes
   const finalKelasList = React.useMemo(() => {
     if (classList && classList.length > 0) {
       return classList;
     }
-    return dynamicKelasList;
+    if (dynamicKelasList && dynamicKelasList.length > 0) {
+      return dynamicKelasList;
+    }
+    // High-fidelity instant loading default class list
+    return [
+      '7.A', '7.B', '7.C', '7.D', '7.E', '7.F', '7.G', '7.H', '7.I',
+      '8.A', '8.B', '8.C', '8.D', '8.E', '8.F', '8.G', '8.H', '8.I',
+      '9.A', '9.B', '9.C', '9.D', '9.E', '9.F', '9.G', '9.H', '9.I'
+    ];
   }, [classList, dynamicKelasList]);
+
+  // Auto-select Pramuka as soon as a class is selected
+  useEffect(() => {
+    if (kelas) {
+      const activeEskuls = eskulList.filter(e => e.tahunPelajaran === tahunPelajaranAktif);
+      const pramukaEskul = activeEskuls.find(e => 
+        e.nama.toLowerCase().includes('pramuka')
+      ) || eskulList.find(e => 
+        e.nama.toLowerCase().includes('pramuka')
+      );
+
+      if (pramukaEskul) {
+        setSelectedEskul(pramukaEskul);
+      } else {
+        setSelectedEskul({
+          id: 'eskul-1',
+          nama: 'Pramuka (Wajib)',
+          kelasAllowed: ['VII', 'VIII', 'IX'],
+          tahunPelajaran: tahunPelajaranAktif
+        });
+      }
+    } else {
+      setSelectedEskul(null);
+    }
+  }, [kelas, eskulList, tahunPelajaranAktif]);
 
   // Load Provinces on mount
   useEffect(() => {
@@ -453,7 +487,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       selectedKabupaten !== null &&
       selectedKecamatan !== null &&
       selectedKelurahan !== null &&
-      selectedEskul !== null;
+      selectedEskul !== null &&
+      selectedEskul2 !== null;
 
     if (!basicValid) return false;
 
@@ -497,7 +532,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     if (!selectedKabupaten) missing.push('Kota/Kabupaten');
     if (!selectedKecamatan) missing.push('Kecamatan');
     if (!selectedKelurahan) missing.push('Kelurahan/Desa');
-    if (!selectedEskul) missing.push('Pilihan Eskul 1');
+    if (!selectedEskul) missing.push('Ekstrakurikuler Wajib');
+    if (!selectedEskul2) missing.push('Pilihan Ekstrakurikuler 2');
 
     if (hasAchievements) {
       if (!namaLomba.trim()) missing.push('Nama Lomba');
@@ -590,6 +626,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           eskulName: selectedEskul?.nama || '',
           eskulId2: selectedEskul2?.id || '',
           eskulName2: selectedEskul2?.nama || '',
+          eskulId3: selectedEskul3?.id || '',
+          eskulName3: selectedEskul3?.nama || '',
           tahunPelajaran: tahunPelajaranAktif
         };
 
@@ -757,11 +795,12 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       doc.line(15, currentY + 1, 195, currentY + 1);
       currentY += 6;
 
+      drawField('Ekstrakurikuler Wajib', registeredStudent.eskulName.toUpperCase(), true);
       if (registeredStudent.eskulName2) {
-        drawField('Pilihan Ekstrakurikuler 1', registeredStudent.eskulName.toUpperCase(), true);
         drawField('Pilihan Ekstrakurikuler 2', registeredStudent.eskulName2.toUpperCase(), true);
-      } else {
-        drawField('Pilihan Ekstrakurikuler', registeredStudent.eskulName.toUpperCase(), true);
+      }
+      if (registeredStudent.eskulName3) {
+        drawField('Pilihan Ekstrakurikuler 3', registeredStudent.eskulName3.toUpperCase(), true);
       }
 
       // 3. DATA ORANG TUA
@@ -851,7 +890,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 No: ${registeredStudent.regNo}
 Nama: ${registeredStudent.name}
 Kelas: ${registeredStudent.kelas}
-Eskul 1: ${registeredStudent.eskulName}${registeredStudent.eskulName2 ? `\nEskul 2: ${registeredStudent.eskulName2}` : ''}
+Eskul Wajib: ${registeredStudent.eskulName}${registeredStudent.eskulName2 ? `\nEskul Pilihan 2: ${registeredStudent.eskulName2}` : ''}${registeredStudent.eskulName3 ? `\nEskul Pilihan 3: ${registeredStudent.eskulName3}` : ''}
 Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       
       const qrDataUrl = await QRCode.toDataURL(qrText, { margin: 1 });
@@ -955,21 +994,20 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               <span className="text-xs text-blue-600 font-medium">Kelas</span>
               <span className="text-sm font-semibold text-blue-900">{registeredStudent.kelas}</span>
             </div>
-            {registeredStudent.eskulName2 ? (
-              <>
-                <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
-                  <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler 1</span>
-                  <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName}</span>
-                </div>
-                <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
-                  <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler 2</span>
-                  <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName2}</span>
-                </div>
-              </>
-            ) : (
+            <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
+              <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler Wajib</span>
+              <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName}</span>
+            </div>
+            {registeredStudent.eskulName2 && (
               <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
-                <span className="text-xs text-blue-600 font-medium">Ekstrakurikuler</span>
-                <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName}</span>
+                <span className="text-xs text-blue-600 font-medium">Pilihan Ekstrakurikuler 2</span>
+                <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName2}</span>
+              </div>
+            )}
+            {registeredStudent.eskulName3 && (
+              <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
+                <span className="text-xs text-blue-600 font-medium">Pilihan Ekstrakurikuler 3</span>
+                <span className="text-sm font-bold text-blue-900">{registeredStudent.eskulName3}</span>
               </div>
             )}
             <div className="flex justify-between pt-1">
@@ -1118,6 +1156,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                         setKelas(e.target.value);
                         setSelectedEskul(null); // Reset eskul selection as criteria may change
                         setSelectedEskul2(null);
+                        setSelectedEskul3(null);
                       }}
                       className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
                       required
@@ -1189,31 +1228,17 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                 </div>
               </div>
 
-              {/* Extracurricular Selection */}
+              {/* Extracurricular Selection - Wajib (PRAMUKA) */}
               <div className="space-y-1">
-                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">PILIH EKSTRAKURIKULER 1 <span className="text-red-500">*</span></label>
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">EKSTRAKURIKULER WAJIB <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <Award className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <select
                     value={selectedEskul?.id || ''}
-                    onChange={(e) => {
-                      const eskul = eligibleEskuls.find(item => item.id === e.target.value) || null;
-                      setSelectedEskul(eskul);
-                      // Clear second if it is now identical or invalid
-                      if (selectedEskul2 && selectedEskul2.id === e.target.value) {
-                        setSelectedEskul2(null);
-                      }
-                    }}
-                    className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
-                    required
-                    disabled={!kelas}
+                    disabled={true}
+                    className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-[11px] sm:text-xs text-slate-500 font-semibold cursor-not-allowed appearance-none"
                   >
-                    <option value="">{kelas ? '-- Pilih Ekstrakurikuler --' : 'Pilih Kelas terlebih dahulu...'}</option>
-                    {eligibleEskuls.map(eskul => (
-                      <option key={eskul.id} value={eskul.id}>
-                        {eskul.nama}
-                      </option>
-                    ))}
+                    <option value={selectedEskul?.id || ''}>{selectedEskul ? selectedEskul.nama : 'PRAMUKA (Wajib)'}</option>
                   </select>
                 </div>
                 {kelas && eligibleEskuls.length === 0 && (
@@ -1224,9 +1249,9 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                 )}
               </div>
 
-              {/* Extracurricular Selection 2 (Optional) */}
+              {/* Extracurricular Selection 2 (Wajib Pilihan) */}
               <div className="space-y-1">
-                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">PILIH EKSTRAKURIKULER 2 (Tidak Wajib)</label>
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">PILIH EKSTRAKURIKULER 2 <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <Award className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
                   <select
@@ -1234,13 +1259,43 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     onChange={(e) => {
                       const eskul = eligibleEskuls.find(item => item.id === e.target.value) || null;
                       setSelectedEskul2(eskul);
+                      if (selectedEskul3 && selectedEskul3.id === e.target.value) {
+                        setSelectedEskul3(null);
+                      }
                     }}
                     className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
-                    disabled={!kelas || !selectedEskul}
+                    required
+                    disabled={!kelas}
                   >
-                    <option value="">{!kelas ? 'Pilih Kelas terlebih dahulu...' : !selectedEskul ? 'Pilih Ekstrakurikuler 1 terlebih dahulu...' : '-- Pilih Ekstrakurikuler 2 (Tidak Wajib) --'}</option>
+                    <option value="">{!kelas ? 'Pilih Kelas terlebih dahulu...' : '-- Pilih Ekstrakurikuler 2 --'}</option>
                     {eligibleEskuls
                       .filter(eskul => eskul.id !== selectedEskul?.id)
+                      .map(eskul => (
+                        <option key={eskul.id} value={eskul.id}>
+                          {eskul.nama}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Extracurricular Selection 3 (Optional - TIDAK WAJIB) */}
+              <div className="space-y-1">
+                <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">PILIH EKSTRAKURIKULER 3 (TIDAK WAJIB)</label>
+                <div className="relative">
+                  <Award className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                  <select
+                    value={selectedEskul3?.id || ''}
+                    onChange={(e) => {
+                      const eskul = eligibleEskuls.find(item => item.id === e.target.value) || null;
+                      setSelectedEskul3(eskul);
+                    }}
+                    className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-semibold cursor-pointer appearance-none"
+                    disabled={!kelas || !selectedEskul2}
+                  >
+                    <option value="">{!kelas ? 'Pilih Kelas terlebih dahulu...' : !selectedEskul2 ? 'Pilih Ekstrakurikuler 2 terlebih dahulu...' : '-- Pilih Ekstrakurikuler 3 (Tidak Wajib) --'}</option>
+                    {eligibleEskuls
+                      .filter(eskul => eskul.id !== selectedEskul?.id && eskul.id !== selectedEskul2?.id)
                       .map(eskul => (
                         <option key={eskul.id} value={eskul.id}>
                           {eskul.nama}
