@@ -12,7 +12,7 @@ async function startServer() {
   const settingsFilePath = path.join(process.cwd(), "settings.json");
 
   const defaultSettings = {
-    googleAppsScriptUrl: "https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec",
+    googleAppsScriptUrl: "",
     tahunPelajaranAktif: "2026/2027",
     adminUsername: "admin",
     adminPassword: "admin123"

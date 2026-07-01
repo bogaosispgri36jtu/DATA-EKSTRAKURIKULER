@@ -1064,7 +1064,17 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
 
       {/* Main Registration Form */}
       <div className="max-w-3xl mx-auto px-3 sm:px-6 -mt-5 sm:-mt-6 relative z-20">
-        <form onSubmit={handleSubmit} noValidate className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2.5 sm:p-4 md:p-5 space-y-3 sm:space-y-3.5 border border-slate-100">
+        {!isLive ? (
+          <div className="bg-white rounded-2xl shadow-lg p-8 sm:p-12 border border-slate-100 space-y-4 text-center">
+            <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto border border-red-100">
+              <AlertTriangle className="w-8 h-8 text-red-600 animate-pulse" />
+            </div>
+            <h3 className="text-sm sm:text-base font-black text-red-600 tracking-wider uppercase">
+              PENDAFTARAN EKSTRAKURIKULER BELUM DIMULAI
+            </h3>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} noValidate className="bg-white rounded-lg sm:rounded-xl shadow-lg p-2.5 sm:p-4 md:p-5 space-y-3 sm:space-y-3.5 border border-slate-100">
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4.5 items-start">
             
@@ -1648,7 +1658,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               Dengan mengirim pendaftaran, Anda menyatakan bahwa data di atas diisi dengan jujur, benar, dan bersedia mengikuti seluruh kegiatan esktrakurikuller SMP PGRI Jatiuwung.
             </p>
           </div>
-        </form>
+          </form>
+        )}
       </div>
     </div>
   );

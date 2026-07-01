@@ -85,9 +85,58 @@ export default function AdminDashboard({
   // Navigation State
   const [activeTab, setActiveTab] = useState<'eskul' | 'laporan' | 'pengaturan'>('laporan');
 
+  // Extract grades and rombels dynamically from both classList and eskulList (Spreadsheet integration)
+  const { availableGrades, availableRombels } = React.useMemo(() => {
+    const gradesSet = new Set<string>(['7', '8', '9']);
+    const rombelsSet = new Set<string>(['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']);
+
+    const allRawClasses: string[] = [];
+    
+    // Add from classList (Sheet Kelas)
+    if (classList && classList.length > 0) {
+      allRawClasses.push(...classList);
+    }
+    
+    // Add from eskulList (Sheet Eskul)
+    if (eskulList && eskulList.length > 0) {
+      eskulList.forEach(e => {
+        if (e.kelasAllowed) {
+          allRawClasses.push(...e.kelasAllowed);
+        }
+      });
+    }
+
+    allRawClasses.forEach(cls => {
+      const trimmed = cls.trim();
+      if (!trimmed) return;
+      // Split by dot (e.g. "7.A") or space (e.g. "7 A") or dash (e.g. "7-A") or take components
+      const parts = trimmed.split(/[\.\-\s]+/);
+      if (parts[0]) {
+        gradesSet.add(parts[0].trim());
+      }
+      if (parts[1]) {
+        rombelsSet.add(parts[1].trim());
+      }
+    });
+
+    let gradesArr = Array.from(gradesSet);
+    let rombelsArr = Array.from(rombelsSet);
+
+    // Sort grades and rombels naturally
+    const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    gradesArr.sort(collator.compare);
+    rombelsArr.sort(collator.compare);
+
+    return {
+      availableGrades: gradesArr,
+      availableRombels: rombelsArr
+    };
+  }, [classList, eskulList]);
+
   // New Eskul State
   const [newEskulNama, setNewEskulNama] = useState('');
-  const [newEskulKelas, setNewEskulKelas] = useState('');
+  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
+  const [selectedRombels, setSelectedRombels] = useState<string[]>([]);
   const [newEskulTahun, setNewEskulTahun] = useState(settings.tahunPelajaranAktif);
   const [isAddingEskul, setIsAddingEskul] = useState(false);
 
@@ -237,15 +286,28 @@ export default function AdminDashboard({
       return;
     }
 
-    const classesArray = newEskulKelas.split(',')
-      .map(k => k.trim())
-      .filter(k => k !== '');
+    // Generate selected classes by combining checked grades and checked rombels
+    const classesArray: string[] = [];
+    selectedGrades.forEach(g => {
+      selectedRombels.forEach(r => {
+        // Try to match exact original formatting from classList, otherwise default to "g.r" (e.g. "7.A")
+        const matchingClass = classList.find(cls => {
+          const parts = cls.trim().split(/[\.\-\s]+/);
+          return parts[0]?.trim() === g && parts[1]?.trim() === r;
+        });
+        if (matchingClass) {
+          classesArray.push(matchingClass);
+        } else {
+          classesArray.push(`${g}.${r}`);
+        }
+      });
+    });
 
     if (classesArray.length === 0) {
       Swal.fire({ 
         icon: 'warning', 
         title: 'Kelas Wajib Diisi', 
-        text: 'Masukkan minimal satu kelas (misal: 7.A atau VII).',
+        text: 'Silakan pilih minimal satu Tingkatan Kelas dan satu Rombel Kelas dengan mencentangnya.',
         confirmButtonColor: '#1d4ed8',
         width: '340px',
         timer: 5000,
@@ -258,7 +320,8 @@ export default function AdminDashboard({
     try {
       await onAddEskul(newEskulNama, classesArray, newEskulTahun);
       setNewEskulNama('');
-      setNewEskulKelas('');
+      setSelectedGrades([]);
+      setSelectedRombels([]);
       Swal.fire({
         icon: 'success',
         title: 'Eskul Ditambahkan',
@@ -1136,17 +1199,100 @@ export default function AdminDashboard({
                 </select>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-3.5 border border-slate-100 p-3 sm:p-4 bg-slate-50/50 rounded-2xl space-y-3 shadow-inner">
                 <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">ROMBEL KELAS DIIZINKAN <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  value={newEskulKelas}
-                  onChange={(e) => setNewEskulKelas(e.target.value)}
-                  placeholder="Contoh: 7.A, 8.A, 9.A"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 font-mono transition-all duration-200 shadow-sm"
-                  required
-                />
-                <p className="text-[8px] sm:text-[9px] text-slate-400 font-medium leading-none">Pisahkan dengan koma (Contoh: VII-1, VII-2, VIII-1).</p>
+                
+                {/* Tingkatan Kelas checkboxes */}
+                <div className="space-y-1.5">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase block">1. Pilih Tingkat Kelas:</span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {availableGrades.map(g => {
+                      const isChecked = selectedGrades.includes(g);
+                      return (
+                        <button
+                          key={g}
+                          type="button"
+                          onClick={() => {
+                            if (isChecked) {
+                              setSelectedGrades(prev => prev.filter(x => x !== g));
+                            } else {
+                              setSelectedGrades(prev => [...prev, g]);
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer select-none ${
+                            isChecked
+                              ? 'bg-blue-600 border-blue-700 text-white shadow-sm font-black'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}} // handled by button onClick
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
+                          />
+                          Kelas {g}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Nama Rombel checkboxes */}
+                <div className="space-y-1.5">
+                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase block">2. Pilih Nama Rombel:</span>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {availableRombels.map(r => {
+                      const isChecked = selectedRombels.includes(r);
+                      return (
+                        <button
+                          key={r}
+                          type="button"
+                          onClick={() => {
+                            if (isChecked) {
+                              setSelectedRombels(prev => prev.filter(x => x !== r));
+                            } else {
+                              setSelectedRombels(prev => [...prev, r]);
+                            }
+                          }}
+                          className={`py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer select-none ${
+                            isChecked
+                              ? 'bg-blue-600 border-blue-700 text-white shadow-sm font-black'
+                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {}} // handled by button onClick
+                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3 h-3 cursor-pointer"
+                          />
+                          {r}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Kombinasi preview */}
+                {selectedGrades.length > 0 && selectedRombels.length > 0 && (
+                  <div className="bg-white p-2 rounded-xl border border-slate-100 mt-2 text-[10px] font-semibold text-blue-700 font-mono shadow-sm">
+                    <span className="text-slate-400 font-bold uppercase text-[8px] block mb-1">Hasil Kombinasi Kelas ({selectedGrades.length * selectedRombels.length}):</span>
+                    <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                      {selectedGrades.flatMap(g => 
+                        selectedRombels.map(r => {
+                          const matchingClass = classList.find(cls => {
+                            const parts = cls.trim().split(/[\.\-\s]+/);
+                            return parts[0]?.trim() === g && parts[1]?.trim() === r;
+                          });
+                          return matchingClass || `${g}.${r}`;
+                        })
+                      ).map(c => (
+                        <span key={c} className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 text-blue-800 text-[9px]">{c}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button

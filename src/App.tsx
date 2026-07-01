@@ -128,6 +128,7 @@ export default function App() {
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [isGasUrlConfigOpen, setIsGasUrlConfigOpen] = useState(false);
   const [tempGasUrl, setTempGasUrl] = useState('');
+  const [isVerifyingLogin, setIsVerifyingLogin] = useState(false);
 
   const handleSetIsAdminLoggedIn = (loggedIn: boolean, adminUser?: { username: string; status: string }) => {
     setIsAdminLoggedIn(loggedIn);
@@ -208,16 +209,7 @@ export default function App() {
       : settings.googleAppsScriptUrl;
 
     if (!matchedAccount && checkGasUrl && checkGasUrl.startsWith('http')) {
-      Swal.fire({
-        title: 'Memverifikasi...',
-        text: 'Sedang mencocokkan data dengan Google Sheet...',
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        },
-        width: '340px'
-      });
-
+      setIsVerifyingLogin(true);
       try {
         const response = await fetch(`${checkGasUrl}?action=getData`);
         if (response.ok) {
@@ -253,8 +245,9 @@ export default function App() {
         }
       } catch (error) {
         console.warn('Failed to refetch live admins for verification', error);
+      } finally {
+        setIsVerifyingLogin(false);
       }
-      Swal.close();
     }
 
     if (matchedAccount) {
@@ -275,22 +268,10 @@ export default function App() {
         width: '340px'
       });
     } else {
-      const activeAdmins = (admins && admins.length > 0) ? admins : localAdmins;
-      const loadedUsernames = activeAdmins.map((acc: any) => acc.username || '').filter(Boolean);
-      const usernamesListHtml = loadedUsernames.length > 0 
-        ? `<div class="mt-2 text-[10px] bg-blue-50 text-blue-800 p-2 rounded-lg font-bold"><b>Daftar Akun Terdaftar Saat Ini:</b><br/>${loadedUsernames.join(', ')}</div>`
-        : '';
-
       Swal.fire({
         icon: 'error',
         title: 'Akses Ditolak',
-        html: `<div class="text-xs text-slate-600 leading-relaxed text-center space-y-1.5">
-          <div>Username atau password yang Anda masukkan salah!</div>
-          ${usernamesListHtml}
-          <div class="mt-2 text-[10px] bg-slate-100 p-2 rounded-lg text-slate-500 font-semibold text-left">
-            <b>Tips:</b> Jika baru menambahkan admin di Spreadsheet, pastikan Anda sudah melakukan <b>Deploy Ulang (New Deployment)</b> di Google Apps Script agar perubahan tersinkronisasi.
-          </div>
-        </div>`,
+        text: 'Username atau password yang Anda masukkan salah!',
         confirmButtonColor: '#ef4444',
         width: '340px'
       });
@@ -386,7 +367,7 @@ export default function App() {
   const [classList, setClassList] = useState<string[]>([]);
   const [admins, setAdmins] = useState<any[]>([]);
   const [settings, setSettings] = useState<AppSettings>({
-    googleAppsScriptUrl: 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec',
+    googleAppsScriptUrl: '',
     tahunPelajaranAktif: '2026/2027',
     adminUsername: 'admin',
     adminPassword: 'admin123'
@@ -399,7 +380,7 @@ export default function App() {
   useEffect(() => {
     const initializeApp = async () => {
       let activeSettings = {
-        googleAppsScriptUrl: 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec',
+        googleAppsScriptUrl: '',
         tahunPelajaranAktif: '2026/2027',
         adminUsername: 'admin',
         adminPassword: 'admin123'
@@ -422,8 +403,8 @@ export default function App() {
         }
       }
 
-      if (!activeSettings.googleAppsScriptUrl || activeSettings.googleAppsScriptUrl.trim() === '') {
-        activeSettings.googleAppsScriptUrl = 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec';
+      if (!activeSettings.googleAppsScriptUrl) {
+        activeSettings.googleAppsScriptUrl = '';
       }
 
       setSettings(activeSettings);
@@ -498,45 +479,10 @@ export default function App() {
     // LOCAL DATABASE FALLBACK (localStorage)
     setIsLiveConnection(false);
     
-    // Load Eskul
-    const savedEskul = localStorage.getItem('smp_pgri_eskul');
-    if (savedEskul) {
-      setEskulList(JSON.parse(savedEskul));
-    } else {
-      localStorage.setItem('smp_pgri_eskul', JSON.stringify(DEFAULT_EXTRACURRICULARS));
-      setEskulList(DEFAULT_EXTRACURRICULARS);
-    }
-
-    // Load Kelas List
-    const savedClasses = localStorage.getItem('smp_pgri_classes');
-    if (savedClasses) {
-      setClassList(JSON.parse(savedClasses));
-    } else {
-      // Dynamic fallback based on unique classes in eskul list
-      const currentEskuls = savedEskul ? JSON.parse(savedEskul) : DEFAULT_EXTRACURRICULARS;
-      const extractedClasses: string[] = [];
-      currentEskuls.forEach((esk: any) => {
-        if (esk && esk.kelasAllowed) {
-          esk.kelasAllowed.forEach((cls: string) => {
-            const trimmed = cls.trim();
-            if (trimmed && !extractedClasses.includes(trimmed)) {
-              extractedClasses.push(trimmed);
-            }
-          });
-        }
-      });
-      localStorage.setItem('smp_pgri_classes', JSON.stringify(extractedClasses));
-      setClassList(extractedClasses);
-    }
-
-    // Load Students
-    const savedStudents = localStorage.getItem('smp_pgri_students');
-    if (savedStudents) {
-      setStudents(JSON.parse(savedStudents));
-    } else {
-      localStorage.setItem('smp_pgri_students', JSON.stringify(SEED_STUDENTS));
-      setStudents(SEED_STUDENTS);
-    }
+    // Clear lists when unconnected
+    setEskulList([]);
+    setClassList([]);
+    setStudents([]);
 
     // Load Admin List Fallback
     const savedAdmins = localStorage.getItem('smp_pgri_admins');
@@ -1037,15 +983,19 @@ export default function App() {
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handlePopupLoginSubmit} noValidate className="p-4 space-y-3.5">
+            <form onSubmit={handlePopupLoginSubmit} noValidate className="p-4 space-y-3.5 relative">
+              {isVerifyingLogin && (
+                <div className="absolute inset-0 bg-white/50 backdrop-blur-[1px] flex items-center justify-center z-10 rounded-b-2xl"></div>
+              )}
               <div className="space-y-1">
                 <label className="text-[9px] font-bold text-slate-600 uppercase tracking-wider block">Username</label>
                 <input
                   type="text"
                   value={loginUsername}
                   onChange={(e) => setLoginUsername(e.target.value)}
+                  disabled={isVerifyingLogin}
                   placeholder="Username"
-                  className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800 disabled:opacity-60"
                 />
               </div>
 
@@ -1056,13 +1006,15 @@ export default function App() {
                     type={showLoginPassword ? "text" : "password"}
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
+                    disabled={isVerifyingLogin}
                     placeholder="••••••••"
-                    className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800"
+                    className="w-full pl-3 pr-9 py-2 bg-slate-50 border border-slate-250 rounded-lg text-xs focus:outline-none focus:border-blue-700 font-semibold text-slate-800 disabled:opacity-60"
                   />
                   <button
                     type="button"
+                    disabled={isVerifyingLogin}
                     onClick={() => setShowLoginPassword(!showLoginPassword)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors p-1 disabled:opacity-50"
                   >
                     {showLoginPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   </button>
@@ -1071,10 +1023,27 @@ export default function App() {
 
               <button
                 type="submit"
-                className="w-full py-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
+                disabled={isVerifyingLogin}
+                className={`w-full py-2 text-white font-bold text-xs rounded-lg shadow-md transition-all flex items-center justify-center gap-1.5 mt-2 ${
+                  isVerifyingLogin 
+                    ? 'bg-blue-500 cursor-not-allowed opacity-80' 
+                    : 'bg-blue-700 hover:bg-blue-800 cursor-pointer'
+                }`}
               >
-                <ShieldCheck className="w-4 h-4" />
-                <span>MASUK</span>
+                {isVerifyingLogin ? (
+                  <>
+                    <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    <span>Memproses...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>MASUK</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
