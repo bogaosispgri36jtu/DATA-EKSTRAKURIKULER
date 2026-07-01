@@ -485,11 +485,10 @@ export default function App() {
       try {
         setEskulList(JSON.parse(savedEskul));
       } catch (e) {
-        setEskulList(DEFAULT_EXTRACURRICULARS);
+        setEskulList([]);
       }
     } else {
-      setEskulList(DEFAULT_EXTRACURRICULARS);
-      localStorage.setItem('smp_pgri_eskul', JSON.stringify(DEFAULT_EXTRACURRICULARS));
+      setEskulList([]);
     }
 
     // Load Classes Fallback
@@ -498,20 +497,10 @@ export default function App() {
       try {
         setClassList(JSON.parse(savedClasses));
       } catch (e) {
-        setClassList([
-          '7.A', '7.B', '7.C', '7.D', '7.E', '7.F', '7.G', '7.H', '7.I',
-          '8.A', '8.B', '8.C', '8.D', '8.E', '8.F', '8.G', '8.H', '8.I',
-          '9.A', '9.B', '9.C', '9.D', '9.E', '9.F', '9.G', '9.H', '9.I'
-        ]);
+        setClassList([]);
       }
     } else {
-      const defaultClasses = [
-        '7.A', '7.B', '7.C', '7.D', '7.E', '7.F', '7.G', '7.H', '7.I',
-        '8.A', '8.B', '8.C', '8.D', '8.E', '8.F', '8.G', '8.H', '8.I',
-        '9.A', '9.B', '9.C', '9.D', '9.E', '9.F', '9.G', '9.H', '9.I'
-      ];
-      setClassList(defaultClasses);
-      localStorage.setItem('smp_pgri_classes', JSON.stringify(defaultClasses));
+      setClassList([]);
     }
 
     // Load Students Fallback
@@ -520,11 +509,10 @@ export default function App() {
       try {
         setStudents(JSON.parse(savedStudents));
       } catch (e) {
-        setStudents(SEED_STUDENTS);
+        setStudents([]);
       }
     } else {
-      setStudents(SEED_STUDENTS);
-      localStorage.setItem('smp_pgri_students', JSON.stringify(SEED_STUDENTS));
+      setStudents([]);
     }
 
     // Load Admin List Fallback

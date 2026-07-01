@@ -121,7 +121,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     return sortedList.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   }, [eskulList, tahunPelajaranAktif]);
 
-  // Use classList from spreadsheet if available, fallback to dynamic derived list, and finally default classes
+  // Use classList from spreadsheet if available, fallback to dynamic derived list
   const finalKelasList = React.useMemo(() => {
     if (classList && classList.length > 0) {
       return classList;
@@ -129,12 +129,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     if (dynamicKelasList && dynamicKelasList.length > 0) {
       return dynamicKelasList;
     }
-    // High-fidelity instant loading default class list
-    return [
-      '7.A', '7.B', '7.C', '7.D', '7.E', '7.F', '7.G', '7.H', '7.I',
-      '8.A', '8.B', '8.C', '8.D', '8.E', '8.F', '8.G', '8.H', '8.I',
-      '9.A', '9.B', '9.C', '9.D', '9.E', '9.F', '9.G', '9.H', '9.I'
-    ];
+    return [];
   }, [classList, dynamicKelasList]);
 
   // Auto-select Pramuka as soon as a class is selected
