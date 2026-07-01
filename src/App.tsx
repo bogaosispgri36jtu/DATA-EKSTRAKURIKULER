@@ -191,7 +191,7 @@ export default function App() {
                 <div class="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></div>
               </div>
               <p class="text-xs sm:text-[13px] text-slate-500 font-bold tracking-wider mt-4">
-                Memuat Ulang Database...
+                Memuat Ulang...
               </p>
             </div>
           `,
@@ -1054,10 +1054,10 @@ export default function App() {
                     
                     <div className="space-y-3">
                       <span className="inline-flex items-center px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest bg-amber-100 text-amber-800">
-                        Pendaftaran Belum Dibuka
+                        Pendaftaran sudah di tutup
                       </span>
                       <h2 className="text-xl sm:text-2xl font-black text-slate-800 leading-tight">
-                        Pendaftaran Esktrakurikuller belum di buka, mohon di tunggu
+                        Pendaftaran Esktrakurikuller Sudah ditutup
                       </h2>
                       <p className="text-xs sm:text-sm text-slate-500 font-medium leading-relaxed max-w-md mx-auto">
                         Tahun Pelajaran {settings.tahunPelajaranAktif || '2026/2027'}

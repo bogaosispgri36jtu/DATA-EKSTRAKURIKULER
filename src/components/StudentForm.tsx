@@ -145,8 +145,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
               <div class="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></div>
             </div>
             <!-- Aesthetic Description below spinner -->
-            <p class="text-xs sm:text-[13px] text-slate-500 font-bold tracking-wider mt-4">
-              Mohon Tunggu Sebentar
+            <p class="text-xs sm:text-[13px] text-slate-500 font-base tracking-wider mt-4">
+              Mohon Tunggu Sebentar ...
             </p>
           </div>
         `,
