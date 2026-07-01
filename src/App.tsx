@@ -951,6 +951,7 @@ export default function App() {
                 onSubmitRegistration={handleRegisterStudent}
                 isLive={isLiveConnection}
                 classList={classList}
+                isLoading={isLoading}
               />
             )}
             {activeView === 'admin' && (
