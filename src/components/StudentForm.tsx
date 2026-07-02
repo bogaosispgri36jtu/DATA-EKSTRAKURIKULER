@@ -408,26 +408,104 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       return;
     }
 
-    // Limit to 100kb to keep Base64 strings manageable and fit requested limit
-    if (file.size > 100 * 1024) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Ukuran File Terlalu Besar',
-        text: 'Maksimal ukuran file sertifikat adalah 100kb.',
-        confirmButtonColor: '#1d4ed8',
-        width: '360px',
-        timer: 5000,
-        timerProgressBar: true
-      });
-      return;
-    }
+    // Show loading SweetAlert
+    Swal.fire({
+      title: 'Memproses...',
+      html: 'Sedang memproses ...',
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+      width: '320px',
+      customClass: { popup: 'rounded-2xl' }
+    });
 
     setCertificateFileName(file.name);
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const result = event.target?.result as string;
-      setCertificateFile(result);
+      const base64Data = event.target?.result as string;
+
+      if (isImage) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // Max dimension bounds for scaling
+          const MAX_DIM = 800;
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height *= MAX_DIM / width;
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width *= MAX_DIM / height;
+              height = MAX_DIM;
+            }
+          }
+
+          // Start compression loop to target <= 100 KB
+          let quality = 0.8;
+          let dataUrl = '';
+          let sizeInKb = 999;
+          let scale = 1.0;
+
+          while (sizeInKb > 100 && scale > 0.1) {
+            const currentWidth = Math.round(width * scale);
+            const currentHeight = Math.round(height * scale);
+            canvas.width = currentWidth;
+            canvas.height = currentHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.clearRect(0, 0, currentWidth, currentHeight);
+              ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
+            }
+
+            quality = 0.7;
+            do {
+              dataUrl = canvas.toDataURL('image/jpeg', quality);
+              const head = 'data:image/jpeg;base64,'.length;
+              sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+              quality -= 0.15;
+            } while (sizeInKb > 100 && quality > 0.05);
+
+            if (sizeInKb > 100) {
+              scale -= 0.15; // scale down dimensions further if quality adjustment alone is insufficient
+            }
+          }
+
+          setCertificateFile(dataUrl);
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil Diproses',
+            text: `Gambar sertifikat berhasil dikompres menjadi ${sizeInKb} KB.`,
+            confirmButtonColor: '#1d4ed8',
+            width: '340px',
+            timer: 2000,
+            timerProgressBar: true,
+            customClass: { popup: 'rounded-2xl' }
+          });
+        };
+        img.src = base64Data;
+      } else {
+        // For PDF, we cannot compress it in client JS easily, so we keep it as is
+        setCertificateFile(base64Data);
+        const originalSizeKb = Math.round(file.size / 1024);
+        Swal.fire({
+          icon: 'success',
+          title: 'Berhasil Diproses',
+          text: `File PDF sertifikat (${originalSizeKb} KB) siap diunggah.`,
+          confirmButtonColor: '#1d4ed8',
+          width: '340px',
+          timer: 2000,
+          timerProgressBar: true,
+          customClass: { popup: 'rounded-2xl' }
+        });
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -525,7 +603,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         cabangLomba.trim() !== '' &&
         tingkatLomba !== '' &&
         juaraKe !== '' &&
-        penyelenggara.trim() !== ''
+        penyelenggara.trim() !== '' &&
+        certificateFile !== ''
       );
     }
 
@@ -568,6 +647,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       if (!tingkatLomba) missing.push('Tingkat Lomba');
       if (!juaraKe) missing.push('Juara Ke');
       if (!penyelenggara.trim()) missing.push('Penyelenggara');
+      if (!certificateFile) missing.push('Lampiran Sertifikat Juara');
     }
 
     if (missing.length > 0) {
@@ -620,16 +700,33 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     if (result.isConfirmed) {
       setIsSubmitting(true);
       try {
+        const formatToIndoPhone = (num: string): string => {
+          if (!num) return '';
+          let clean = num.replace(/\D/g, '');
+          if (clean.startsWith('0')) {
+            clean = '62' + clean.slice(1);
+          } else if (clean.startsWith('8')) {
+            clean = '62' + clean;
+          } else if (!clean.startsWith('62')) {
+            clean = '62' + clean;
+          }
+          return '+' + clean;
+        };
+
+        const formattedHpSiswa = formatToIndoPhone(hpSiswa);
+        const formattedHpOrtu = formatToIndoPhone(hpOrtu);
+
         const studentData: Omit<Student, 'id' | 'regNo' | 'createdAt'> = {
           name,
+          nama: name, // back-compat for Google Sheets mapping of s.nama
           photo,
           kelas,
           jenisKelamin: jenisKelamin as 'Laki-laki' | 'Perempuan',
           email: email.trim(),
           namaAyah,
           namaIbu,
-          hpSiswa,
-          hpOrtu,
+          hpSiswa: formattedHpSiswa,
+          hpOrtu: formattedHpOrtu,
           prestasiChecked: hasAchievements,
           namaLomba: hasAchievements ? namaLomba : '',
           cabangLomba: hasAchievements ? cabangLomba : '',
@@ -1385,7 +1482,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               <div className="space-y-2 bg-slate-50 p-2.5 sm:p-3 rounded-lg border border-slate-200/60">
                 {/* Kampung/Perumahan  dan Blok */}
                 <div className="space-y-1">
-                  <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KAMPUNG / PERUMAHAN dan BLOK <span className="text-red-500">*</span></label>
+                  <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">KAMPUNG / PERUMAHAN DAN BLOK <span className="text-red-500">*</span></label>
                   <input 
                     type="text" 
                     value={alamat} 
@@ -1599,7 +1696,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     {/* Lampiran Sertifikat (JPG / PDF) */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">LAMPIRAN SERTIFIKAT JUARA (JPG / PDF)</label>
+                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">LAMPIRAN SERTIFIKAT JUARA (JPG / PDF) <span className="text-red-500">*</span></label>
                         {certificateFile && (
                           <span className="text-[8px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase">Terlampir</span>
                         )}
@@ -1639,7 +1736,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                             className="w-full flex items-center justify-center gap-2 py-1.5 text-[10px] sm:text-xs font-bold text-slate-500 hover:text-blue-700 transition-all cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5" />
-                            Pilih Gambar / PDF (Maks. 100kb)
+                            Pilih Gambar / PDF (Min. 100kb)
                           </button>
                         )}
                       </div>

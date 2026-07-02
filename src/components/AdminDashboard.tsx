@@ -36,6 +36,19 @@ interface AdminDashboardProps {
   classList?: string[];
 }
 
+const formatToIndoPhone = (num: string): string => {
+  if (!num) return '';
+  let clean = num.replace(/\D/g, '');
+  if (clean.startsWith('0')) {
+    clean = '62' + clean.slice(1);
+  } else if (clean.startsWith('8')) {
+    clean = '62' + clean;
+  } else if (!clean.startsWith('62')) {
+    clean = '62' + clean;
+  }
+  return '+' + clean;
+};
+
 export default function AdminDashboard({
   students,
   eskulList,
@@ -56,7 +69,6 @@ export default function AdminDashboard({
   classList = []
 }: AdminDashboardProps) {
   const isLoggedAdminUtama = !loggedAdmin ? false : (
-    (loggedAdmin.username || '').toLowerCase().trim() === 'admin' || 
     (loggedAdmin.status && loggedAdmin.status.toLowerCase().includes('utama'))
   );
 
@@ -136,10 +148,72 @@ export default function AdminDashboard({
 
   // New Eskul State
   const [newEskulNama, setNewEskulNama] = useState('');
-  const [selectedGrades, setSelectedGrades] = useState<string[]>([]);
-  const [selectedRombels, setSelectedRombels] = useState<string[]>([]);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [newEskulTahun, setNewEskulTahun] = useState(settings.tahunPelajaranAktif);
   const [isAddingEskul, setIsAddingEskul] = useState(false);
+
+  // Robustly resolve grade & rombel into exact class name matching classList formatting
+  const resolveClassName = (grade: string, rombel: string): string => {
+    const rombelMap: Record<string, string> = {
+      'A': '1', 'B': '2', 'C': '3', 'D': '4', 'E': '5', 'F': '6', 'G': '7', 'H': '8', 'I': '9'
+    };
+    const numericRombel = rombelMap[rombel.toUpperCase()] || '';
+
+    const found = classList.find(cls => {
+      const c = cls.trim().toUpperCase();
+      const romanGrade = grade === '7' ? 'VII' : grade === '8' ? 'VIII' : grade === '9' ? 'IX' : '';
+      
+      const parts = c.split(/[\.\-\s]+/);
+      if (parts.length >= 2) {
+        const gPart = parts[0];
+        const rPart = parts[1];
+        if (
+          (gPart === grade || gPart === romanGrade) && 
+          (rPart === rombel.toUpperCase() || (numericRombel && rPart === numericRombel))
+        ) {
+          return true;
+        }
+      } else {
+        if (
+          c === `${grade}${rombel}` || 
+          c === `${romanGrade}${rombel}` ||
+          (numericRombel && (c === `${grade}${numericRombel}` || c === `${romanGrade}${numericRombel}`))
+        ) {
+          return true;
+        }
+      }
+      return false;
+    });
+    
+    const romanGrade = grade === '7' ? 'VII' : grade === '8' ? 'VIII' : grade === '9' ? 'IX' : grade;
+    const defaultFormat = numericRombel ? `${romanGrade}-${numericRombel}` : `${grade}.${rombel}`;
+    return found || defaultFormat;
+  };
+
+  const handleToggleClass = (classNameVal: string) => {
+    setSelectedClasses(prev => {
+      if (prev.includes(classNameVal)) {
+        return prev.filter(x => x !== classNameVal);
+      } else {
+        return [...prev, classNameVal];
+      }
+    });
+  };
+
+  const handleToggleMaster = (grade: string) => {
+    const rombels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+    const classNamesForGrade = rombels.map(r => resolveClassName(grade, r));
+    const allSelected = classNamesForGrade.every(c => selectedClasses.includes(c));
+    
+    if (allSelected) {
+      setSelectedClasses(prev => prev.filter(c => !classNamesForGrade.includes(c)));
+    } else {
+      setSelectedClasses(prev => {
+        const otherClasses = prev.filter(c => !classNamesForGrade.includes(c));
+        return [...otherClasses, ...classNamesForGrade];
+      });
+    }
+  };
 
   // Laporan Filters State
   const [searchQuery, setSearchQuery] = useState('');
@@ -194,14 +268,26 @@ export default function AdminDashboard({
     }
 
     const savedAdminsStr = localStorage.getItem('smp_pgri_admins');
-    let localAdmins = [{ username: 'admin', password: 'admin123', status: 'Utama' }];
+    let localAdmins: any[] = [];
     if (savedAdminsStr) {
       try {
         localAdmins = JSON.parse(savedAdminsStr);
       } catch (e) {}
     }
     
-    const currentAdmins = (admins && admins.length > 0) ? admins : localAdmins;
+    // Purge any default admin account with username "admin" and password "admin123" from local cache
+    localAdmins = localAdmins.filter(acc => {
+      const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+      const p = acc.password ? acc.password.toString().trim() : '';
+      return !(u === 'admin' && p === 'admin123');
+    });
+    
+    const currentAdmins = (admins && admins.length > 0) ? admins.filter(acc => {
+      const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+      const p = acc.password ? acc.password.toString().trim() : '';
+      return !(u === 'admin' && p === 'admin123');
+    }) : localAdmins;
+
     let matchedAccount = currentAdmins.find((acc) => {
       const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
       const p = acc.password ? acc.password.toString().trim() : '';
@@ -251,8 +337,7 @@ export default function AdminDashboard({
         width: '340px'
       });
     } else {
-      const activeAdmins = (admins && admins.length > 0) ? admins : localAdmins;
-      const loadedUsernames = activeAdmins.map((acc: any) => acc.username || '').filter(Boolean);
+      const loadedUsernames = currentAdmins.map((acc: any) => acc.username || '').filter(Boolean);
       const usernamesListHtml = loadedUsernames.length > 0 
         ? `<div class="mt-2 text-[10px] bg-blue-50 text-blue-800 p-2 rounded-lg font-bold"><b>Daftar Akun Terdaftar Saat Ini:</b><br/>${loadedUsernames.join(', ')}</div>`
         : '';
@@ -288,28 +373,11 @@ export default function AdminDashboard({
       return;
     }
 
-    // Generate selected classes by combining checked grades and checked rombels
-    const classesArray: string[] = [];
-    selectedGrades.forEach(g => {
-      selectedRombels.forEach(r => {
-        // Try to match exact original formatting from classList, otherwise default to "g.r" (e.g. "7.A")
-        const matchingClass = classList.find(cls => {
-          const parts = cls.trim().split(/[\.\-\s]+/);
-          return parts[0]?.trim() === g && parts[1]?.trim() === r;
-        });
-        if (matchingClass) {
-          classesArray.push(matchingClass);
-        } else {
-          classesArray.push(`${g}.${r}`);
-        }
-      });
-    });
-
-    if (classesArray.length === 0) {
+    if (selectedClasses.length === 0) {
       Swal.fire({ 
         icon: 'warning', 
         title: 'Kelas Wajib Diisi', 
-        text: 'Silakan pilih minimal satu Tingkatan Kelas dan satu Rombel Kelas dengan mencentangnya.',
+        text: 'Silakan pilih minimal satu rombel kelas yang diizinkan dengan mencentangnya.',
         confirmButtonColor: '#1d4ed8',
         width: '340px',
         timer: 5000,
@@ -320,10 +388,9 @@ export default function AdminDashboard({
 
     setIsAddingEskul(true);
     try {
-      await onAddEskul(newEskulNama, classesArray, newEskulTahun);
+      await onAddEskul(newEskulNama, selectedClasses, newEskulTahun);
       setNewEskulNama('');
-      setSelectedGrades([]);
-      setSelectedRombels([]);
+      setSelectedClasses([]);
       Swal.fire({
         icon: 'success',
         title: 'Eskul Ditambahkan',
@@ -1071,11 +1138,11 @@ export default function AdminDashboard({
 
   // Handle Delete Admin with SweetAlert2 confirmation
   const handleDeleteAdminClick = async (username: string) => {
-    if (username.toLowerCase().trim() === 'admin') {
+    if (username.toLowerCase().trim() === (loggedAdmin?.username || '').toLowerCase().trim()) {
       Swal.fire({
         icon: 'error',
         title: 'Aksi Ditolak',
-        text: 'Akun administrator utama "admin" tidak dapat dihapus!',
+        text: 'Anda tidak dapat menghapus akun Anda sendiri yang sedang aktif digunakan!',
         confirmButtonColor: '#ef4444',
         width: '340px'
       });
@@ -1189,7 +1256,7 @@ export default function AdminDashboard({
 
           <div className="bg-yellow-50 text-yellow-800 text-[10px] font-semibold border border-yellow-200/50 p-2.5 rounded-xl flex items-start gap-1.5 text-left">
             <ShieldAlert className="w-4 h-4 text-yellow-600 shrink-0 mt-0.5" />
-            <span>Kredensial Default: Gunakan <b>admin</b> dan sandi <b>admin123</b> (Sandi tersinkronisasi aman dengan Apps Script).</span>
+            <span>Kredensial Login: Silakan gunakan data akun yang terdaftar pada tab/sheet <b>Admin</b> di Google Spreadsheet Anda.</span>
           </div>
         </div>
       </div>
@@ -1327,95 +1394,73 @@ export default function AdminDashboard({
                 </select>
               </div>
 
-              <div className="space-y-3.5 border border-slate-100 p-3 sm:p-4 bg-slate-50/50 rounded-2xl space-y-3 shadow-inner">
+              <div className="space-y-3.5 border border-slate-100 p-3 sm:p-4 bg-slate-50/50 rounded-2xl shadow-inner">
                 <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase tracking-wider">ROMBEL KELAS DIIZINKAN <span className="text-red-500">*</span></label>
                 
-                {/* Tingkatan Kelas checkboxes */}
-                <div className="space-y-1.5">
-                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase block">1. Pilih Tingkat Kelas:</span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {availableGrades.map(g => {
-                      const isChecked = selectedGrades.includes(g);
-                      return (
-                        <button
-                          key={g}
-                          type="button"
-                          onClick={() => {
-                            if (isChecked) {
-                              setSelectedGrades(prev => prev.filter(x => x !== g));
-                            } else {
-                              setSelectedGrades(prev => [...prev, g]);
-                            }
-                          }}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer select-none ${
-                            isChecked
-                              ? 'bg-blue-600 border-blue-700 text-white shadow-sm font-black'
-                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}} // handled by button onClick
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer"
-                          />
-                          Kelas {g}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                {/* Render elegant grade rows matching user's requested layout precisely */}
+                {['7', '8', '9'].map(grade => {
+                  const rombels = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I'];
+                  const classNamesForGrade = rombels.map(r => resolveClassName(grade, r));
+                  const isMasterChecked = classNamesForGrade.every(c => selectedClasses.includes(c));
 
-                {/* Nama Rombel checkboxes */}
-                <div className="space-y-1.5">
-                  <span className="text-[8px] sm:text-[9px] font-bold text-slate-500 uppercase block">2. Pilih Nama Rombel:</span>
-                  <div className="grid grid-cols-5 gap-1.5">
-                    {availableRombels.map(r => {
-                      const isChecked = selectedRombels.includes(r);
-                      return (
-                        <button
-                          key={r}
-                          type="button"
-                          onClick={() => {
-                            if (isChecked) {
-                              setSelectedRombels(prev => prev.filter(x => x !== r));
-                            } else {
-                              setSelectedRombels(prev => [...prev, r]);
-                            }
-                          }}
-                          className={`py-1.5 rounded-lg text-xs font-bold border transition-all flex items-center justify-center gap-1 cursor-pointer select-none ${
-                            isChecked
-                              ? 'bg-blue-600 border-blue-700 text-white shadow-sm font-black'
-                              : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => {}} // handled by button onClick
-                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3 h-3 cursor-pointer"
-                          />
-                          {r}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                  const renderRombelCheckbox = (r: string) => {
+                    const classNameVal = resolveClassName(grade, r);
+                    const isChecked = selectedClasses.includes(classNameVal);
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => handleToggleClass(classNameVal)}
+                        className={`w-full py-1 rounded-lg text-xs font-bold border transition-all text-center cursor-pointer select-none ${
+                          isChecked
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm font-black scale-105'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 hover:text-slate-800'
+                        }`}
+                      >
+                        {r}
+                      </button>
+                    );
+                  };
 
-                {/* Kombinasi preview */}
-                {selectedGrades.length > 0 && selectedRombels.length > 0 && (
-                  <div className="bg-white p-2 rounded-xl border border-slate-100 mt-2 text-[10px] font-semibold text-blue-700 font-mono shadow-sm">
-                    <span className="text-slate-400 font-bold uppercase text-[8px] block mb-1">Hasil Kombinasi Kelas ({selectedGrades.length * selectedRombels.length}):</span>
+                  return (
+                    <div key={grade} className="flex items-start gap-4 p-3 bg-white rounded-xl border border-slate-100 shadow-sm">
+                      {/* Left Part: Grade Label (Checkbox removed as requested, text acts as master toggle) */}
+                      <div className="flex flex-col items-center justify-center shrink-0 w-16 text-center border-r border-slate-100 pr-3 self-stretch my-auto">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleMaster(grade)}
+                          className="text-[11px] font-black text-slate-700 hover:text-blue-700 hover:underline transition-all focus:outline-none cursor-pointer"
+                          title={`Klik untuk pilih/hapus semua rombel Kelas ${grade}`}
+                        >
+                          Kelas {grade}
+                        </button>
+                      </div>
+                      
+                      {/* Right Part: Rombels in 3 columns */}
+                      <div className="flex-1 grid grid-cols-3 gap-x-4 gap-y-1.5 pl-1">
+                        {/* Column 1: A, B, C */}
+                        <div className="space-y-1.5">
+                          {['A', 'B', 'C'].map(r => renderRombelCheckbox(r))}
+                        </div>
+                        {/* Column 2: D, E, F */}
+                        <div className="space-y-1.5">
+                          {['D', 'E', 'F'].map(r => renderRombelCheckbox(r))}
+                        </div>
+                        {/* Column 3: G, H, I */}
+                        <div className="space-y-1.5">
+                          {['G', 'H', 'I'].map(r => renderRombelCheckbox(r))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {/* Selected combination summary badge list */}
+                {selectedClasses.length > 0 && (
+                  <div className="bg-white p-2.5 rounded-xl border border-slate-100 mt-2 text-[10px] font-semibold text-blue-700 font-mono shadow-sm">
+                    <span className="text-slate-400 font-bold uppercase text-[8px] block mb-1">Hasil Kriteria Kelas Diizinkan ({selectedClasses.length}):</span>
                     <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
-                      {selectedGrades.flatMap(g => 
-                        selectedRombels.map(r => {
-                          const matchingClass = classList.find(cls => {
-                            const parts = cls.trim().split(/[\.\-\s]+/);
-                            return parts[0]?.trim() === g && parts[1]?.trim() === r;
-                          });
-                          return matchingClass || `${g}.${r}`;
-                        })
-                      ).map(c => (
+                      {selectedClasses.sort().map(c => (
                         <span key={c} className="bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 text-blue-800 text-[9px]">{c}</span>
                       ))}
                     </div>
@@ -1678,7 +1723,7 @@ export default function AdminDashboard({
                           )}
                         </td>
                         <td className="py-3.5 px-3 font-mono text-slate-600 text-[11px]">
-                          {s.hpSiswa}
+                          {formatToIndoPhone(s.hpSiswa)}
                         </td>
                         <td className="py-3.5 px-3.5 text-center">
                           <button
@@ -2008,11 +2053,11 @@ export default function AdminDashboard({
               <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-4 sm:p-5 space-y-3 lg:col-span-1">
                 <h2 className="text-[10px] sm:text-[11px] font-black text-blue-800 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-2.5">
                   <Shield className="w-4 h-4 text-blue-700" />
-                  Administrator Terdaftar ({admins && admins.length > 0 ? admins.length : 1})
+                  Administrator Terdaftar ({admins ? admins.length : 0})
                 </h2>
                 <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
-                  {(admins && admins.length > 0 ? admins : [{ username: 'admin', status: 'Utama' }]).map((adm: any, idx: number) => {
-                    const isAdminUtama = adm.username.toLowerCase().trim() === 'admin' || (adm.status && adm.status.toLowerCase().includes('utama'));
+                  {(admins || []).map((adm: any, idx: number) => {
+                    const isAdminUtama = adm.status && adm.status.toLowerCase().includes('utama');
                     const roleText = isAdminUtama ? 'Utama' : (adm.status || 'Biasa');
                     return (
                       <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border border-slate-100 gap-2 animate-fadeIn">
@@ -2078,21 +2123,40 @@ export default function AdminDashboard({
 
             {/* Content */}
             <div className="p-6 space-y-6 text-xs text-slate-700">
-              {/* Core Info Row */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b border-slate-100 pb-5">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Kelas Siswa</span>
-                  <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1 rounded-lg inline-block">Kelas {selectedStudentDetail.kelas}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Jenis Kelamin</span>
-                  <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1 rounded-lg inline-block">{selectedStudentDetail.jenisKelamin}</span>
-                </div>
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Tanggal Daftar</span>
-                  <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1 rounded-lg inline-block">
-                    {new Date(selectedStudentDetail.createdAt).toLocaleString('id-ID')}
-                  </span>
+              {/* Photo & Core Info Row */}
+              <div className="flex flex-col sm:flex-row gap-6 items-center border-b border-slate-100 pb-5">
+                {selectedStudentDetail.photo ? (
+                  <div className="shrink-0 bg-slate-50 p-1.5 rounded-2xl shadow-sm border border-slate-200">
+                    <img
+                      src={selectedStudentDetail.photo}
+                      alt={selectedStudentDetail.name}
+                      referrerPolicy="no-referrer"
+                      className="w-24 h-32 object-cover rounded-xl shadow-inner border border-slate-100 bg-white"
+                    />
+                    <p className="text-[8px] font-extrabold text-center text-slate-400 mt-1.5 uppercase tracking-wide">FOTO 3x4</p>
+                  </div>
+                ) : (
+                  <div className="shrink-0 w-24 h-32 bg-slate-50 rounded-2xl flex flex-col items-center justify-center border border-dashed border-slate-300 text-slate-400">
+                    <User className="w-8 h-8 text-slate-300" />
+                    <span className="text-[8px] font-extrabold mt-1.5 text-center uppercase leading-none px-1 text-slate-400">FOTO 3x4<br/>KOSONG</span>
+                  </div>
+                )}
+                
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Kelas Siswa</span>
+                    <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">Kelas {selectedStudentDetail.kelas}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Jenis Kelamin</span>
+                    <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">{selectedStudentDetail.jenisKelamin}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Tanggal Daftar</span>
+                    <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">
+                      {new Date(selectedStudentDetail.createdAt).toLocaleString('id-ID')}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -2116,7 +2180,7 @@ export default function AdminDashboard({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">No. HP (WhatsApp)</span>
-                    <span className="font-bold text-slate-800 font-mono text-xs">{selectedStudentDetail.hpSiswa}</span>
+                    <span className="font-bold text-slate-800 font-mono text-xs">{formatToIndoPhone(selectedStudentDetail.hpSiswa)}</span>
                   </div>
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Email</span>
@@ -2141,14 +2205,14 @@ export default function AdminDashboard({
                   </div>
                   <div>
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">No. HP Orang Tua</span>
-                    <span className="font-bold text-slate-800 font-mono text-xs">{selectedStudentDetail.hpOrtu}</span>
+                    <span className="font-bold text-slate-800 font-mono text-xs">{formatToIndoPhone(selectedStudentDetail.hpOrtu)}</span>
                   </div>
                 </div>
               </div>
 
               {/* Jalur Prestasi */}
               {selectedStudentDetail.prestasiChecked && (
-                <div className="bg-amber-50/50 p-4 border border-amber-200/70 rounded-2xl">
+                <div className="bg-amber-50/50 p-4 border border-amber-200/70 rounded-2xl space-y-3">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div className="space-y-1">
                       <span className="text-[9px] font-black text-amber-800 block uppercase tracking-wider">★ JALUR PRESTASI KHUSUS</span>
@@ -2168,6 +2232,43 @@ export default function AdminDashboard({
                       </a>
                     )}
                   </div>
+
+                  {/* Attachment Preview (Request #3) */}
+                  {selectedStudentDetail.certificateFile && (
+                    <div className="border-t border-amber-200/50 pt-3 space-y-1.5">
+                      <span className="text-[8px] font-extrabold text-amber-800 uppercase tracking-wider block">Lampiran Sertifikat Juara:</span>
+                      {selectedStudentDetail.certificateFile.startsWith('data:image/') ? (
+                        <div className="max-w-md mx-auto bg-white p-1 rounded-xl shadow-inner border border-amber-100/60">
+                          <img
+                            src={selectedStudentDetail.certificateFile}
+                            alt="Sertifikat Juara"
+                            referrerPolicy="no-referrer"
+                            className="max-h-60 w-auto object-contain rounded-lg mx-auto"
+                          />
+                        </div>
+                      ) : (
+                        <div className="bg-white p-3 rounded-xl border border-amber-100/60 flex items-center justify-between gap-3 shadow-inner">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-rose-50 rounded-lg flex items-center justify-center border border-rose-100">
+                              <FileText className="w-4 h-4 text-rose-600" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-bold text-slate-700 truncate max-w-xs">{selectedStudentDetail.certificateFileName || 'Sertifikat_Juara.pdf'}</p>
+                              <p className="text-[8px] font-semibold text-rose-500 uppercase">Dokumen PDF</p>
+                            </div>
+                          </div>
+                          <a
+                            href={selectedStudentDetail.certificateFile}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all cursor-pointer text-center"
+                          >
+                            Buka / Lihat PDF
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
 

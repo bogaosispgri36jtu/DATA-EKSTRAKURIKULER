@@ -7,6 +7,7 @@ export interface Student {
   id: string;
   regNo: string;
   name: string;
+  nama?: string; // Compatibility field for Google Sheets mapping
   photo: string; // Base64 compressed image
   kelas: string;
   jenisKelamin: 'Laki-laki' | 'Perempuan';
@@ -54,8 +55,6 @@ export interface Extracurricular {
 export interface AppSettings {
   googleAppsScriptUrl: string;
   tahunPelajaranAktif: string;
-  adminUsername: string;
-  adminPassword: string;
   isPublished?: boolean;
 }
 

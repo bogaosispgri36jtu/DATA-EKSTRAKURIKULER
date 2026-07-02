@@ -180,52 +180,8 @@ export default function App() {
       confirmButtonText: 'IYA',
       cancelButtonText: 'TIDAK',
       width: '340px'
-    }).then(async (result) => {
+    }).then((result) => {
       if (result.isConfirmed) {
-        // Show reloading database loader
-        Swal.fire({
-          html: `
-            <div class="flex flex-col items-center justify-center py-4">
-              <div class="relative w-12 h-12 flex items-center justify-center">
-                <div class="absolute inset-0 rounded-full border-4 border-slate-100"></div>
-                <div class="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></div>
-              </div>
-              <p class="text-xs sm:text-[13px] text-slate-500 font-bold tracking-wider mt-4">
-                Memuat Ulang...
-              </p>
-            </div>
-          `,
-          showConfirmButton: false,
-          allowOutsideClick: false,
-          allowEscapeKey: false,
-          customClass: {
-            popup: 'rounded-2xl shadow-xl border border-slate-100 max-w-[260px] sm:max-w-xs'
-          }
-        });
-
-        // 1. Fetch latest settings from server
-        let activeSettings = settings;
-        try {
-          const response = await fetch('/api/settings');
-          if (response.ok) {
-            const serverSettings = await response.json();
-            activeSettings = { ...activeSettings, ...serverSettings };
-            setSettings(activeSettings);
-            localStorage.setItem('smp_pgri_settings', JSON.stringify(activeSettings));
-          }
-        } catch (e) {
-          console.warn('Failed to fetch settings on logout', e);
-        }
-
-        // 2. Perform database reload
-        try {
-          await fetchAppData(activeSettings);
-        } catch (e) {
-          console.error(e);
-        }
-
-        // Close loading modal and log out
-        Swal.close();
         handleSetIsAdminLoggedIn(false);
       }
     });
@@ -260,13 +216,26 @@ export default function App() {
     }
 
     const savedAdminsStr = localStorage.getItem('smp_pgri_admins');
-    let localAdmins = [{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }];
+    let localAdmins: any[] = [];
     if (savedAdminsStr) {
       try {
         localAdmins = JSON.parse(savedAdminsStr);
       } catch (e) {}
     }
-    const currentAdmins = (admins && admins.length > 0) ? admins : localAdmins;
+    
+    // Purge any default admin account with username "admin" and password "admin123" from local cache
+    localAdmins = localAdmins.filter(acc => {
+      const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+      const p = acc.password ? acc.password.toString().trim() : '';
+      return !(u === 'admin' && p === 'admin123');
+    });
+    
+    const currentAdmins = (admins && admins.length > 0) ? admins.filter(acc => {
+      const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+      const p = acc.password ? acc.password.toString().trim() : '';
+      return !(u === 'admin' && p === 'admin123');
+    }) : localAdmins;
+
     let matchedAccount = currentAdmins.find((acc) => {
       const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
       const p = acc.password ? acc.password.toString().trim() : '';
@@ -394,6 +363,17 @@ export default function App() {
         setSettings(newSettings);
         localStorage.setItem('smp_pgri_settings', JSON.stringify(newSettings));
         
+        // Save to backend server so it persists on reloads
+        try {
+          await fetch('/api/settings', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newSettings)
+          });
+        } catch (e) {
+          console.error('Failed to save settings to server', e);
+        }
+        
         setStudents(resJson.students || []);
         setEskulList(resJson.eskul || []);
         if (resJson.classes && Array.isArray(resJson.classes)) {
@@ -430,7 +410,7 @@ export default function App() {
     }
   };
 
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycby4fbLKd7JdwuigJ7Pi3kJe6h2z70ewSDEIHhBMo2BQM_2AkD4l6kkO3hhIOnBOpXtTpA/exec';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzKPvYMrx6bhtcr_WTOtMNwm9u1TvALHmVtVUfNn-GVZs3Mla42YyZQP4_iJv7U0r3f_g/exec';
 
   // Core Data state
   const [students, setStudents] = useState<Student[]>([]);
@@ -440,8 +420,6 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings>({
     googleAppsScriptUrl: '',
     tahunPelajaranAktif: '2026/2027',
-    adminUsername: 'admin',
-    adminPassword: 'admin123',
     isPublished: true
   });
 
@@ -450,12 +428,26 @@ export default function App() {
 
   // Initialize and load data (from backend API or local storage fallback)
   useEffect(() => {
+    // Purge any old cached default "admin" account with password "admin123" from browser storage
+    const savedAdminsStr = localStorage.getItem('smp_pgri_admins');
+    if (savedAdminsStr) {
+      try {
+        const parsed = JSON.parse(savedAdminsStr);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(acc => {
+            const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+            const p = acc.password ? acc.password.toString().trim() : '';
+            return !(u === 'admin' && p === 'admin123');
+          });
+          localStorage.setItem('smp_pgri_admins', JSON.stringify(cleaned));
+        }
+      } catch (err) {}
+    }
+
     const initializeApp = async () => {
       let activeSettings = {
         googleAppsScriptUrl: '',
         tahunPelajaranAktif: '2026/2027',
-        adminUsername: 'admin',
-        adminPassword: 'admin123',
         isPublished: true
       };
 
@@ -501,7 +493,11 @@ export default function App() {
         const resJson = await response.json();
         
         if (resJson.status === 'success') {
-          setStudents(resJson.students || []);
+          const mappedStudents = (resJson.students || []).map((s: any) => ({
+            ...s,
+            name: s.name || s.nama || ''
+          }));
+          setStudents(mappedStudents);
           setEskulList(resJson.eskul || []);
           if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
             setClassList(resJson.classes);
@@ -527,19 +523,27 @@ export default function App() {
               setClassList(extracted);
             }
           }
-          if (resJson.admins && Array.isArray(resJson.admins)) {
+          if (resJson.admins && Array.isArray(resJson.admins) && resJson.admins.length > 0) {
             setAdmins(resJson.admins);
             localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
           } else {
-            const defaultAdmins = [{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }];
-            setAdmins(defaultAdmins);
-            localStorage.setItem('smp_pgri_admins', JSON.stringify(defaultAdmins));
+            const savedAdminsStr = localStorage.getItem('smp_pgri_admins');
+            if (savedAdminsStr) {
+              try {
+                const parsedAdmins = JSON.parse(savedAdminsStr);
+                if (Array.isArray(parsedAdmins)) {
+                  setAdmins(parsedAdmins);
+                }
+              } catch (e) {
+                setAdmins([]);
+              }
+            } else {
+              setAdmins([]);
+            }
           }
           setSettings({
             ...currentSettings,
-            tahunPelajaranAktif: resJson.settings.tahunPelajaranAktif,
-            adminUsername: '',
-            adminPassword: ''
+            tahunPelajaranAktif: resJson.settings.tahunPelajaranAktif
           });
           setIsLiveConnection(true);
           setIsLoading(false);
@@ -596,12 +600,10 @@ export default function App() {
       try {
         setAdmins(JSON.parse(savedAdmins));
       } catch (e) {
-        setAdmins([{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }]);
+        setAdmins([]);
       }
     } else {
-      const defaultAdmins = [{ id: 'admin-default', username: 'admin', password: 'admin123', status: 'Utama', createdAt: new Date().toISOString() }];
-      localStorage.setItem('smp_pgri_admins', JSON.stringify(defaultAdmins));
-      setAdmins(defaultAdmins);
+      setAdmins([]);
     }
 
     setIsLoading(false);
@@ -800,7 +802,13 @@ export default function App() {
         const resJson = await response.json();
         if (resJson.status === 'success') {
           setIsLiveConnection(true);
-          if (resJson.students) setStudents(resJson.students);
+          if (resJson.students) {
+            const mappedStudents = resJson.students.map((s: any) => ({
+              ...s,
+              name: s.name || s.nama || ''
+            }));
+            setStudents(mappedStudents);
+          }
           if (resJson.eskul) setEskulList(resJson.eskul);
           if (resJson.admins) {
             setAdmins(resJson.admins);

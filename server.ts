@@ -14,8 +14,6 @@ async function startServer() {
   const defaultSettings = {
     googleAppsScriptUrl: "",
     tahunPelajaranAktif: "2026/2027",
-    adminUsername: "admin",
-    adminPassword: "admin123",
     isPublished: true
   };
 

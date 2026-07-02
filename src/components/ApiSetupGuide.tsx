@@ -5,8 +5,7 @@
 
 import React, { useState } from 'react';
 import { 
-  Copy, Check, FileCode, HelpCircle, HardDrive, Share2, 
-  Settings, Key, Layers, Users, BookOpen, ChevronDown, ChevronUp
+  Copy, Check, BookOpen, ChevronDown, ChevronUp
 } from 'lucide-react';
 
 export default function ApiSetupGuide() {
@@ -14,14 +13,13 @@ export default function ApiSetupGuide() {
   const [isExpanded, setIsExpanded] = useState(false);
 
   const gsCode = `/**
- /**
  * =========================================================================
  * GOOGLE APPS SCRIPT WEB APP API - BACKEND PENDAFTARAN EKSTRAKURIKULER
  * SMP PGRI JATIUWUNG TANGERANG - BANTEN
  * =========================================================================
  * 
  * PETUNJUK PEMBUATAN SPREADSHEET:
- * Buat 1 Google Spreadsheet baru dengan 4 Lembar (Sheet) berikut:
+ * Buat 1 Google Spreadsheet baru dengan 5 Sheet (Lembar) berikut:
  * 
  * 1. Sheet bernama "Settings"
  *    Kolom A: Key, Kolom B: Value
@@ -29,11 +27,11 @@ export default function ApiSetupGuide() {
  * 
  * 2. Sheet bernama "Admin"
  *    Kolom A: ID, Kolom B: Username, Kolom C: Password, Kolom D: Status, Kolom E: CreatedAt
- *    Baris 1: Username=admin, Password=admin123, Status=Utama (Secara default)
+ *    Isi baris dengan daftar akun admin yang Anda inginkan (Status: Utama atau Biasa)
  * 
  * 3. Sheet bernama "Eskul"
  *    Kolom A: ID
- *    Kolom B: Nama
+ *    Kolom B: NamaEskul
  *    Kolom C: KelasAllowed (Kombinasi dipisahkan koma, contoh: VII,VIII,IX)
  *    Kolom D: TahunPelajaran
  * 
@@ -41,7 +39,7 @@ export default function ApiSetupGuide() {
  *    Kolom A: ID
  *    Kolom B: RegNo
  *    Kolom C: Nama
- *    Kolom D: Photo (Base64 / kosongkan)
+ *    Kolom D: Photo (Base64)
  *    Kolom E: Kelas
  *    Kolom F: JenisKelamin
  *    Kolom G: NamaAyah
@@ -63,8 +61,10 @@ export default function ApiSetupGuide() {
  *    Kolom Z: KelurahanId, Kolom AA: KelurahanName
  *    Kolom AB: EskulId, Kolom AC: EskulName
  *    Kolom AD: EskulId2, Kolom AE: EskulName2
- *    Kolom AF: TahunPelajaran
- *    Kolom AG: CreatedAt
+ *    Kolom AF: EskulId3, Kolom AG: EskulName3
+ *    Kolom AH: CertificateFile, Kolom AI: CertificateFileName
+ *    Kolom AJ: TahunPelajaran
+ *    Kolom AK: CreatedAt
  * 
  * 5. Sheet bernama "Kelas" (Opsional, untuk kustomisasi daftar kelas di luar VII, VIII, IX)
  *    Kolom A: Nama Kelas (Baris 1 berisi judul "Nama Kelas", baris berikutnya berisi nama-nama kelas)
@@ -85,6 +85,20 @@ function getSpreadsheet() {
   throw new Error("Spreadsheet tidak terhubung! Silakan isi SPREADSHEET_ID di bagian paling atas kode Apps Script Anda.");
 }
 
+// Format phone number to start with +62
+function formatToIndoPhone(num) {
+  if (!num) return "";
+  var clean = num.toString().replace(/\\D/g, "");
+  if (clean.indexOf("0") === 0) {
+    clean = "62" + clean.substring(1);
+  } else if (clean.indexOf("8") === 0) {
+    clean = "62" + clean;
+  } else if (clean.indexOf("62") !== 0) {
+    clean = "62" + clean;
+  }
+  return "+" + clean;
+}
+
 // Handle Request GET (Mengambil Data)
 function doGet(e) {
   var response = {};
@@ -92,7 +106,7 @@ function doGet(e) {
     var action = e.parameter.action;
     var ss = getSpreadsheet();
     
-    // Inisialisasi Lembar/Sheet jika masih kosong
+    // Inisialisasi Database jika kosong
     initDatabase(ss);
     
     if (action === "getData") {
@@ -168,32 +182,51 @@ function doPost(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// Helper to automatically repair outdated headers if the user had an older schema
+function repairHeadersIfNeeded(sheet, requiredHeaders) {
+  if (!sheet) return;
+  var lastCol = Math.max(1, sheet.getLastColumn());
+  var range = sheet.getRange(1, 1, 1, lastCol);
+  var currentHeaders = range.getValues()[0];
+  
+  // If we have fewer columns or headers are blank/mismatched, force set the headers
+  if (currentHeaders.length < requiredHeaders.length || !currentHeaders[0]) {
+    sheet.getRange(1, 1, 1, requiredHeaders.length).setValues([requiredHeaders]);
+  }
+}
+
 // Inisialisasi Header Tabel jika belum dibuat
 function initDatabase(ss) {
-  var sheetSettings = ss.getSheetByName("Settings");
+  var sheetSettings = getSheetCaseInsensitive(ss, "Settings");
   if (!sheetSettings) {
     sheetSettings = ss.insertSheet("Settings");
     sheetSettings.appendRow(["Key", "Value"]);
     sheetSettings.appendRow(["TahunPelajaranAktif", "2026/2027"]);
+  } else {
+    repairHeadersIfNeeded(sheetSettings, ["Key", "Value"]);
   }
   
-  var sheetAdmin = ss.getSheetByName("Admin");
+  var sheetAdmin = getSheetCaseInsensitive(ss, "Admin");
   if (!sheetAdmin) {
     sheetAdmin = ss.insertSheet("Admin");
     sheetAdmin.appendRow(["ID", "Username", "Password", "Status", "CreatedAt"]);
-    sheetAdmin.appendRow(["admin-default", "admin", "admin123", "Utama", new Date().toISOString()]);
+  } else {
+    repairHeadersIfNeeded(sheetAdmin, ["ID", "Username", "Password", "Status", "CreatedAt"]);
   }
   
-  var sheetEskul = ss.getSheetByName("Eskul");
+  var sheetEskul = getSheetCaseInsensitive(ss, "Eskul");
   if (!sheetEskul) {
     sheetEskul = ss.insertSheet("Eskul");
     sheetEskul.appendRow(["ID", "NamaEskul", "KelasAllowed", "TahunPelajaran"]);
+    // Seed awal
     sheetEskul.appendRow(["eskul-1", "Pramuka (Wajib)", "VII,VIII,IX", "2026/2027"]);
     sheetEskul.appendRow(["eskul-2", "Paskibra", "VII,VIII,IX", "2026/2027"]);
     sheetEskul.appendRow(["eskul-3", "Futsal", "VII,VIII,IX", "2026/2027"]);
+  } else {
+    repairHeadersIfNeeded(sheetEskul, ["ID", "NamaEskul", "KelasAllowed", "TahunPelajaran"]);
   }
   
-  var sheetSiswa = ss.getSheetByName("Siswa");
+  var sheetSiswa = getSheetCaseInsensitive(ss, "Siswa");
   if (!sheetSiswa) {
     sheetSiswa = ss.insertSheet("Siswa");
     sheetSiswa.appendRow([
@@ -201,11 +234,21 @@ function initDatabase(ss) {
       "HpSiswa", "HpOrtu", "PrestasiChecked", "NamaLomba", "CabangLomba", "TingkatLomba", 
       "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
       "KabupatenId", "KabupatenName", "KecamatanId", "KecamatanName", "KelurahanId", 
-      "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "EskulId3", "EskulName3", "TahunPelajaran", "CreatedAt"
+      "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "EskulId3", "EskulName3", 
+      "CertificateFile", "CertificateFileName", "TahunPelajaran", "CreatedAt"
+    ]);
+  } else {
+    repairHeadersIfNeeded(sheetSiswa, [
+      "ID", "RegNo", "Nama", "Photo", "Kelas", "JenisKelamin", "NamaAyah", "NamaIbu", 
+      "HpSiswa", "HpOrtu", "PrestasiChecked", "NamaLomba", "CabangLomba", "TingkatLomba", 
+      "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
+      "KabupatenId", "KabupatenName", "KecamatanId", "KecamatanName", "KelurahanId", 
+      "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "EskulId3", "EskulName3", 
+      "CertificateFile", "CertificateFileName", "TahunPelajaran", "CreatedAt"
     ]);
   }
   
-  var sheetKelas = ss.getSheetByName("Kelas");
+  var sheetKelas = getSheetCaseInsensitive(ss, "Kelas");
   if (!sheetKelas) {
     sheetKelas = ss.insertSheet("Kelas");
     sheetKelas.appendRow(["Nama Kelas"]);
@@ -215,12 +258,100 @@ function initDatabase(ss) {
     sheetKelas.appendRow(["VIII-2"]);
     sheetKelas.appendRow(["IX-1"]);
     sheetKelas.appendRow(["IX-2"]);
+  } else {
+    repairHeadersIfNeeded(sheetKelas, ["Nama Kelas"]);
   }
+}
+
+function getSettings(ss) {
+  var sheet = getSheetCaseInsensitive(ss, "Settings");
+  var rows = sheet.getDataRange().getValues();
+  var config = {};
+  for (var i = 1; i < rows.length; i++) {
+    config[rows[i][0]] = rows[i][1];
+  }
+  return {
+    tahunPelajaranAktif: config["TahunPelajaranAktif"] || "2026/2027"
+  };
+}
+
+// Ambil Daftar Eskul
+function getEskulList(ss) {
+  var sheet = getSheetCaseInsensitive(ss, "Eskul");
+  var rows = sheet.getDataRange().getValues();
+  var eskul = [];
+  for (var i = 1; i < rows.length; i++) {
+    var idVal = rows[i][0];
+    var namaVal = rows[i][1];
+    var kelasAllowedVal = rows[i][2];
+    var tpVal = rows[i][3];
+    
+    if (idVal && namaVal) {
+      eskul.push({
+        id: idVal.toString(),
+        nama: namaVal.toString(),
+        kelasAllowed: kelasAllowedVal ? kelasAllowedVal.toString().split(",") : [],
+        tahunPelajaran: tpVal ? tpVal.toString() : "2026/2027"
+      });
+    }
+  }
+  return eskul;
+}
+
+// Ambil Daftar Siswa
+function getStudentsList(ss) {
+  var sheet = getSheetCaseInsensitive(ss, "Siswa");
+  var rows = sheet.getDataRange().getValues();
+  var students = [];
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0]) {
+      students.push({
+        id: rows[i][0].toString(),
+        regNo: rows[i][1].toString(),
+        nama: rows[i][2].toString(),
+        photo: rows[i][3] ? rows[i][3].toString() : "",
+        kelas: rows[i][4].toString(),
+        jenisKelamin: rows[i][5].toString(),
+        namaAyah: rows[i][6].toString(),
+        namaIbu: rows[i][7].toString(),
+        hpSiswa: rows[i][8].toString(),
+        hpOrtu: rows[i][9].toString(),
+        prestasiChecked: rows[i][10] === true || rows[i][10] === "TRUE" || rows[i][10] === "true",
+        namaLomba: rows[i][11] ? rows[i][11].toString() : "",
+        cabangLomba: rows[i][12] ? rows[i][12].toString() : "",
+        tingkatLomba: rows[i][13] ? rows[i][13].toString() : "",
+        juaraKe: rows[i][14] ? rows[i][14].toString() : "",
+        penyelenggara: rows[i][15] ? rows[i][15].toString() : "",
+        alamat: rows[i][16] ? rows[i][16].toString() : "",
+        rt: rows[i][17] ? rows[i][17].toString() : "",
+        rw: rows[i][18] ? rows[i][18].toString() : "",
+        provinsiId: rows[i][19] ? rows[i][19].toString() : "",
+        provinsiName: rows[i][20] ? rows[i][20].toString() : "",
+        kabupatenId: rows[i][21] ? rows[i][21].toString() : "",
+        kabupatenName: rows[i][22] ? rows[i][22].toString() : "",
+        kecamatanId: rows[i][23] ? rows[i][23].toString() : "",
+        kecamatanName: rows[i][24] ? rows[i][24].toString() : "",
+        kelurahanId: rows[i][25] ? rows[i][25].toString() : "",
+        kelurahanName: rows[i][26] ? rows[i][26].toString() : "",
+        eskulId: rows[i][27] ? rows[i][27].toString() : "",
+        eskulName: rows[i][28] ? rows[i][28].toString() : "",
+        eskulId2: rows[i][29] ? rows[i][29].toString() : "",
+        eskulName2: rows[i][30] ? rows[i][30].toString() : "",
+        eskulId3: rows[i][31] ? rows[i][31].toString() : "",
+        eskulName3: rows[i][32] ? rows[i][32].toString() : "",
+        certificateFile: rows[i][33] ? rows[i][33].toString() : "",
+        certificateFileName: rows[i][34] ? rows[i][34].toString() : "",
+        tahunPelajaran: rows[i][35] ? rows[i][35].toString() : "",
+        createdAt: rows[i][36] ? rows[i][36].toString() : ""
+      });
+    }
+  }
+  return students;
 }
 
 // Ambil Daftar Kelas dari Sheet Kelas
 function getClassList(ss) {
-  var sheet = ss.getSheetByName("Kelas");
+  var sheet = getSheetCaseInsensitive(ss, "Kelas");
   if (!sheet) return [];
   var lastRow = sheet.getLastRow();
   if (lastRow < 1) return [];
@@ -246,101 +377,15 @@ function getClassList(ss) {
   return classes;
 }
 
-// Ambil Konfigurasi Settings
-function getSettings(ss) {
-  var sheet = ss.getSheetByName("Settings");
-  var rows = sheet.getDataRange().getValues();
-  var config = {};
-  for (var i = 1; i < rows.length; i++) {
-    config[rows[i][0]] = rows[i][1];
-  }
-  return {
-    tahunPelajaranAktif: config["TahunPelajaranAktif"] || "2026/2027"
-  };
-}
-
-// Ambil Daftar Eskul
-function getEskulList(ss) {
-  var sheet = ss.getSheetByName("Eskul");
-  var rows = sheet.getDataRange().getValues();
-  var eskul = [];
-  for (var i = 1; i < rows.length; i++) {
-    var idVal = rows[i][0];
-    var namaVal = rows[i][1];
-    var kelasAllowedVal = rows[i][2];
-    var tpVal = rows[i][3];
-    
-    if (idVal && namaVal) {
-      eskul.push({
-        id: idVal.toString(),
-        nama: namaVal.toString(),
-        kelasAllowed: kelasAllowedVal ? kelasAllowedVal.toString().split(",") : [],
-        tahunPelajaran: tpVal ? tpVal.toString() : "2026/2027"
-      });
-    }
-  }
-  return eskul;
-}
-
-// Ambil Daftar Siswa
-function getStudentsList(ss) {
-  var sheet = ss.getSheetByName("Siswa");
-  var rows = sheet.getDataRange().getValues();
-  var students = [];
-  for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0]) {
-      students.push({
-        id: rows[i][0].toString(),
-        regNo: rows[i][1].toString(),
-        nama: rows[i][2].toString(),
-        photo: rows[i][3] ? rows[i][3].toString() : "",
-        kelas: rows[i][4].toString(),
-        jenisKelamin: rows[i][5].toString(),
-        namaAyah: rows[i][6].toString(),
-        namaIbu: rows[i][7].toString(),
-        hpSiswa: rows[i][8].toString(),
-        hpOrtu: rows[i][9].toString(),
-        prestasiChecked: rows[i][10] === true || rows[i][10] === "TRUE",
-        namaLomba: rows[i][11] ? rows[i][11].toString() : "",
-        cabangLomba: rows[i][12] ? rows[i][12].toString() : "",
-        tingkatLomba: rows[i][13] ? rows[i][13].toString() : "",
-        juaraKe: rows[i][14] ? rows[i][14].toString() : "",
-        penyelenggara: rows[i][15] ? rows[i][15].toString() : "",
-        alamat: rows[i][16] ? rows[i][16].toString() : "",
-        rt: rows[i][17] ? rows[i][17].toString() : "",
-        rw: rows[i][18] ? rows[i][18].toString() : "",
-        provinsiId: rows[i][19] ? rows[i][19].toString() : "",
-        provinsiName: rows[i][20] ? rows[i][20].toString() : "",
-        kabupatenId: rows[i][21] ? rows[i][21].toString() : "",
-        kabupatenName: rows[i][22] ? rows[i][22].toString() : "",
-        kecamatanId: rows[i][23] ? rows[i][23].toString() : "",
-        kecamatanName: rows[i][24] ? rows[i][24].toString() : "",
-        kelurahanId: rows[i][25] ? rows[i][25].toString() : "",
-        kelurahanName: rows[i][26] ? rows[i][26].toString() : "",
-        eskulId: rows[i][27] ? rows[i][27].toString() : "",
-        eskulName: rows[i][28] ? rows[i][28].toString() : "",
-        eskulId2: rows[i][29] ? rows[i][29].toString() : "",
-        eskulName2: rows[i][30] ? rows[i][30].toString() : "",
-        eskulId3: rows[i][31] ? rows[i][31].toString() : "",
-        eskulName3: rows[i][32] ? rows[i][32].toString() : "",
-        tahunPelajaran: rows[i][33] ? rows[i][33].toString() : "",
-        createdAt: rows[i][34] ? rows[i][34].toString() : ""
-      });
-    }
-  }
-  return students;
-}
-
 // Ambil Daftar Admin
 function getAdminsList(ss) {
-  var sheet = ss.getSheetByName("Admin");
+  var sheet = getSheetCaseInsensitive(ss, "Admin");
   var rows = sheet.getDataRange().getValues();
   if (rows.length === 0) return [];
   
   var admins = [];
   var headers = rows[0].map(function(h) { return h ? h.toString().toLowerCase().trim() : ""; });
   
-  // Cari indeks masing-masing kolom berdasarkan nama header secara cerdas
   var idIdx = headers.indexOf("id");
   
   var userIdx = headers.indexOf("username");
@@ -364,10 +409,8 @@ function getAdminsList(ss) {
   
   var startIdx = 1;
   
-  // JIKA TIDAK ADA HEADER YANG COCOK SAMA SEKALI
-  // Kita coba deteksi otomatis posisi kolom berdasarkan struktur data
   if (userIdx === -1 && passIdx === -1) {
-    startIdx = 0; // Berarti baris pertama langsung berupa DATA (bukan nama kolom)
+    startIdx = 0;
     
     var numCols = rows[0].length;
     if (numCols === 1) {
@@ -387,7 +430,6 @@ function getAdminsList(ss) {
       createdIdx = 4;
     }
   } else {
-    // Jika ada header tapi beberapa indeks tidak terdeteksi, berikan fallback aman
     if (userIdx === -1) userIdx = (idIdx === 0) ? 1 : 0;
     if (passIdx === -1) passIdx = (userIdx === 1) ? 2 : 1;
   }
@@ -422,23 +464,42 @@ function getAdminsList(ss) {
 
 // Simpan Data Pendaftaran Siswa Baru
 function saveStudent(ss, s) {
-  var sheet = ss.getSheetByName("Siswa");
+  var sheet = getSheetCaseInsensitive(ss, "Siswa");
+  
+  // Hitung jumlah pendaftar di tahun pelajaran yang sama untuk nomor urut
+  var rows = sheet.getDataRange().getValues();
+  var matchCount = 0;
+  var targetYear = s.tahunPelajaran.split("/")[0]; // Ambil tahun awal saja (misal: 2026)
+  
+  for (var i = 1; i < rows.length; i++) {
+    // Indeks ke-35 di layout baru adalah TahunPelajaran
+    if (rows[i][35] && rows[i][35].toString() === s.tahunPelajaran) {
+      matchCount++;
+    }
+  }
+  
+  // Format nomor urut: REG/TAHUN/00X (Contoh: REG/2026/001)
+  var urutan = ("00" + (matchCount + 1)).slice(-3);
+  var regNo = "REG/" + targetYear + "/" + urutan;
   var id = "REG-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
-  var regNo = "REG/" + new Date().getFullYear() + "/" + Math.floor(1000 + Math.random() * 9000);
   var createdAt = new Date().toISOString();
+  
+  // Ambil data dan pastikan format No. WhatsApp sudah menggunakan +62
+  var formattedHpSiswa = formatToIndoPhone(s.hpSiswa || s.hpSiswa);
+  var formattedHpOrtu = formatToIndoPhone(s.hpOrtu || s.hpOrtu);
   
   sheet.appendRow([
     id,
     regNo,
-    s.nama,
+    s.nama || s.name,
     s.photo || "",
     s.kelas,
     s.jenisKelamin,
     s.namaAyah,
     s.namaIbu,
-    s.hpSiswa,
-    s.hpOrtu,
-    s.prestasiChecked ? "TRUE" : "FALSE",
+    formattedHpSiswa,
+    formattedHpOrtu,
+    (s.prestasiChecked === true || s.prestasiChecked === "TRUE" || s.prestasiChecked === "true") ? "TRUE" : "FALSE",
     s.namaLomba || "",
     s.cabangLomba || "",
     s.tingkatLomba || "",
@@ -461,16 +522,18 @@ function saveStudent(ss, s) {
     s.eskulName2 || "",
     s.eskulId3 || "",
     s.eskulName3 || "",
+    s.certificateFile || "",
+    s.certificateFileName || "",
     s.tahunPelajaran,
     createdAt
   ]);
   
-  return { id: id, regNo: regNo, createdAt: createdAt, ...s };
+  return { id: id, regNo: regNo, hpSiswa: formattedHpSiswa, hpOrtu: formattedHpOrtu, createdAt: createdAt, ...s };
 }
 
 // Simpan Ekstrakurikuler Baru
 function saveEskul(ss, e) {
-  var sheet = ss.getSheetByName("Eskul");
+  var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var id = "eskul-" + Date.now();
   sheet.appendRow([
     id,
@@ -483,7 +546,7 @@ function saveEskul(ss, e) {
 
 // Hapus Ekstrakurikuler
 function deleteEskul(ss, id) {
-  var sheet = ss.getSheetByName("Eskul");
+  var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
     if (rows[i][0].toString() === id.toString()) {
@@ -495,13 +558,14 @@ function deleteEskul(ss, id) {
 
 // Reset Pendaftar Per Eskul
 function resetEskulStudents(ss, eskulId) {
-  var sheet = ss.getSheetByName("Siswa");
+  var sheet = getSheetCaseInsensitive(ss, "Siswa");
   var rows = sheet.getDataRange().getValues();
   // Loop terbalik agar indeks baris tidak bergeser saat dihapus
   for (var i = rows.length - 1; i >= 1; i--) {
     var eskul1 = rows[i][27] ? rows[i][27].toString() : "";
     var eskul2 = rows[i][29] ? rows[i][29].toString() : "";
-    if (eskul1 === eskulId || eskul2 === eskulId) {
+    var eskul3 = rows[i][31] ? rows[i][31].toString() : "";
+    if (eskul1 === eskulId || eskul2 === eskulId || eskul3 === eskulId) {
       sheet.deleteRow(i + 1);
     }
   }
@@ -509,7 +573,7 @@ function resetEskulStudents(ss, eskulId) {
 
 // Reset Seluruh Database Siswa Pendaftar
 function resetAllData(ss) {
-  var sheet = ss.getSheetByName("Siswa");
+  var sheet = getSheetCaseInsensitive(ss, "Siswa");
   var lastRow = sheet.getLastRow();
   if (lastRow > 1) {
     sheet.deleteRows(2, lastRow - 1);
@@ -518,8 +582,7 @@ function resetAllData(ss) {
 
 // Update Konfigurasi Settings
 function updateSettings(ss, config) {
-  var sheet = ss.getSheetByName("Settings");
-  var lastRow = sheet.getLastRow();
+  var sheet = getSheetCaseInsensitive(ss, "Settings");
   var rows = sheet.getDataRange().getValues();
   
   var activeTpUpdated = false;
@@ -537,7 +600,7 @@ function updateSettings(ss, config) {
 
 // Simpan Admin Baru ke Sheet
 function saveAdmin(ss, admin) {
-  var sheet = ss.getSheetByName("Admin");
+  var sheet = getSheetCaseInsensitive(ss, "Admin");
   var id = "admin-" + Date.now();
   var createdAt = new Date().toISOString();
   sheet.appendRow([
@@ -552,7 +615,7 @@ function saveAdmin(ss, admin) {
 
 // Hapus Admin dari Sheet
 function deleteAdmin(ss, username) {
-  var sheet = ss.getSheetByName("Admin");
+  var sheet = getSheetCaseInsensitive(ss, "Admin");
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
     if (rows[i][1].toString().toLowerCase().trim() === username.toLowerCase().trim()) {
