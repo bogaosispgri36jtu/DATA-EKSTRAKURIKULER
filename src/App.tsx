@@ -249,7 +249,7 @@ export default function App() {
     if (!matchedAccount && checkGasUrl && checkGasUrl.startsWith('http')) {
       setIsVerifyingLogin(true);
       try {
-        const response = await fetch(`${checkGasUrl}?action=getData`);
+        const response = await fetch(`/api/gas?url=${encodeURIComponent(checkGasUrl)}&action=getData`);
         if (response.ok) {
           const resJson = await response.json();
           if (resJson.status === 'success') {
@@ -355,7 +355,7 @@ export default function App() {
     };
 
     try {
-      const response = await fetch(`${newSettings.googleAppsScriptUrl}?action=getData`);
+      const response = await fetch(`/api/gas?url=${encodeURIComponent(newSettings.googleAppsScriptUrl)}&action=getData`);
       if (!response.ok) throw new Error('Response not OK');
       const resJson = await response.json();
       
@@ -410,7 +410,7 @@ export default function App() {
     }
   };
 
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzKPvYMrx6bhtcr_WTOtMNwm9u1TvALHmVtVUfNn-GVZs3Mla42YyZQP4_iJv7U0r3f_g/exec';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyHwTkpTwb9GU0dgKunUBX7kIKEdzn-CLs6A8wQX5WGLORe5FRx0TEuDksp-GyHCRFnAw/exec';
 
   // Core Data state
   const [students, setStudents] = useState<Student[]>([]);
@@ -488,7 +488,7 @@ export default function App() {
     if (gasUrl && gasUrl.startsWith('http')) {
       try {
         // Try fetching from Google Apps Script Web App
-        const response = await fetch(`${gasUrl}?action=getData`);
+        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}&action=getData`);
         if (!response.ok) throw new Error('API fetch failed');
         const resJson = await response.json();
         
@@ -617,23 +617,27 @@ export default function App() {
     
     if (isLiveConnection && gasUrl) {
       try {
-        const response = await fetch(gasUrl, {
+        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'registerStudent',
             data: studentData
           })
         });
 
-        // Due to no-cors limitations or redirect in GAS web apps, we double-check the server state
-        // To keep it 100% reliable, we trigger an immediate silent re-fetch
-        setTimeout(() => fetchAppData(settings), 2000);
+        if (response.ok) {
+          const resJson = await response.json();
+          if (resJson.status === 'success' && resJson.data) {
+            setStudents(prev => [resJson.data, ...prev]);
+            return resJson.data;
+          }
+        }
 
-        // Generate matching mock response client-side for immediate feedback
+        // Fallback re-fetch trigger just in case
+        setTimeout(() => fetchAppData(settings), 2000);
+        
         const mockReg = generateMockStudentResponse(studentData);
-        // Append locally as optimist update
         setStudents(prev => [mockReg, ...prev]);
         return mockReg;
       } catch (err) {
@@ -674,10 +678,9 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(gasUrl, {
+        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'addEskul',
             data: newEskul
@@ -717,10 +720,9 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(gasUrl, {
+        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'deleteEskul',
             id
@@ -743,10 +745,9 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(gasUrl, {
+        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'resetEskulStudents',
             eskulId
@@ -770,10 +771,9 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(gasUrl, {
+        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'resetAllData'
           })
@@ -797,7 +797,7 @@ export default function App() {
       return;
     }
     try {
-      const response = await fetch(`${url}?action=getData`);
+      const response = await fetch(`/api/gas?url=${encodeURIComponent(url)}&action=getData`);
       if (response.ok) {
         const resJson = await response.json();
         if (resJson.status === 'success') {
@@ -848,10 +848,9 @@ export default function App() {
     // If cloud link is active, update settings on sheet
     if (isLiveConnection && updated.googleAppsScriptUrl) {
       try {
-        await fetch(updated.googleAppsScriptUrl, {
+        await fetch(`/api/gas?url=${encodeURIComponent(updated.googleAppsScriptUrl)}`, {
           method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'updateSettings',
             data: newSettings
@@ -912,9 +911,9 @@ export default function App() {
     const gasUrl = settings.googleAppsScriptUrl;
     if (isLiveConnection && gasUrl && gasUrl.startsWith('http')) {
       try {
-        const response = await fetch(gasUrl, {
+        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'addAdmin',
             data: adminWithStatus
@@ -945,9 +944,9 @@ export default function App() {
     const gasUrl = settings.googleAppsScriptUrl;
     if (isLiveConnection && gasUrl && gasUrl.startsWith('http')) {
       try {
-        const response = await fetch(gasUrl, {
+        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             action: 'deleteAdmin',
             username: username

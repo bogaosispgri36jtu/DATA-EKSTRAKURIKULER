@@ -610,3 +610,16 @@ function deleteAdmin(ss, username) {
     }
   }
 }
+
+// Helper to get sheet with case-insensitive name matching
+function getSheetCaseInsensitive(ss, name) {
+  var sheets = ss.getSheets();
+  var targetLower = name.toLowerCase().trim();
+  for (var i = 0; i < sheets.length; i++) {
+    var sheetName = sheets[i].getName().toLowerCase().trim();
+    if (sheetName === targetLower) {
+      return sheets[i];
+    }
+  }
+  return null;
+}
