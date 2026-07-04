@@ -814,19 +814,29 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       }
     });
 
-    // Fetch Kop Surat Logo from proxy to avoid CORS
-    let kopSuratBase64 = '';
+    // Fetch Left Logo and Right Logo from proxy in parallel to avoid CORS
+    let logoKiriBase64 = '';
+    let logoKananBase64 = '';
     try {
-      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q/view?usp=sharing')}`;
-      const response = await fetch(proxyUrl);
-      if (response.ok) {
-        const resJson = await response.json();
-        if (resJson.status === 'success' && resJson.base64) {
-          kopSuratBase64 = resJson.base64;
+      const [resKiri, resKanan] = await Promise.all([
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`),
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`)
+      ]);
+      
+      if (resKiri.ok) {
+        const json = await resKiri.json();
+        if (json.status === 'success' && json.base64) {
+          logoKiriBase64 = json.base64;
+        }
+      }
+      if (resKanan.ok) {
+        const json = await resKanan.json();
+        if (json.status === 'success' && json.base64) {
+          logoKananBase64 = json.base64;
         }
       }
     } catch (err) {
-      console.warn('Failed to fetch kop surat image via proxy:', err);
+      console.warn('Failed to fetch logos via proxy:', err);
     }
 
     try {
@@ -836,29 +846,47 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         format: 'a4'
       });
 
-      // Draw Kop Surat (Letterhead Banner)
-      if (kopSuratBase64) {
-        doc.addImage(kopSuratBase64, 'PNG', 12, 10, 186, 32);
-      } else {
-        // Fallback KOP SURAT Header (if network fails)
-        doc.setTextColor(31, 41, 55);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(16);
-        doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS)', 105, 16, { align: 'center' });
-        doc.setFontSize(20);
-        doc.text('SMP PGRI JATIUWUNG', 105, 24, { align: 'center' });
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.setTextColor(100, 116, 139);
-        doc.text('JL. GATOT SUBROTO KM. 5 NO. 4 JATIUWUNG (021) 29576484 KOTA TANGERANG', 105, 30, { align: 'center' });
-        
-        // Double Divider line
-        doc.setDrawColor(31, 41, 55);
-        doc.setLineWidth(0.8);
-        doc.line(12, 35, 198, 35);
-        doc.setLineWidth(0.3);
-        doc.line(12, 36.5, 198, 36.5);
+      // Draw Left Logo (Cibodas / Banten / Kiri)
+      if (logoKiriBase64) {
+        try {
+          doc.addImage(logoKiriBase64, 'PNG', 12, 10, 22, 22);
+        } catch (e) {
+          console.error("Failed to add left logo", e);
+        }
       }
+
+      // Draw Right Logo (SMP PGRI Jatiuwung / Kanan)
+      if (logoKananBase64) {
+        try {
+          doc.addImage(logoKananBase64, 'PNG', 176, 10, 22, 22);
+        } catch (e) {
+          console.error("Failed to add right logo", e);
+        }
+      }
+
+      // Draw Kop Surat Text
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('YAYASAN PEMBINA LEMBAGA PENDIDIKAN PGRI (YPLP-PGRI)', 105, 13, { align: 'center' });
+      doc.setFontSize(12);
+      doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS) SMP PGRI JATIUWUNG', 105, 18, { align: 'center' });
+      doc.setFontSize(16);
+      doc.text('SMP PGRI JATIUWUNG KOTA TANGERANG', 105, 25, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.text('NSS: 202026103033 / NPSN: 20606068 / Akreditasi "A" (Unggul)', 105, 29, { align: 'center' });
+      doc.setFontSize(7.5);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text('Alamat: Jl. Gatot Subroto Km. 5 No. 4 Jatiuwung, Cibodas, Kota Tangerang 15134 | Telp: (021) 29576484', 105, 33, { align: 'center' });
+      doc.text('Email: smppgrijatiuwungtng@gmail.com | Website: https://smppgrijatiuwung.sch.id', 105, 36, { align: 'center' });
+
+      // Double Divider line
+      doc.setDrawColor(15, 23, 42); // slate-900
+      doc.setLineWidth(0.8);
+      doc.line(12, 38.5, 198, 38.5);
+      doc.setLineWidth(0.3);
+      doc.line(12, 40, 198, 40);
 
       // Title Section (BUKTI PENDAFTARAN ESKTRAKURIKULLER - spelling matched exactly with image)
       doc.setFont('helvetica', 'bold');
@@ -1010,7 +1038,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.text(formattedDateTime, 198, 281, { align: 'right' });
 
       // Save PDF
-      doc.save(`BUKTI_REG_${registeredStudent.regNo.replace(/\//g, '_')}.pdf`);
+      const pdfFileName = `${registeredStudent.name}&_&${registeredStudent.regNo.replace(/\//g, '_')}.pdf`;
+      doc.save(pdfFileName);
       Swal.close();
       
       Swal.fire({

@@ -291,52 +291,74 @@ function getEskulList(ss) {
 function getStudentsList(ss) {
   var sheet = getSheetCaseInsensitive(ss, "Siswa");
   var rows = sheet.getDataRange().getValues();
+  if (rows.length === 0) return [];
+  
+  var headers = rows[0].map(function(h) { return h ? h.toString().toLowerCase().trim() : ""; });
   var students = [];
+  
   for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0]) {
-      students.push({
-        id: rows[i][0].toString(),
-        regNo: rows[i][1].toString(),
-        nama: rows[i][2].toString(),
-        photo: rows[i][3] ? rows[i][3].toString() : "",
-        kelas: rows[i][4].toString(),
-        jenisKelamin: rows[i][5].toString(),
-        tempatLahir: rows[i][6] ? rows[i][6].toString() : "",
-        tanggalLahir: rows[i][7] ? rows[i][7].toString() : "",
-        namaAyah: rows[i][8].toString(),
-        namaIbu: rows[i][9].toString(),
-        hpSiswa: rows[i][10].toString(),
-        hpOrtu: rows[i][11].toString(),
-        email: rows[i][12] ? rows[i][12].toString() : "",
-        prestasiChecked: rows[i][13] === true || rows[i][13] === "TRUE" || rows[i][13] === "true",
-        namaLomba: rows[i][14] ? rows[i][14].toString() : "",
-        cabangLomba: rows[i][15] ? rows[i][15].toString() : "",
-        tingkatLomba: rows[i][16] ? rows[i][16].toString() : "",
-        juaraKe: rows[i][17] ? rows[i][17].toString() : "",
-        penyelenggara: rows[i][18] ? rows[i][18].toString() : "",
-        alamat: rows[i][19] ? rows[i][19].toString() : "",
-        rt: rows[i][20] ? rows[i][20].toString() : "",
-        rw: rows[i][21] ? rows[i][21].toString() : "",
-        provinsiId: rows[i][22] ? rows[i][22].toString() : "",
-        provinsiName: rows[i][23] ? rows[i][23].toString() : "",
-        kabupatenId: rows[i][24] ? rows[i][24].toString() : "",
-        kabupatenName: rows[i][25] ? rows[i][25].toString() : "",
-        kecamatanId: rows[i][26] ? rows[i][26].toString() : "",
-        kecamatanName: rows[i][27] ? rows[i][27].toString() : "",
-        kelurahanId: rows[i][28] ? rows[i][28].toString() : "",
-        kelurahanName: rows[i][29] ? rows[i][29].toString() : "",
-        eskulId: rows[i][30] ? rows[i][30].toString() : "",
-        eskulName: rows[i][31] ? rows[i][31].toString() : "",
-        eskulId2: rows[i][32] ? rows[i][32].toString() : "",
-        eskulName2: rows[i][33] ? rows[i][33].toString() : "",
-        eskulId3: rows[i][34] ? rows[i][34].toString() : "",
-        eskulName3: rows[i][35] ? rows[i][35].toString() : "",
-        certificateFile: rows[i][36] ? rows[i][36].toString() : "",
-        certificateFileName: rows[i][37] ? rows[i][37].toString() : "",
-        tahunPelajaran: rows[i][38] ? rows[i][38].toString() : "",
-        createdAt: rows[i][39] ? rows[i][39].toString() : ""
-      });
-    }
+    var row = rows[i];
+    if (!row || !row[0]) continue;
+    
+    var student = {};
+    
+    // Helper untuk mengambil nilai secara aman dengan mencocokkan header
+    var getVal = function(names) {
+      for (var j = 0; j < names.length; j++) {
+        var idx = headers.indexOf(names[j]);
+        if (idx !== -1 && idx < row.length) {
+          return row[idx];
+        }
+      }
+      return "";
+    };
+    
+    student.id = getVal(["id"]).toString();
+    student.regNo = getVal(["regno", "no. registrasi", "noreg", "no registrasi"]).toString();
+    student.nama = getVal(["nama", "name"]).toString();
+    student.name = student.nama;
+    student.photo = getVal(["photo", "foto"]).toString();
+    student.kelas = getVal(["kelas"]).toString();
+    student.jenisKelamin = getVal(["jeniskelamin", "jenis kelamin"]).toString();
+    student.tempatLahir = getVal(["tempatlahir", "tempat lahir"]).toString();
+    student.tanggalLahir = getVal(["tanggallahir", "tanggal lahir"]).toString();
+    student.namaAyah = getVal(["namaayah", "nama ayah"]).toString();
+    student.namaIbu = getVal(["namaibu", "nama ibu", "namalbu"]).toString();
+    student.hpSiswa = getVal(["hpsiswa", "hp siswa", "no. hp siswa"]).toString();
+    student.hpOrtu = getVal(["hportu", "hp ortu", "no. hp orang tua"]).toString();
+    student.email = getVal(["email"]).toString();
+    
+    var prest = getVal(["prestasichecked", "prestasi"]);
+    student.prestasiChecked = (prest === true || prest === "TRUE" || prest === "true");
+    
+    student.namaLomba = getVal(["namalomba", "nama lomba"]).toString();
+    student.cabangLomba = getVal(["cabanglomba", "cabang lomba"]).toString();
+    student.tingkatLomba = getVal(["tingkatlomba", "tingkat lomba"]).toString();
+    student.juaraKe = getVal(["juarake", "juara ke"]).toString();
+    student.penyelenggara = getVal(["penyelenggara"]).toString();
+    student.alamat = getVal(["alamat"]).toString();
+    student.rt = getVal(["rt"]).toString();
+    student.rw = getVal(["rw"]).toString();
+    student.provinsiId = getVal(["provinsiid", "provinsi id"]).toString();
+    student.provinsiName = getVal(["provinsiname", "provinsi name", "provinsi"]).toString();
+    student.kabupatenId = getVal(["kabupatenid", "kabupaten id"]).toString();
+    student.kabupatenName = getVal(["kabupatenname", "kabupaten name", "kabupaten"]).toString();
+    student.kecamatanId = getVal(["kecamatanid", "kecamatan id"]).toString();
+    student.kecamatanName = getVal(["kecamatanname", "kecamatan name", "kecamatan"]).toString();
+    student.kelurahanId = getVal(["kelurahanid", "kelurahan id"]).toString();
+    student.kelurahanName = getVal(["kelurahanname", "kelurahan name", "kelurahan"]).toString();
+    student.eskulId = getVal(["eskulid", "eskul id"]).toString();
+    student.eskulName = getVal(["eskulname", "eskul name"]).toString();
+    student.eskulId2 = getVal(["eskulid2", "eskul id 2"]).toString();
+    student.eskulName2 = getVal(["eskulname2", "eskul name 2"]).toString();
+    student.eskulId3 = getVal(["eskulid3", "eskul id 3"]).toString();
+    student.eskulName3 = getVal(["eskulname3", "eskul name 3"]).toString();
+    student.certificateFile = getVal(["certificatefile", "certificate file"]).toString();
+    student.certificateFileName = getVal(["certificatefilename", "certificate file name"]).toString();
+    student.tahunPelajaran = getVal(["tahunpelajaran", "tahun pelajaran"]).toString();
+    student.createdAt = getVal(["createdat", "created at"]).toString();
+    
+    students.push(student);
   }
   return students;
 }
@@ -457,72 +479,89 @@ function getAdminsList(ss) {
 // Simpan Data Pendaftaran Siswa Baru
 function saveStudent(ss, s) {
   var sheet = getSheetCaseInsensitive(ss, "Siswa");
+  var headers = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
+  
+  // Format No. WhatsApp
+  var formattedHpSiswa = formatToIndoPhone(s.hpSiswa || s.hpSiswa || "");
+  var formattedHpOrtu = formatToIndoPhone(s.hpOrtu || s.hpOrtu || "");
   
   // Hitung jumlah pendaftar di tahun pelajaran yang sama untuk nomor urut
   var rows = sheet.getDataRange().getValues();
   var matchCount = 0;
-  var targetYear = s.tahunPelajaran.split("/")[0]; // Ambil tahun awal saja (misal: 2026)
+  var targetYear = s.tahunPelajaran ? s.tahunPelajaran.replace(/\D/g, "") : "20262027";
+  
+  // Cari indeks kolom Tahun Pelajaran untuk pencocokan urutan
+  var tpIndex = -1;
+  for (var k = 0; k < headers.length; k++) {
+    var h = headers[k].toString().toLowerCase().trim();
+    if (h === "tahunpelajaran" || h === "tahun pelajaran") {
+      tpIndex = k;
+      break;
+    }
+  }
   
   for (var i = 1; i < rows.length; i++) {
-    // Indeks ke-38 di layout baru adalah TahunPelajaran
-    if (rows[i][38] && rows[i][38].toString() === s.tahunPelajaran) {
+    if (tpIndex !== -1 && rows[i][tpIndex] && rows[i][tpIndex].toString() === s.tahunPelajaran) {
       matchCount++;
     }
   }
   
-  // Format nomor urut: REG/TAHUN/00X (Contoh: REG/2026/001)
   var urutan = ("00" + (matchCount + 1)).slice(-3);
-  var regNo = "REG/" + targetYear + "/" + urutan;
+  var regNo = "eskul/" + targetYear + "/" + urutan;
   var id = "REG-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
   var createdAt = new Date().toISOString();
   
-  // Ambil data dan pastikan format No. WhatsApp sudah menggunakan +62
-  var formattedHpSiswa = formatToIndoPhone(s.hpSiswa || s.hpSiswa);
-  var formattedHpOrtu = formatToIndoPhone(s.hpOrtu || s.hpOrtu);
+  // Susun baris baru secara dinamis menyesuaikan header kolom yang ada
+  var newRow = [];
+  for (var c = 0; c < headers.length; c++) {
+    var header = headers[c].toString().toLowerCase().trim();
+    var val = "";
+    
+    if (header === "id") val = id;
+    else if (header === "regno" || header === "no. registrasi" || header === "noreg" || header === "no registrasi") val = regNo;
+    else if (header === "nama" || header === "name") val = s.nama || s.name || "";
+    else if (header === "photo" || header === "foto") val = s.photo || "";
+    else if (header === "kelas") val = s.kelas || "";
+    else if (header === "jeniskelamin" || header === "jenis kelamin") val = s.jenisKelamin || "";
+    else if (header === "tempatlahir" || header === "tempat lahir") val = s.tempatLahir || "";
+    else if (header === "tanggallahir" || header === "tanggal lahir") val = s.tanggalLahir || "";
+    else if (header === "namaayah" || header === "nama ayah") val = s.namaAyah || "";
+    else if (header === "namaibu" || header === "nama ibu" || header === "namalbu") val = s.namaIbu || "";
+    else if (header === "hpsiswa" || header === "hp siswa" || header === "no. hp siswa") val = formattedHpSiswa;
+    else if (header === "hportu" || header === "hp ortu" || header === "no. hp orang tua") val = formattedHpOrtu;
+    else if (header === "email") val = s.email || "";
+    else if (header === "prestasichecked" || header === "prestasi") val = (s.prestasiChecked === true || s.prestasiChecked === "TRUE" || s.prestasiChecked === "true") ? "TRUE" : "FALSE";
+    else if (header === "namalomba" || header === "nama lomba") val = s.namaLomba || "";
+    else if (header === "cabanglomba" || header === "cabang lomba") val = s.cabangLomba || "";
+    else if (header === "tingkatlomba" || header === "tingkat lomba") val = s.tingkatLomba || "";
+    else if (header === "juarake" || header === "juara ke") val = s.juaraKe || "";
+    else if (header === "penyelenggara") val = s.penyelenggara || "";
+    else if (header === "alamat") val = s.alamat || "";
+    else if (header === "rt") val = s.rt || "";
+    else if (header === "rw") val = s.rw || "";
+    else if (header === "provinsiid" || header === "provinsi id") val = s.provinsiId || "";
+    else if (header === "provinsiname" || header === "provinsi name" || header === "provinsi") val = s.provinsiName || "";
+    else if (header === "kabupatenid" || header === "kabupaten id") val = s.kabupatenId || "";
+    else if (header === "kabupatenname" || header === "kabupaten name" || header === "kabupaten") val = s.kabupatenName || "";
+    else if (header === "kecamatanid" || header === "kecamatan id") val = s.kecamatanId || "";
+    else if (header === "kecamatanname" || header === "kecamatan name" || header === "kecamatan") val = s.kecamatanName || "";
+    else if (header === "kelurahanid" || header === "kelurahan id") val = s.kelurahanId || "";
+    else if (header === "kelurahanname" || header === "kelurahan name" || header === "kelurahan") val = s.kelurahanName || "";
+    else if (header === "eskulid" || header === "eskul id") val = s.eskulId || "";
+    else if (header === "eskulname" || header === "eskul name") val = s.eskulName || "";
+    else if (header === "eskulid2" || header === "eskul id 2") val = s.eskulId2 || "";
+    else if (header === "eskulname2" || header === "eskul name 2") val = s.eskulName2 || "";
+    else if (header === "eskulid3" || header === "eskul id 3") val = s.eskulId3 || "";
+    else if (header === "eskulname3" || header === "eskul name 3") val = s.eskulName3 || "";
+    else if (header === "certificatefile" || header === "certificate file") val = s.certificateFile || "";
+    else if (header === "certificatefilename" || header === "certificate file name") val = s.certificateFileName || "";
+    else if (header === "tahunpelajaran" || header === "tahun pelajaran") val = s.tahunPelajaran || "";
+    else if (header === "createdat" || header === "created at") val = createdAt;
+    
+    newRow.push(val);
+  }
   
-  sheet.appendRow([
-    id,
-    regNo,
-    s.nama || s.name,
-    s.photo || "",
-    s.kelas,
-    s.jenisKelamin,
-    s.tempatLahir || "",
-    s.tanggalLahir || "",
-    s.namaAyah,
-    s.namaIbu,
-    formattedHpSiswa,
-    formattedHpOrtu,
-    s.email || "",
-    (s.prestasiChecked === true || s.prestasiChecked === "TRUE" || s.prestasiChecked === "true") ? "TRUE" : "FALSE",
-    s.namaLomba || "",
-    s.cabangLomba || "",
-    s.tingkatLomba || "",
-    s.juaraKe || "",
-    s.penyelenggara || "",
-    s.alamat || "",
-    s.rt || "",
-    s.rw || "",
-    s.provinsiId || "",
-    s.provinsiName || "",
-    s.kabupatenId || "",
-    s.kabupatenName || "",
-    s.kecamatanId || "",
-    s.kecamatanName || "",
-    s.kelurahanId || "",
-    s.kelurahanName || "",
-    s.eskulId || "",
-    s.eskulName || "",
-    s.eskulId2 || "",
-    s.eskulName2 || "",
-    s.eskulId3 || "",
-    s.eskulName3 || "",
-    s.certificateFile || "",
-    s.certificateFileName || "",
-    s.tahunPelajaran,
-    createdAt
-  ]);
-  
+  sheet.appendRow(newRow);
   return { id: id, regNo: regNo, hpSiswa: formattedHpSiswa, hpOrtu: formattedHpOrtu, createdAt: createdAt, ...s };
 }
 

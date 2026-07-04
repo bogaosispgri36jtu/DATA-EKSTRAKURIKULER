@@ -760,9 +760,9 @@ export default function App() {
     // Count existing registrations in this school year for registration number sequence
     const yearMatches = students.filter(s => s.tahunPelajaran === studentData.tahunPelajaran).length;
     const sequenceStr = ("00" + (yearMatches + 1)).slice(-3);
-    const targetYear = studentData.tahunPelajaran.split('/')[0];
+    const targetYear = studentData.tahunPelajaran.replace(/\D/g, '');
     
-    const regNo = `REG/${targetYear}/${sequenceStr}`;
+    const regNo = `eskul/${targetYear}/${sequenceStr}`;
     const id = `student-${Math.random().toString(36).substr(2, 9)}`;
     const createdAt = new Date().toISOString();
 
