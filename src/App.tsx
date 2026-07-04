@@ -249,37 +249,34 @@ export default function App() {
     if (!matchedAccount && checkGasUrl && checkGasUrl.startsWith('http')) {
       setIsVerifyingLogin(true);
       try {
-        const response = await fetch(`/api/gas?url=${encodeURIComponent(checkGasUrl)}&action=getData`);
-        if (response.ok) {
-          const resJson = await response.json();
-          if (resJson.status === 'success') {
-            // Save the URL since it connects successfully
-            const newSettings = {
-              ...settings,
-              googleAppsScriptUrl: checkGasUrl
-            };
-            setSettings(newSettings);
-            localStorage.setItem('smp_pgri_settings', JSON.stringify(newSettings));
+        const resJson = await gasFetch(checkGasUrl, 'getData');
+        if (resJson.status === 'success') {
+          // Save the URL since it connects successfully
+          const newSettings = {
+            ...settings,
+            googleAppsScriptUrl: checkGasUrl
+          };
+          setSettings(newSettings);
+          localStorage.setItem('smp_pgri_settings', JSON.stringify(newSettings));
 
-            // Sync other data as well
-            setStudents(resJson.students || []);
-            setEskulList(resJson.eskul || []);
-            if (resJson.classes && Array.isArray(resJson.classes)) {
-              setClassList(resJson.classes);
-              localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
-            }
-            if (resJson.admins && Array.isArray(resJson.admins)) {
-              setAdmins(resJson.admins);
-              localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
-              
-              matchedAccount = resJson.admins.find((acc: any) => {
-                const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
-                const p = acc.password ? acc.password.toString().trim() : '';
-                return u === loginUsername.toLowerCase().trim() && p === loginPassword.trim();
-              });
-            }
-            setIsLiveConnection(true);
+          // Sync other data as well
+          setStudents(resJson.students || []);
+          setEskulList(resJson.eskul || []);
+          if (resJson.classes && Array.isArray(resJson.classes)) {
+            setClassList(resJson.classes);
+            localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
           }
+          if (resJson.admins && Array.isArray(resJson.admins)) {
+            setAdmins(resJson.admins);
+            localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
+            
+            matchedAccount = resJson.admins.find((acc: any) => {
+              const u = acc.username ? acc.username.toString().toLowerCase().trim() : '';
+              const p = acc.password ? acc.password.toString().trim() : '';
+              return u === loginUsername.toLowerCase().trim() && p === loginPassword.trim();
+            });
+          }
+          setIsLiveConnection(true);
         }
       } catch (error) {
         console.warn('Failed to refetch live admins for verification', error);
@@ -355,9 +352,7 @@ export default function App() {
     };
 
     try {
-      const response = await fetch(`/api/gas?url=${encodeURIComponent(newSettings.googleAppsScriptUrl)}&action=getData`);
-      if (!response.ok) throw new Error('Response not OK');
-      const resJson = await response.json();
+      const resJson = await gasFetch(newSettings.googleAppsScriptUrl, 'getData');
       
       if (resJson.status === 'success') {
         setSettings(newSettings);
@@ -412,6 +407,83 @@ export default function App() {
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyHwTkpTwb9GU0dgKunUBX7kIKEdzn-CLs6A8wQX5WGLORe5FRx0TEuDksp-GyHCRFnAw/exec';
 
+  const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}): Promise<any> => {
+    try {
+      const urlObj = new URL('/api/gas', window.location.origin);
+      urlObj.searchParams.set('url', gasUrl);
+      urlObj.searchParams.set('action', action);
+      Object.entries(params).forEach(([key, val]) => {
+        urlObj.searchParams.set(key, val);
+      });
+
+      const response = await fetch(urlObj.toString());
+      if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const json = await response.json();
+          if (json && (json.status === 'success' || json.status === 'error' || Array.isArray(json.students))) {
+            return json;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Proxy fetch failed, trying direct Google Apps Script fetch...', e);
+    }
+
+    // Direct GAS Web App fetch (e.g. for Vercel/serverless environments where proxy is not running)
+    const directUrl = new URL(gasUrl);
+    directUrl.searchParams.set('action', action);
+    Object.entries(params).forEach(([key, val]) => {
+      directUrl.searchParams.set(key, val);
+    });
+
+    const response = await fetch(directUrl.toString(), {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    if (!response.ok) {
+      throw new Error(`Direct connection to Google Apps Script failed: ${response.status}`);
+    }
+    return await response.json();
+  };
+
+  const gasPost = async (gasUrl: string, body: any): Promise<any> => {
+    try {
+      const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(body)
+      });
+      if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const json = await response.json();
+          if (json && (json.status === 'success' || json.status === 'error')) {
+            return json;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Proxy POST failed, trying direct Google Apps Script POST...', e);
+    }
+
+    // Direct GAS Web App POST via no-cors (e.g. for Vercel/serverless environments where proxy is not running)
+    await fetch(gasUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'text/plain'
+      },
+      body: JSON.stringify(body)
+    });
+
+    return { status: 'success', isDirectPost: true };
+  };
+
   // Core Data state
   const [students, setStudents] = useState<Student[]>([]);
   const [eskulList, setEskulList] = useState<Extracurricular[]>([]);
@@ -454,8 +526,11 @@ export default function App() {
       try {
         const response = await fetch('/api/settings');
         if (response.ok) {
-          const serverSettings = await response.json();
-          activeSettings = { ...activeSettings, ...serverSettings };
+          const contentType = response.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const serverSettings = await response.json();
+            activeSettings = { ...activeSettings, ...serverSettings };
+          }
         }
       } catch (e) {
         console.warn('Failed to fetch settings from backend API, falling back to local storage', e);
@@ -488,9 +563,7 @@ export default function App() {
     if (gasUrl && gasUrl.startsWith('http')) {
       try {
         // Try fetching from Google Apps Script Web App
-        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}&action=getData`);
-        if (!response.ok) throw new Error('API fetch failed');
-        const resJson = await response.json();
+        const resJson = await gasFetch(gasUrl, 'getData');
         
         if (resJson.status === 'success') {
           const mappedStudents = (resJson.students || []).map((s: any) => ({
@@ -617,20 +690,21 @@ export default function App() {
     
     if (isLiveConnection && gasUrl) {
       try {
-        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'registerStudent',
-            data: studentData
-          })
+        const resJson = await gasPost(gasUrl, {
+          action: 'registerStudent',
+          data: studentData
         });
 
-        if (response.ok) {
-          const resJson = await response.json();
-          if (resJson.status === 'success' && resJson.data) {
+        if (resJson && resJson.status === 'success') {
+          if (resJson.data) {
             setStudents(prev => [resJson.data, ...prev]);
             return resJson.data;
+          } else {
+            // direct post fallback (no-cors)
+            setTimeout(() => fetchAppData(settings), 2000);
+            const mockReg = generateMockStudentResponse(studentData);
+            setStudents(prev => [mockReg, ...prev]);
+            return mockReg;
           }
         }
 
@@ -678,13 +752,9 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'addEskul',
-            data: newEskul
-          })
+        await gasPost(gasUrl, {
+          action: 'addEskul',
+          data: newEskul
         });
       } catch (e) {
         console.error(e);
@@ -720,13 +790,9 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'deleteEskul',
-            id
-          })
+        await gasPost(gasUrl, {
+          action: 'deleteEskul',
+          id
         });
       } catch (e) {
         console.error(e);
@@ -745,13 +811,9 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'resetEskulStudents',
-            eskulId
-          })
+        await gasPost(gasUrl, {
+          action: 'resetEskulStudents',
+          eskulId
         });
         setTimeout(() => fetchAppData(settings), 1500);
       } catch (e) {
@@ -771,12 +833,8 @@ export default function App() {
 
     if (isLiveConnection && gasUrl) {
       try {
-        await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'resetAllData'
-          })
+        await gasPost(gasUrl, {
+          action: 'resetAllData'
         });
         setTimeout(() => fetchAppData(settings), 1500);
         return;
@@ -797,29 +855,26 @@ export default function App() {
       return;
     }
     try {
-      const response = await fetch(`/api/gas?url=${encodeURIComponent(url)}&action=getData`);
-      if (response.ok) {
-        const resJson = await response.json();
-        if (resJson.status === 'success') {
-          setIsLiveConnection(true);
-          if (resJson.students) {
-            const mappedStudents = resJson.students.map((s: any) => ({
-              ...s,
-              name: s.name || s.nama || ''
-            }));
-            setStudents(mappedStudents);
-          }
-          if (resJson.eskul) setEskulList(resJson.eskul);
-          if (resJson.admins) {
-            setAdmins(resJson.admins);
-            localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
-          }
-          if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
-            setClassList(resJson.classes);
-            localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
-          }
-          return;
+      const resJson = await gasFetch(url, 'getData');
+      if (resJson.status === 'success') {
+        setIsLiveConnection(true);
+        if (resJson.students) {
+          const mappedStudents = resJson.students.map((s: any) => ({
+            ...s,
+            name: s.name || s.nama || ''
+          }));
+          setStudents(mappedStudents);
         }
+        if (resJson.eskul) setEskulList(resJson.eskul);
+        if (resJson.admins) {
+          setAdmins(resJson.admins);
+          localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
+        }
+        if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
+          setClassList(resJson.classes);
+          localStorage.setItem('smp_pgri_classes', JSON.stringify(resJson.classes));
+        }
+        return;
       }
       setIsLiveConnection(false);
     } catch (e) {
@@ -848,13 +903,9 @@ export default function App() {
     // If cloud link is active, update settings on sheet
     if (isLiveConnection && updated.googleAppsScriptUrl) {
       try {
-        await fetch(`/api/gas?url=${encodeURIComponent(updated.googleAppsScriptUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'updateSettings',
-            data: newSettings
-          })
+        await gasPost(updated.googleAppsScriptUrl, {
+          action: 'updateSettings',
+          data: newSettings
         });
       } catch (e) {
         console.error('Could not sync settings to Sheets');
@@ -888,10 +939,13 @@ export default function App() {
     try {
       const response = await fetch('/api/settings');
       if (response.ok) {
-        const serverSettings = await response.json();
-        currentSettings = { ...currentSettings, ...serverSettings };
-        setSettings(currentSettings);
-        localStorage.setItem('smp_pgri_settings', JSON.stringify(currentSettings));
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const serverSettings = await response.json();
+          currentSettings = { ...currentSettings, ...serverSettings };
+          setSettings(currentSettings);
+          localStorage.setItem('smp_pgri_settings', JSON.stringify(currentSettings));
+        }
       }
     } catch (e) {
       console.warn('Failed to fetch settings from backend API on refresh', e);
@@ -911,20 +965,16 @@ export default function App() {
     const gasUrl = settings.googleAppsScriptUrl;
     if (isLiveConnection && gasUrl && gasUrl.startsWith('http')) {
       try {
-        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'addAdmin',
-            data: adminWithStatus
-          })
+        const resJson = await gasPost(gasUrl, {
+          action: 'addAdmin',
+          data: adminWithStatus
         });
-        if (!response.ok) throw new Error('Failed to save admin to Sheets');
-        const resJson = await response.json();
-        if (resJson.status === 'success') {
-          const updatedAdmins = [...admins, resJson.data];
+        if (resJson && resJson.status === 'success') {
+          const finalData = resJson.data || adminWithStatus;
+          const updatedAdmins = [...admins, finalData];
           setAdmins(updatedAdmins);
-          return resJson.data;
+          localStorage.setItem('smp_pgri_admins', JSON.stringify(updatedAdmins));
+          return finalData;
         }
       } catch (error) {
         console.error('Error adding admin to Sheets:', error);
@@ -944,18 +994,14 @@ export default function App() {
     const gasUrl = settings.googleAppsScriptUrl;
     if (isLiveConnection && gasUrl && gasUrl.startsWith('http')) {
       try {
-        const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'deleteAdmin',
-            username: username
-          })
+        const resJson = await gasPost(gasUrl, {
+          action: 'deleteAdmin',
+          username: username
         });
-        if (!response.ok) throw new Error('Failed to delete admin from Sheets');
-        const resJson = await response.json();
-        if (resJson.status === 'success') {
-          setAdmins(prev => prev.filter(adm => adm.username.toLowerCase().trim() !== username.toLowerCase().trim()));
+        if (resJson && resJson.status === 'success') {
+          const filtered = admins.filter(adm => adm.username.toLowerCase().trim() !== username.toLowerCase().trim());
+          setAdmins(filtered);
+          localStorage.setItem('smp_pgri_admins', JSON.stringify(filtered));
           return;
         }
       } catch (error) {
