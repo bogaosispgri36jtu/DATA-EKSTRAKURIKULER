@@ -819,8 +819,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     let logoKananBase64 = '';
     try {
       const [resKiri, resKanan] = await Promise.all([
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`),
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`)
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`),
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`)
       ]);
       
       if (resKiri.ok) {
@@ -846,7 +846,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         format: 'a4'
       });
 
-      // Draw Left Logo (Cibodas / Banten / Kiri)
+      // Draw Left Logo (SMP PGRI Jatiuwung / Kiri)
       if (logoKiriBase64) {
         try {
           doc.addImage(logoKiriBase64, 'PNG', 12, 10, 22, 22);
@@ -855,7 +855,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         }
       }
 
-      // Draw Right Logo (SMP PGRI Jatiuwung / Kanan)
+      // Draw Right Logo (Cibodas / Banten / Kanan)
       if (logoKananBase64) {
         try {
           doc.addImage(logoKananBase64, 'PNG', 176, 10, 22, 22);
@@ -867,19 +867,14 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       // Draw Kop Surat Text
       doc.setTextColor(15, 23, 42); // slate-900
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.text('YAYASAN PEMBINA LEMBAGA PENDIDIKAN PGRI (YPLP-PGRI)', 105, 13, { align: 'center' });
-      doc.setFontSize(12);
-      doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS) SMP PGRI JATIUWUNG', 105, 18, { align: 'center' });
+      doc.setFontSize(14);
+      doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS)', 105, 18, { align: 'center' });
       doc.setFontSize(16);
       doc.text('SMP PGRI JATIUWUNG KOTA TANGERANG', 105, 25, { align: 'center' });
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.text('NSS: 202026103033 / NPSN: 20606068 / Akreditasi "A" (Unggul)', 105, 29, { align: 'center' });
       doc.setFontSize(7.5);
       doc.setTextColor(71, 85, 105); // slate-600
-      doc.text('Alamat: Jl. Gatot Subroto Km. 5 No. 4 Jatiuwung, Cibodas, Kota Tangerang 15134 | Telp: (021) 29576484', 105, 33, { align: 'center' });
-      doc.text('Email: smppgrijatiuwungtng@gmail.com | Website: https://smppgrijatiuwung.sch.id', 105, 36, { align: 'center' });
+      doc.text('Alamat: Jl. Gatot Subroto Km. 5 No. 4 Jatiuwung Kota Tangerang 15134 | Telp: (021) 29576484', 105, 33, { align: 'center' });
 
       // Double Divider line
       doc.setDrawColor(15, 23, 42); // slate-900
@@ -892,12 +887,14 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
       doc.setTextColor(31, 41, 55);
-      doc.text('BUKTI PENDAFTARAN ESKTRAKURIKULLER', 105, 48, { align: 'center' });
+      doc.text('BUKTI PENDAFTARAN ESKTRAKURIKULLER', 105, 47, { align: 'center' });
+      doc.setFontSize(10);
+      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, 52, { align: 'center' });
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9.5);
       doc.setTextColor(55, 65, 81);
-      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 105, 53, { align: 'center' });
+      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 105, 58, { align: 'center' });
 
       // Fields Section Start
       let currentY = 64;
