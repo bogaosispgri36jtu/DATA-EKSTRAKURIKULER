@@ -389,7 +389,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       Swal.fire({
         icon: 'warning',
         title: 'Ukuran File Terlalu Besar',
-        text: 'Maksimal ukuran file sertifikat adalah 1MB (1024 KB) agar proses pendaftaran cepat.',
+        text: 'Maksimal ukuran file sertifikat adalah 1MB (1024 KB)',
         confirmButtonColor: '#1d4ed8',
         width: '360px',
         timer: 5000,
@@ -765,7 +765,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         // Show loading screen with SweetAlert2 during network submission
         Swal.fire({
           title: 'Mengirim Pendaftaran...',
-          html: 'Sedang menyimpan data ke server, mohon tunggu sebentar...',
+          html: 'mohon tunggu sebentar...',
           allowOutsideClick: false,
           allowEscapeKey: false,
           didOpen: () => {
@@ -1094,7 +1094,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
           
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Pendaftaran Berhasil!</h2>
           <p className="text-slate-500 text-sm mb-6 px-4">
-            Selamat <span className="font-semibold text-slate-700">{registeredStudent.name}</span>, data pendaftaran Anda telah berhasil.
+            Selamat <span className="text-sm font-base text-slate-700">{registeredStudent.name}</span>, data pendaftaran Anda telah berhasil, silahkan di download bukti pendaftaran di file PDF di bawah ini untuk kemudian di print 2 lembar  dan di serahkan kepada 1 lbr Pembina OSIS dan 1 lbr untuk Pelatih Ekstrakurikuler
           </p>
 
           {/* Registrasi info box */}
