@@ -1386,12 +1386,20 @@ export default function AdminDashboard({
                 <select
                   value={newEskulTahun}
                   onChange={(e) => setNewEskulTahun(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 focus:bg-white cursor-pointer transition-all duration-200 shadow-sm"
+                  disabled={!isLoggedAdminUtama}
+                  className={`w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-700 focus:bg-white transition-all duration-200 shadow-sm ${
+                    !isLoggedAdminUtama ? 'opacity-70 cursor-not-allowed bg-slate-100' : 'cursor-pointer'
+                  }`}
                 >
                   {TAHUN_PELAJARAN_LIST.map(y => (
                     <option key={y} value={y}>{y}</option>
                   ))}
                 </select>
+                {!isLoggedAdminUtama && (
+                  <span className="text-[8px] font-bold text-slate-400 block mt-1 italic">
+                    * Dikunci (hanya admin utama yang dapat merubah)
+                  </span>
+                )}
               </div>
 
               <div className="space-y-3.5 border border-slate-100 p-3 sm:p-4 bg-slate-50/50 rounded-2xl shadow-inner">
@@ -1794,8 +1802,8 @@ export default function AdminDashboard({
                       </div>
                     </div>
                     {!isLoggedAdminUtama && (
-                      <p className="text-[8px] text-amber-600 font-extrabold uppercase mt-1">
-                        * PENGATURAN INI DIKUNCI (HANYA UNTUK ADMIN UTAMA)
+                      <p className="text-[8px] text-amber-600 font-extrabold mt-1 italic">
+                        * Dikunci (hanya admin utama yang dapat merubah)
                       </p>
                     )}
                   </div>
@@ -1814,8 +1822,8 @@ export default function AdminDashboard({
                     </select>
                     <p className="text-[8px] sm:text-[9px] text-slate-400 leading-normal">Mengatur tahun aktif pendaftaran untuk formulir publik secara instan.</p>
                     {!isLoggedAdminUtama && (
-                      <p className="text-[8px] text-amber-600 font-extrabold uppercase mt-1">
-                        * PENGATURAN INI DIKUNCI (HANYA UNTUK ADMIN UTAMA)
+                      <p className="text-[8px] text-amber-600 font-extrabold mt-1 italic">
+                        * Dikunci (hanya admin utama yang dapat merubah)
                       </p>
                     )}
                   </div>
