@@ -523,28 +523,34 @@ export default function App() {
         isPublished: true
       };
 
+      // Load from Local Storage first so we don't lose configured settings in Vercel/serverless environments
+      const savedSettings = localStorage.getItem('smp_pgri_settings');
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings);
+          activeSettings = { ...activeSettings, ...parsed };
+        } catch (err) {}
+      }
+
       try {
         const response = await fetch('/api/settings');
         if (response.ok) {
           const contentType = response.headers.get('content-type') || '';
           if (contentType.includes('application/json')) {
             const serverSettings = await response.json();
-            activeSettings = { ...activeSettings, ...serverSettings };
+            // Merge server settings, but do not overwrite a valid local GAS URL with an empty server URL
+            activeSettings = {
+              ...activeSettings,
+              tahunPelajaranAktif: serverSettings.tahunPelajaranAktif || activeSettings.tahunPelajaranAktif,
+              isPublished: serverSettings.isPublished !== undefined ? serverSettings.isPublished : activeSettings.isPublished,
+              googleAppsScriptUrl: (serverSettings.googleAppsScriptUrl && serverSettings.googleAppsScriptUrl.trim().startsWith('http'))
+                ? serverSettings.googleAppsScriptUrl
+                : activeSettings.googleAppsScriptUrl
+            };
           }
         }
       } catch (e) {
-        console.warn('Failed to fetch settings from backend API, falling back to local storage', e);
-        const savedSettings = localStorage.getItem('smp_pgri_settings');
-        if (savedSettings) {
-          try {
-            const parsed = JSON.parse(savedSettings);
-            activeSettings = { ...activeSettings, ...parsed };
-          } catch (err) {}
-        }
-      }
-
-      if (!activeSettings.googleAppsScriptUrl) {
-        activeSettings.googleAppsScriptUrl = '';
+        console.warn('Failed to fetch settings from backend API, using local storage values', e);
       }
 
       setSettings(activeSettings);
@@ -614,10 +620,23 @@ export default function App() {
               setAdmins([]);
             }
           }
-          setSettings({
+          let isPublishedVal = currentSettings.isPublished;
+          if (resJson.settings && resJson.settings.isPublished !== undefined) {
+            if (typeof resJson.settings.isPublished === 'boolean') {
+              isPublishedVal = resJson.settings.isPublished;
+            } else if (typeof resJson.settings.isPublished === 'string') {
+              isPublishedVal = resJson.settings.isPublished.toLowerCase() === 'true';
+            }
+          }
+
+          const updatedSettings = {
             ...currentSettings,
-            tahunPelajaranAktif: resJson.settings.tahunPelajaranAktif
-          });
+            tahunPelajaranAktif: (resJson.settings && resJson.settings.tahunPelajaranAktif) || currentSettings.tahunPelajaranAktif,
+            isPublished: isPublishedVal
+          };
+
+          setSettings(updatedSettings);
+          localStorage.setItem('smp_pgri_settings', JSON.stringify(updatedSettings));
           setIsLiveConnection(true);
           setIsLoading(false);
           return;
@@ -869,6 +888,23 @@ export default function App() {
         if (resJson.admins) {
           setAdmins(resJson.admins);
           localStorage.setItem('smp_pgri_admins', JSON.stringify(resJson.admins));
+        }
+        if (resJson.settings) {
+          let isPublishedVal = settings.isPublished;
+          if (resJson.settings.isPublished !== undefined) {
+            if (typeof resJson.settings.isPublished === 'boolean') {
+              isPublishedVal = resJson.settings.isPublished;
+            } else if (typeof resJson.settings.isPublished === 'string') {
+              isPublishedVal = resJson.settings.isPublished.toLowerCase() === 'true';
+            }
+          }
+          const updatedSettings = {
+            ...settings,
+            tahunPelajaranAktif: resJson.settings.tahunPelajaranAktif || settings.tahunPelajaranAktif,
+            isPublished: isPublishedVal
+          };
+          setSettings(updatedSettings);
+          localStorage.setItem('smp_pgri_settings', JSON.stringify(updatedSettings));
         }
         if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
           setClassList(resJson.classes);
