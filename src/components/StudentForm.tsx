@@ -1310,7 +1310,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       type="text" 
                       value={tempatLahir} 
                       onChange={(e) => setTempatLahir(e.target.value)}
-                      placeholder="Kota/Kabupaten" 
+                      placeholder="Kota/Kab" 
                       className="w-full pl-8 pr-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold"
                       required
                     />
@@ -1761,7 +1761,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                             className="w-full flex items-center justify-center gap-2 py-1.5 text-[10px] sm:text-xs font-bold text-slate-500 hover:text-blue-700 transition-all cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5" />
-                            Pilih Gambar / PDF (Min. 100kb)
+                            Pilih Gambar / PDF (Min. 1MB)
                           </button>
                         )}
                       </div>

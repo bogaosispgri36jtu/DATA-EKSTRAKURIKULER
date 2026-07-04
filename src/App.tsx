@@ -405,7 +405,7 @@ export default function App() {
     }
   };
 
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbyHwTkpTwb9GU0dgKunUBX7kIKEdzn-CLs6A8wQX5WGLORe5FRx0TEuDksp-GyHCRFnAw/exec';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbw5HWUImAnOns-034uisW2zWHoFDGcwFriA6rePPm2QjngQaGLKL0n_uFPdeoPRwQrtcA/exec';
 
   const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}): Promise<any> => {
     try {

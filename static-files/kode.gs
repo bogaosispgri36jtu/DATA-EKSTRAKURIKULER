@@ -28,29 +28,32 @@
  *    Kolom D: Photo (Base64)
  *    Kolom E: Kelas
  *    Kolom F: JenisKelamin
- *    Kolom G: NamaAyah
- *    Kolom H: NamaIbu
- *    Kolom I: HpSiswa
- *    Kolom J: HpOrtu
- *    Kolom K: PrestasiChecked (TRUE/FALSE)
- *    Kolom L: NamaLomba
- *    Kolom M: CabangLomba
- *    Kolom N: TingkatLomba
- *    Kolom O: JuaraKe
- *    Kolom P: Penyelenggara
- *    Kolom Q: Alamat
- *    Kolom R: RT
- *    Kolom S: RW
- *    Kolom T: ProvinsiId, Kolom U: ProvinsiName
- *    Kolom V: KabupatenId, Kolom W: KabupatenName
- *    Kolom X: KecamatanId, Kolom Y: KecamatanName
- *    Kolom Z: KelurahanId, Kolom AA: KelurahanName
- *    Kolom AB: EskulId, Kolom AC: EskulName
- *    Kolom AD: EskulId2, Kolom AE: EskulName2
- *    Kolom AF: EskulId3, Kolom AG: EskulName3
- *    Kolom AH: CertificateFile, Kolom AI: CertificateFileName
- *    Kolom AJ: TahunPelajaran
- *    Kolom AK: CreatedAt
+ *    Kolom G: TempatLahir
+ *    Kolom H: TanggalLahir
+ *    Kolom I: NamaAyah
+ *    Kolom J: NamaIbu
+ *    Kolom K: HpSiswa
+ *    Kolom L: HpOrtu
+ *    Kolom M: Email
+ *    Kolom N: PrestasiChecked (TRUE/FALSE)
+ *    Kolom O: NamaLomba
+ *    Kolom P: CabangLomba
+ *    Kolom Q: TingkatLomba
+ *    Kolom R: JuaraKe
+ *    Kolom S: Penyelenggara
+ *    Kolom T: Alamat
+ *    Kolom U: RT
+ *    Kolom V: RW
+ *    Kolom W: ProvinsiId, Kolom X: ProvinsiName
+ *    Kolom Y: KabupatenId, Kolom Z: KabupatenName
+ *    Kolom AA: KecamatanId, Kolom AB: KecamatanName
+ *    Kolom AC: KelurahanId, Kolom AD: KelurahanName
+ *    Kolom AE: EskulId, Kolom AF: EskulName
+ *    Kolom AG: EskulId2, Kolom AH: EskulName2
+ *    Kolom AI: EskulId3, Kolom AJ: EskulName3
+ *    Kolom AK: CertificateFile, Kolom AL: CertificateFileName
+ *    Kolom AM: TahunPelajaran
+ *    Kolom AN: CreatedAt
  * 
  * 5. Sheet bernama "Kelas" (Opsional, untuk kustomisasi daftar kelas di luar VII, VIII, IX)
  *    Kolom A: Nama Kelas (Baris 1 berisi judul "Nama Kelas", baris berikutnya berisi nama-nama kelas)
@@ -216,18 +219,18 @@ function initDatabase(ss) {
   if (!sheetSiswa) {
     sheetSiswa = ss.insertSheet("Siswa");
     sheetSiswa.appendRow([
-      "ID", "RegNo", "Nama", "Photo", "Kelas", "JenisKelamin", "NamaAyah", "NamaIbu", 
-      "HpSiswa", "HpOrtu", "PrestasiChecked", "NamaLomba", "CabangLomba", "TingkatLomba", 
-      "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
+      "ID", "RegNo", "Nama", "Photo", "Kelas", "JenisKelamin", "TempatLahir", "TanggalLahir",
+      "NamaAyah", "NamaIbu", "HpSiswa", "HpOrtu", "Email", "PrestasiChecked", "NamaLomba", "CabangLomba",
+      "TingkatLomba", "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
       "KabupatenId", "KabupatenName", "KecamatanId", "KecamatanName", "KelurahanId", 
       "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "EskulId3", "EskulName3", 
       "CertificateFile", "CertificateFileName", "TahunPelajaran", "CreatedAt"
     ]);
   } else {
     repairHeadersIfNeeded(sheetSiswa, [
-      "ID", "RegNo", "Nama", "Photo", "Kelas", "JenisKelamin", "NamaAyah", "NamaIbu", 
-      "HpSiswa", "HpOrtu", "PrestasiChecked", "NamaLomba", "CabangLomba", "TingkatLomba", 
-      "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
+      "ID", "RegNo", "Nama", "Photo", "Kelas", "JenisKelamin", "TempatLahir", "TanggalLahir",
+      "NamaAyah", "NamaIbu", "HpSiswa", "HpOrtu", "Email", "PrestasiChecked", "NamaLomba", "CabangLomba",
+      "TingkatLomba", "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
       "KabupatenId", "KabupatenName", "KecamatanId", "KecamatanName", "KelurahanId", 
       "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "EskulId3", "EskulName3", 
       "CertificateFile", "CertificateFileName", "TahunPelajaran", "CreatedAt"
@@ -298,37 +301,40 @@ function getStudentsList(ss) {
         photo: rows[i][3] ? rows[i][3].toString() : "",
         kelas: rows[i][4].toString(),
         jenisKelamin: rows[i][5].toString(),
-        namaAyah: rows[i][6].toString(),
-        namaIbu: rows[i][7].toString(),
-        hpSiswa: rows[i][8].toString(),
-        hpOrtu: rows[i][9].toString(),
-        prestasiChecked: rows[i][10] === true || rows[i][10] === "TRUE" || rows[i][10] === "true",
-        namaLomba: rows[i][11] ? rows[i][11].toString() : "",
-        cabangLomba: rows[i][12] ? rows[i][12].toString() : "",
-        tingkatLomba: rows[i][13] ? rows[i][13].toString() : "",
-        juaraKe: rows[i][14] ? rows[i][14].toString() : "",
-        penyelenggara: rows[i][15] ? rows[i][15].toString() : "",
-        alamat: rows[i][16] ? rows[i][16].toString() : "",
-        rt: rows[i][17] ? rows[i][17].toString() : "",
-        rw: rows[i][18] ? rows[i][18].toString() : "",
-        provinsiId: rows[i][19] ? rows[i][19].toString() : "",
-        provinsiName: rows[i][20] ? rows[i][20].toString() : "",
-        kabupatenId: rows[i][21] ? rows[i][21].toString() : "",
-        kabupatenName: rows[i][22] ? rows[i][22].toString() : "",
-        kecamatanId: rows[i][23] ? rows[i][23].toString() : "",
-        kecamatanName: rows[i][24] ? rows[i][24].toString() : "",
-        kelurahanId: rows[i][25] ? rows[i][25].toString() : "",
-        kelurahanName: rows[i][26] ? rows[i][26].toString() : "",
-        eskulId: rows[i][27] ? rows[i][27].toString() : "",
-        eskulName: rows[i][28] ? rows[i][28].toString() : "",
-        eskulId2: rows[i][29] ? rows[i][29].toString() : "",
-        eskulName2: rows[i][30] ? rows[i][30].toString() : "",
-        eskulId3: rows[i][31] ? rows[i][31].toString() : "",
-        eskulName3: rows[i][32] ? rows[i][32].toString() : "",
-        certificateFile: rows[i][33] ? rows[i][33].toString() : "",
-        certificateFileName: rows[i][34] ? rows[i][34].toString() : "",
-        tahunPelajaran: rows[i][35] ? rows[i][35].toString() : "",
-        createdAt: rows[i][36] ? rows[i][36].toString() : ""
+        tempatLahir: rows[i][6] ? rows[i][6].toString() : "",
+        tanggalLahir: rows[i][7] ? rows[i][7].toString() : "",
+        namaAyah: rows[i][8].toString(),
+        namaIbu: rows[i][9].toString(),
+        hpSiswa: rows[i][10].toString(),
+        hpOrtu: rows[i][11].toString(),
+        email: rows[i][12] ? rows[i][12].toString() : "",
+        prestasiChecked: rows[i][13] === true || rows[i][13] === "TRUE" || rows[i][13] === "true",
+        namaLomba: rows[i][14] ? rows[i][14].toString() : "",
+        cabangLomba: rows[i][15] ? rows[i][15].toString() : "",
+        tingkatLomba: rows[i][16] ? rows[i][16].toString() : "",
+        juaraKe: rows[i][17] ? rows[i][17].toString() : "",
+        penyelenggara: rows[i][18] ? rows[i][18].toString() : "",
+        alamat: rows[i][19] ? rows[i][19].toString() : "",
+        rt: rows[i][20] ? rows[i][20].toString() : "",
+        rw: rows[i][21] ? rows[i][21].toString() : "",
+        provinsiId: rows[i][22] ? rows[i][22].toString() : "",
+        provinsiName: rows[i][23] ? rows[i][23].toString() : "",
+        kabupatenId: rows[i][24] ? rows[i][24].toString() : "",
+        kabupatenName: rows[i][25] ? rows[i][25].toString() : "",
+        kecamatanId: rows[i][26] ? rows[i][26].toString() : "",
+        kecamatanName: rows[i][27] ? rows[i][27].toString() : "",
+        kelurahanId: rows[i][28] ? rows[i][28].toString() : "",
+        kelurahanName: rows[i][29] ? rows[i][29].toString() : "",
+        eskulId: rows[i][30] ? rows[i][30].toString() : "",
+        eskulName: rows[i][31] ? rows[i][31].toString() : "",
+        eskulId2: rows[i][32] ? rows[i][32].toString() : "",
+        eskulName2: rows[i][33] ? rows[i][33].toString() : "",
+        eskulId3: rows[i][34] ? rows[i][34].toString() : "",
+        eskulName3: rows[i][35] ? rows[i][35].toString() : "",
+        certificateFile: rows[i][36] ? rows[i][36].toString() : "",
+        certificateFileName: rows[i][37] ? rows[i][37].toString() : "",
+        tahunPelajaran: rows[i][38] ? rows[i][38].toString() : "",
+        createdAt: rows[i][39] ? rows[i][39].toString() : ""
       });
     }
   }
@@ -458,8 +464,8 @@ function saveStudent(ss, s) {
   var targetYear = s.tahunPelajaran.split("/")[0]; // Ambil tahun awal saja (misal: 2026)
   
   for (var i = 1; i < rows.length; i++) {
-    // Indeks ke-35 di layout baru adalah TahunPelajaran
-    if (rows[i][35] && rows[i][35].toString() === s.tahunPelajaran) {
+    // Indeks ke-38 di layout baru adalah TahunPelajaran
+    if (rows[i][38] && rows[i][38].toString() === s.tahunPelajaran) {
       matchCount++;
     }
   }
@@ -481,10 +487,13 @@ function saveStudent(ss, s) {
     s.photo || "",
     s.kelas,
     s.jenisKelamin,
+    s.tempatLahir || "",
+    s.tanggalLahir || "",
     s.namaAyah,
     s.namaIbu,
     formattedHpSiswa,
     formattedHpOrtu,
+    s.email || "",
     (s.prestasiChecked === true || s.prestasiChecked === "TRUE" || s.prestasiChecked === "true") ? "TRUE" : "FALSE",
     s.namaLomba || "",
     s.cabangLomba || "",
@@ -548,9 +557,9 @@ function resetEskulStudents(ss, eskulId) {
   var rows = sheet.getDataRange().getValues();
   // Loop terbalik agar indeks baris tidak bergeser saat dihapus
   for (var i = rows.length - 1; i >= 1; i--) {
-    var eskul1 = rows[i][27] ? rows[i][27].toString() : "";
-    var eskul2 = rows[i][29] ? rows[i][29].toString() : "";
-    var eskul3 = rows[i][31] ? rows[i][31].toString() : "";
+    var eskul1 = rows[i][30] ? rows[i][30].toString() : "";
+    var eskul2 = rows[i][32] ? rows[i][32].toString() : "";
+    var eskul3 = rows[i][34] ? rows[i][34].toString() : "";
     if (eskul1 === eskulId || eskul2 === eskulId || eskul3 === eskulId) {
       sheet.deleteRow(i + 1);
     }

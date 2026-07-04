@@ -571,9 +571,9 @@ function resetEskulStudents(ss, eskulId) {
   var rows = sheet.getDataRange().getValues();
   // Loop terbalik agar indeks baris tidak bergeser saat dihapus
   for (var i = rows.length - 1; i >= 1; i--) {
-    var eskul1 = rows[i][27] ? rows[i][27].toString() : "";
-    var eskul2 = rows[i][29] ? rows[i][29].toString() : "";
-    var eskul3 = rows[i][31] ? rows[i][31].toString() : "";
+    var eskul1 = rows[i][30] ? rows[i][30].toString() : "";
+    var eskul2 = rows[i][32] ? rows[i][32].toString() : "";
+    var eskul3 = rows[i][34] ? rows[i][34].toString() : "";
     if (eskul1 === eskulId || eskul2 === eskulId || eskul3 === eskulId) {
       sheet.deleteRow(i + 1);
     }
