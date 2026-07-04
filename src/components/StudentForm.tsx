@@ -819,8 +819,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     let logoKananBase64 = '';
     try {
       const [resKiri, resKanan] = await Promise.all([
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`),
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`)
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`),
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`)
       ]);
       
       if (resKiri.ok) {
@@ -1035,7 +1035,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.text(formattedDateTime, 198, 281, { align: 'right' });
 
       // Save PDF
-      const pdfFileName = `${registeredStudent.name}&_&${registeredStudent.regNo.replace(/\//g, '_')}.pdf`;
+      const pdfFileName = `${registeredStudent.name}_${registeredStudent.regNo.replace(/\//g, '_')}.pdf`;
       doc.save(pdfFileName);
       Swal.close();
       
@@ -1261,6 +1261,9 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     <div className="text-[9px] sm:text-[8px] text-slate-400 font-normal leading-normal">
                       <p className="font-bold text-slate-500 mb-0.5">Syarat foto :</p>
                       <p>• Foto wajib berseragam sekolah.</p>
+                      <p>• Foto Setengah badan</p>
+                      <p>• Latar Belakang Foto (Background) berwarna merah</p>
+                      
                       <p>• Maksimal ukuran Foto 200 kb</p>
                     </div>
                   </div>

@@ -171,15 +171,40 @@ function doPost(e) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+// Helper to extract nested/un-nested properties case-insensitively
+function getPropCaseInsensitive(obj, keys) {
+  if (!obj) return "";
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (obj[k] !== undefined && obj[k] !== null) {
+      return obj[k];
+    }
+  }
+  // Try case-insensitive matching
+  var lowerKeys = keys.map(function(k) { return k.toLowerCase(); });
+  for (var prop in obj) {
+    if (lowerKeys.indexOf(prop.toLowerCase()) !== -1) {
+      return obj[prop];
+    }
+  }
+  return "";
+}
+
 // Helper to automatically repair outdated headers if the user had an older schema
 function repairHeadersIfNeeded(sheet, requiredHeaders) {
   if (!sheet) return;
   var lastCol = Math.max(1, sheet.getLastColumn());
-  var range = sheet.getRange(1, 1, 1, lastCol);
-  var currentHeaders = range.getValues()[0];
+  var currentHeaders = [];
+  try {
+    currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  } catch (err) {}
   
   // If we have fewer columns or headers are blank/mismatched, force set the headers
   if (currentHeaders.length < requiredHeaders.length || !currentHeaders[0]) {
+    var maxCols = sheet.getMaxColumns();
+    if (maxCols < requiredHeaders.length) {
+      sheet.insertColumnsAfter(maxCols, requiredHeaders.length - maxCols);
+    }
     sheet.getRange(1, 1, 1, requiredHeaders.length).setValues([requiredHeaders]);
   }
 }
@@ -482,13 +507,17 @@ function saveStudent(ss, s) {
   var headers = sheet.getRange(1, 1, 1, Math.max(1, sheet.getLastColumn())).getValues()[0];
   
   // Format No. WhatsApp
-  var formattedHpSiswa = formatToIndoPhone(s.hpSiswa || s.hpSiswa || "");
-  var formattedHpOrtu = formatToIndoPhone(s.hpOrtu || s.hpOrtu || "");
+  var hpSiswaVal = getPropCaseInsensitive(s, ["hpSiswa", "hp_siswa", "hpsiswa", "hp siswa", "noHpSiswa", "no_hp_siswa"]) || "";
+  var hpOrtuVal = getPropCaseInsensitive(s, ["hpOrtu", "hp_ortu", "hportu", "hp ortu", "noHpOrtu", "no_hp_ortu", "noHpOrangTua", "no_hp_orang_tua"]) || "";
+  var formattedHpSiswa = formatToIndoPhone(hpSiswaVal);
+  var formattedHpOrtu = formatToIndoPhone(hpOrtuVal);
   
   // Hitung jumlah pendaftar di tahun pelajaran yang sama untuk nomor urut
   var rows = sheet.getDataRange().getValues();
   var matchCount = 0;
-  var targetYear = s.tahunPelajaran ? s.tahunPelajaran.replace(/\D/g, "") : "20262027";
+  var targetTP = getPropCaseInsensitive(s, ["tahunPelajaran", "tahun_pelajaran", "tahunpelajaran", "tahun pelajaran"]) || "2026/2027";
+  var targetYear = targetTP.replace(/\D/g, "");
+  if (!targetYear) targetYear = "20262027";
   
   // Cari indeks kolom Tahun Pelajaran untuk pencocokan urutan
   var tpIndex = -1;
@@ -501,7 +530,7 @@ function saveStudent(ss, s) {
   }
   
   for (var i = 1; i < rows.length; i++) {
-    if (tpIndex !== -1 && rows[i][tpIndex] && rows[i][tpIndex].toString() === s.tahunPelajaran) {
+    if (tpIndex !== -1 && rows[i][tpIndex] && rows[i][tpIndex].toString() === targetTP) {
       matchCount++;
     }
   }
@@ -519,46 +548,49 @@ function saveStudent(ss, s) {
     
     if (header === "id") val = id;
     else if (header === "regno" || header === "no. registrasi" || header === "noreg" || header === "no registrasi") val = regNo;
-    else if (header === "nama" || header === "name") val = s.nama || s.name || "";
-    else if (header === "photo" || header === "foto") val = s.photo || "";
-    else if (header === "kelas") val = s.kelas || "";
-    else if (header === "jeniskelamin" || header === "jenis kelamin") val = s.jenisKelamin || "";
-    else if (header === "tempatlahir" || header === "tempat lahir") val = s.tempatLahir || "";
-    else if (header === "tanggallahir" || header === "tanggal lahir") val = s.tanggalLahir || "";
-    else if (header === "namaayah" || header === "nama ayah") val = s.namaAyah || "";
-    else if (header === "namaibu" || header === "nama ibu" || header === "namalbu") val = s.namaIbu || "";
+    else if (header === "nama" || header === "name") val = getPropCaseInsensitive(s, ["nama", "name", "namaSiswa", "nama_lengkap"]);
+    else if (header === "photo" || header === "foto") val = getPropCaseInsensitive(s, ["photo", "foto", "photoSiswa"]);
+    else if (header === "kelas") val = getPropCaseInsensitive(s, ["kelas", "class"]);
+    else if (header === "jeniskelamin" || header === "jenis kelamin") val = getPropCaseInsensitive(s, ["jenisKelamin", "jenis_kelamin", "jeniskelamin", "jenis kelamin", "gender"]);
+    else if (header === "tempatlahir" || header === "tempat lahir") val = getPropCaseInsensitive(s, ["tempatLahir", "tempat_lahir", "tempatlahir", "tempat lahir"]);
+    else if (header === "tanggallahir" || header === "tanggal lahir") val = getPropCaseInsensitive(s, ["tanggalLahir", "tanggal_lahir", "tanggallahir", "tanggal lahir"]);
+    else if (header === "namaayah" || header === "nama ayah") val = getPropCaseInsensitive(s, ["namaAyah", "nama_ayah", "namaayah", "nama ayah", "ayah"]);
+    else if (header === "namaibu" || header === "nama ibu" || header === "namalbu") val = getPropCaseInsensitive(s, ["namaIbu", "nama_ibu", "namaibu", "nama ibu", "ibu"]);
     else if (header === "hpsiswa" || header === "hp siswa" || header === "no. hp siswa") val = formattedHpSiswa;
     else if (header === "hportu" || header === "hp ortu" || header === "no. hp orang tua") val = formattedHpOrtu;
-    else if (header === "email") val = s.email || "";
-    else if (header === "prestasichecked" || header === "prestasi") val = (s.prestasiChecked === true || s.prestasiChecked === "TRUE" || s.prestasiChecked === "true") ? "TRUE" : "FALSE";
-    else if (header === "namalomba" || header === "nama lomba") val = s.namaLomba || "";
-    else if (header === "cabanglomba" || header === "cabang lomba") val = s.cabangLomba || "";
-    else if (header === "tingkatlomba" || header === "tingkat lomba") val = s.tingkatLomba || "";
-    else if (header === "juarake" || header === "juara ke") val = s.juaraKe || "";
-    else if (header === "penyelenggara") val = s.penyelenggara || "";
-    else if (header === "alamat") val = s.alamat || "";
-    else if (header === "rt") val = s.rt || "";
-    else if (header === "rw") val = s.rw || "";
-    else if (header === "provinsiid" || header === "provinsi id") val = s.provinsiId || "";
-    else if (header === "provinsiname" || header === "provinsi name" || header === "provinsi") val = s.provinsiName || "";
-    else if (header === "kabupatenid" || header === "kabupaten id") val = s.kabupatenId || "";
-    else if (header === "kabupatenname" || header === "kabupaten name" || header === "kabupaten") val = s.kabupatenName || "";
-    else if (header === "kecamatanid" || header === "kecamatan id") val = s.kecamatanId || "";
-    else if (header === "kecamatanname" || header === "kecamatan name" || header === "kecamatan") val = s.kecamatanName || "";
-    else if (header === "kelurahanid" || header === "kelurahan id") val = s.kelurahanId || "";
-    else if (header === "kelurahanname" || header === "kelurahan name" || header === "kelurahan") val = s.kelurahanName || "";
-    else if (header === "eskulid" || header === "eskul id") val = s.eskulId || "";
-    else if (header === "eskulname" || header === "eskul name") val = s.eskulName || "";
-    else if (header === "eskulid2" || header === "eskul id 2") val = s.eskulId2 || "";
-    else if (header === "eskulname2" || header === "eskul name 2") val = s.eskulName2 || "";
-    else if (header === "eskulid3" || header === "eskul id 3") val = s.eskulId3 || "";
-    else if (header === "eskulname3" || header === "eskul name 3") val = s.eskulName3 || "";
-    else if (header === "certificatefile" || header === "certificate file") val = s.certificateFile || "";
-    else if (header === "certificatefilename" || header === "certificate file name") val = s.certificateFileName || "";
-    else if (header === "tahunpelajaran" || header === "tahun pelajaran") val = s.tahunPelajaran || "";
+    else if (header === "email") val = getPropCaseInsensitive(s, ["email", "Email", "emailSiswa", "email_siswa"]);
+    else if (header === "prestasichecked" || header === "prestasi") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? "TRUE" : "FALSE";
+    }
+    else if (header === "namalomba" || header === "nama lomba") val = getPropCaseInsensitive(s, ["namaLomba", "nama_lomba", "namalomba", "nama lomba"]);
+    else if (header === "cabanglomba" || header === "cabang lomba") val = getPropCaseInsensitive(s, ["cabangLomba", "cabang_lomba", "cabanglomba", "cabang lomba"]);
+    else if (header === "tingkatlomba" || header === "tingkat lomba") val = getPropCaseInsensitive(s, ["tingkatLomba", "tingkat_lomba", "tingkatlomba", "tingkat lomba"]);
+    else if (header === "juarake" || header === "juara ke") val = getPropCaseInsensitive(s, ["juaraKe", "juara_ke", "juarake", "juara ke"]);
+    else if (header === "penyelenggara") val = getPropCaseInsensitive(s, ["penyelenggara", "penyelenggaraLomba"]);
+    else if (header === "alamat") val = getPropCaseInsensitive(s, ["alamat", "alamatLengkap"]);
+    else if (header === "rt") val = getPropCaseInsensitive(s, ["rt"]);
+    else if (header === "rw") val = getPropCaseInsensitive(s, ["rw"]);
+    else if (header === "provinsiid" || header === "provinsi id") val = getPropCaseInsensitive(s, ["provinsiId", "provinsi_id"]);
+    else if (header === "provinsiname" || header === "provinsi name" || header === "provinsi") val = getPropCaseInsensitive(s, ["provinsiName", "provinsi_name", "provinsi"]);
+    else if (header === "kabupatenid" || header === "kabupaten id") val = getPropCaseInsensitive(s, ["kabupatenId", "kabupaten_id"]);
+    else if (header === "kabupatenname" || header === "kabupaten name" || header === "kabupaten") val = getPropCaseInsensitive(s, ["kabupatenName", "kabupaten_name", "kabupaten"]);
+    else if (header === "kecamatanid" || header === "kecamatan id") val = getPropCaseInsensitive(s, ["kecamatanId", "kecamatan_id"]);
+    else if (header === "kecamatanname" || header === "kecamatan name" || header === "kecamatan") val = getPropCaseInsensitive(s, ["kecamatanName", "kecamatan_name", "kecamatan"]);
+    else if (header === "kelurahanid" || header === "kelurahan id") val = getPropCaseInsensitive(s, ["kelurahanId", "kelurahan_id"]);
+    else if (header === "kelurahanname" || header === "kelurahan name" || header === "kelurahan") val = getPropCaseInsensitive(s, ["kelurahanName", "kelurahan_name", "kelurahan"]);
+    else if (header === "eskulid" || header === "eskul id") val = getPropCaseInsensitive(s, ["eskulId", "eskul_id"]);
+    else if (header === "eskulname" || header === "eskul name") val = getPropCaseInsensitive(s, ["eskulName", "eskul_name", "eskul"]);
+    else if (header === "eskulid2" || header === "eskul id 2") val = getPropCaseInsensitive(s, ["eskulId2", "eskul_id_2"]);
+    else if (header === "eskulname2" || header === "eskul name 2") val = getPropCaseInsensitive(s, ["eskulName2", "eskul_name_2", "eskul2"]);
+    else if (header === "eskulid3" || header === "eskul id 3") val = getPropCaseInsensitive(s, ["eskulid3", "eskul_id_3", "eskulId3"]);
+    else if (header === "eskulname3" || header === "eskul name 3") val = getPropCaseInsensitive(s, ["eskulname3", "eskul_name_3", "eskulName3"]);
+    else if (header === "certificatefile" || header === "certificate file") val = getPropCaseInsensitive(s, ["certificateFile", "certificate_file", "certificatefile"]);
+    else if (header === "certificatefilename" || header === "certificate file name") val = getPropCaseInsensitive(s, ["certificateFileName", "certificate_file_name", "certificatefilename"]);
+    else if (header === "tahunpelajaran" || header === "tahun pelajaran") val = targetTP;
     else if (header === "createdat" || header === "created at") val = createdAt;
     
-    newRow.push(val);
+    newRow.push(val === undefined || val === null ? "" : val);
   }
   
   sheet.appendRow(newRow);
