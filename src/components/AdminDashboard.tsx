@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
+import * as XLSX from 'xlsx';
 import { Student, Extracurricular, AppSettings } from '../types';
 import { TAHUN_PELAJARAN_LIST } from '../data';
 import ApiSetupGuide from './ApiSetupGuide';
@@ -494,75 +495,162 @@ export default function AdminDashboard({
     return matchSearch && matchEskul && matchKelas;
   });
 
-  // Export reports to Excel/CSV format
+  // Export reports to Excel format (with multiple sheets per eskul)
   const handleExportExcel = () => {
     if (filteredStudents.length === 0) {
       Swal.fire({ icon: 'info', title: 'Data Kosong', text: 'Tidak ada data siswa untuk diekspor.', width: '340px' });
       return;
     }
 
-    // Prepare CSV headers
-    const headers = [
-      'No. Registrasi', 'Tahun Pelajaran', 'Nama Lengkap', 'Kelas', 'Jenis Kelamin', 'Email Siswa',
-      'Ekstrakurikuler 1', 'Ekstrakurikuler 2', 'Nama Ayah', 'Nama Ibu', 'No. HP Siswa', 'No. HP Orang Tua',
-      'Memiliki Prestasi', 'Nama Lomba', 'Cabang Lomba', 'Tingkat Lomba', 'Juara Ke', 'Penyelenggara',
-      'Alamat', 'RT', 'RW', 'Kelurahan', 'Kecamatan', 'Kota/Kabupaten', 'Provinsi', 'Tanggal Daftar'
+    // 1. Create a new Workbook
+    const wb = XLSX.utils.book_new();
+
+    // 2. Prepare main "Siswa" sheet data matching the Google Sheets "Siswa" schema exactly
+    const siswaHeaders = [
+      "ID", "RegNo", "Nama", "Photo", "Kelas", "JenisKelamin", "TempatLahir", "TanggalLahir",
+      "NamaAyah", "NamaIbu", "HpSiswa", "HpOrtu", "Email", "PrestasiChecked", "NamaLomba", "CabangLomba",
+      "TingkatLomba", "JuaraKe", "Penyelenggara", "Alamat", "RT", "RW", "ProvinsiId", "ProvinsiName", 
+      "KabupatenId", "KabupatenName", "KecamatanId", "KecamatanName", "KelurahanId", 
+      "KelurahanName", "EskulId", "EskulName", "EskulId2", "EskulName2", "EskulId3", "EskulName3", 
+      "CertificateFile", "CertificateFileName", "TahunPelajaran", "CreatedAt"
     ];
 
-    const rows = filteredStudents.map(s => [
+    const siswaRows = filteredStudents.map(s => [
+      s.id,
       s.regNo,
-      s.tahunPelajaran,
       s.name,
+      s.photo || "",
       s.kelas,
       s.jenisKelamin,
-      s.email || '',
-      s.eskulName,
-      s.eskulName2 || '',
+      s.tempatLahir || "",
+      s.tanggalLahir || "",
       s.namaAyah,
       s.namaIbu,
       s.hpSiswa,
       s.hpOrtu,
-      s.prestasiChecked ? 'Ya' : 'Tidak',
-      s.namaLomba || '',
-      s.cabangLomba || '',
-      s.tingkatLomba || '',
-      s.juaraKe || '',
-      s.penyelenggara || '',
+      s.email || "",
+      s.prestasiChecked ? "TRUE" : "FALSE",
+      s.namaLomba || "",
+      s.cabangLomba || "",
+      s.tingkatLomba || "",
+      s.juaraKe || "",
+      s.penyelenggara || "",
       s.alamat,
       s.rt,
       s.rw,
-      s.kelurahanName,
-      s.kecamatanName,
-      s.kabupatenName,
-      s.provinsiName,
-      new Date(s.createdAt).toLocaleString('id-ID')
+      s.provinsiId || "",
+      s.provinsiName || "",
+      s.kabupatenId || "",
+      s.kabupatenName || "",
+      s.kecamatanId || "",
+      s.kecamatanName || "",
+      s.kelurahanId || "",
+      s.kelurahanName || "",
+      s.eskulId,
+      s.eskulName,
+      s.eskulId2 || "",
+      s.eskulName2 || "",
+      s.eskulId3 || "",
+      s.eskulName3 || "",
+      s.certificateFile || "",
+      s.certificateFileName || "",
+      s.tahunPelajaran,
+      new Date(s.createdAt).toISOString()
     ]);
 
-    // Construct CSV content (add BOM for proper Excel encoding of special characters)
-    let csvContent = '\ufeff' + headers.join(',') + '\n';
-    rows.forEach(row => {
-      const formattedRow = row.map(val => {
-        // Escape quotes and wrap in quotes
-        const strVal = String(val).replace(/"/g, '""');
-        return `"${strVal}"`;
+    // Convert to SheetJS format
+    const wsSiswa = XLSX.utils.aoa_to_sheet([siswaHeaders, ...siswaRows]);
+
+    // Set auto-fitting column widths for "Siswa"
+    const colWidthsSiswa = siswaHeaders.map((hdr, cIdx) => {
+      let maxLen = hdr.length;
+      siswaRows.forEach(row => {
+        const val = String(row[cIdx] || '');
+        if (val.length > maxLen) {
+          // Skip extremely long base64 strings to prevent column bloating
+          if (val.length < 50) {
+            maxLen = val.length;
+          }
+        }
       });
-      csvContent += formattedRow.join(',') + '\n';
+      return { wch: Math.max(maxLen + 3, 10) };
+    });
+    wsSiswa['!cols'] = colWidthsSiswa;
+
+    // Append Siswa sheet
+    XLSX.utils.book_append_sheet(wb, wsSiswa, "Siswa");
+
+    // 3. Generate sheet for EACH extracurricular active in eskulList
+    const activeEskuls = eskulList.filter(e => e.tahunPelajaran === settings.tahunPelajaranAktif);
+    
+    activeEskuls.forEach(eskul => {
+      // Find students registered for this eskul (either as choice 1, 2, or 3)
+      const eskulStudents = filteredStudents.filter(s => 
+        s.eskulId === eskul.id || 
+        s.eskulId2 === eskul.id || 
+        s.eskulId3 === eskul.id
+      );
+
+      // Prepare headers for the eskul sheet
+      const eskulHeaders = [
+        "No", "No. Registrasi", "Nama Siswa", "Kelas", "L/P", 
+        "No. HP Siswa", "No. HP Orang Tua", "Email", "Alamat", "Pilihan Ke"
+      ];
+
+      const eskulRows = eskulStudents.map((s, idx) => {
+        let pilihan = "Pilihan 1";
+        if (s.eskulId2 === eskul.id) pilihan = "Pilihan 2";
+        else if (s.eskulId3 === eskul.id) pilihan = "Pilihan 3";
+
+        return [
+          idx + 1,
+          s.regNo,
+          s.name,
+          s.kelas,
+          s.jenisKelamin === "Laki-laki" ? "L" : "P",
+          s.hpSiswa,
+          s.hpOrtu,
+          s.email || "-",
+          `${s.alamat} RT ${s.rt}/RW ${s.rw}, ${s.kelurahanName}, ${s.kecamatanName}`,
+          pilihan
+        ];
+      });
+
+      const wsEskul = XLSX.utils.aoa_to_sheet([eskulHeaders, ...eskulRows]);
+
+      // Column widths for eskul sheets
+      const colWidthsEskul = eskulHeaders.map((hdr, cIdx) => {
+        let maxLen = hdr.length;
+        eskulRows.forEach(row => {
+          const val = String(row[cIdx] || '');
+          if (val.length > maxLen) maxLen = val.length;
+        });
+        return { wch: Math.max(maxLen + 3, 8) };
+      });
+      wsEskul['!cols'] = colWidthsEskul;
+
+      // Sanitize sheet name: unique, max 31 chars, no invalid characters
+      let sheetName = eskul.nama.replace(/[\\\/\?\*\[\]]/g, '').substring(0, 31).trim();
+      if (!sheetName) sheetName = `Eskul ${eskul.id}`;
+      
+      // Handle potential sheet name duplicates
+      let uniqueName = sheetName;
+      let counter = 1;
+      while (wb.SheetNames.includes(uniqueName)) {
+        uniqueName = `${sheetName.substring(0, 28)} ${counter++}`;
+      }
+
+      XLSX.utils.book_append_sheet(wb, wsEskul, uniqueName);
     });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.setAttribute('href', url);
-    link.setAttribute('download', `LAPORAN_ESKUL_SMP_PGRI_JU_${settings.tahunPelajaranAktif.replace(/\//g, '-')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Write file
+    const fileSuffix = settings.tahunPelajaranAktif.replace(/\//g, '-');
+    XLSX.writeFile(wb, `LAPORAN_DAFTAR_SISWA_ESKUL_${fileSuffix}.xlsx`);
 
     Swal.fire({
       icon: 'success',
       title: 'Ekspor Berhasil',
-      text: 'File laporan berformat CSV (Excel) telah terunduh.',
+      text: 'File laporan Excel dengan sheet per-eskul telah terunduh.',
       confirmButtonColor: '#1d4ed8',
       width: '340px'
     });
@@ -750,6 +838,214 @@ export default function AdminDashboard({
     } catch (e) {
       Swal.close();
       Swal.fire({ icon: 'error', title: 'Gagal cetak PDF', width: '340px' });
+    }
+  };
+
+  // Generate PDF Reports per Eskul
+  const handlePrintPDFPerEskul = () => {
+    // Determine which eskuls to print
+    let eskulsToPrint = eskulList.filter(e => e.tahunPelajaran === settings.tahunPelajaranAktif);
+    
+    if (filterEskul) {
+      eskulsToPrint = eskulsToPrint.filter(e => e.id === filterEskul);
+    }
+
+    if (eskulsToPrint.length === 0) {
+      Swal.fire({ icon: 'info', title: 'Data Kosong', text: 'Tidak ada data kategori ekstrakurikuler untuk dicetak.', width: '340px' });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Menyiapkan Dokumen...',
+      text: 'Sedang membuat laporan PDF per-ekstrakurikuler.',
+      allowOutsideClick: false,
+      width: '340px',
+      didOpen: () => Swal.showLoading()
+    });
+
+    try {
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+      let isFirstPage = true;
+
+      eskulsToPrint.forEach(eskul => {
+        // Find students registered for this eskul (choice 1, 2, or 3)
+        const eskulStudents = students.filter(s => 
+          s.tahunPelajaran === settings.tahunPelajaranAktif &&
+          (s.eskulId === eskul.id || s.eskulId2 === eskul.id || s.eskulId3 === eskul.id)
+        );
+
+        if (!isFirstPage) {
+          doc.addPage();
+        }
+        isFirstPage = false;
+
+        // 1. Header Section with School Logo
+        if (logoImgElement) {
+          try {
+            doc.addImage(logoImgElement, 'PNG', 15, 8, 18, 18);
+          } catch (e) {
+            console.error("Failed to add preloaded logo to PDF", e);
+          }
+        }
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(29, 78, 216);
+        doc.text('SMP PGRI JATIUWUNG', 114, 13, { align: 'center' });
+        doc.setFontSize(9.5);
+        doc.setTextColor(107, 114, 128);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`LAPORAN DAFTAR SISWA PESERTA EKSTRAKURIKULER`, 114, 18, { align: 'center' });
+        doc.setFontSize(8.5);
+        doc.text('Jl. Gatot Subroto KM. 5 No. 4 Jatiuwung Kota Tangerang', 114, 22, { align: 'center' });
+        doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 114, 26, { align: 'center' });
+        
+        doc.setDrawColor(29, 78, 216);
+        doc.setLineWidth(0.5);
+        doc.line(15, 29, 195, 29);
+
+        // 2. Eskul Information
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(11);
+        doc.setTextColor(31, 41, 55);
+        doc.text(`KATEGORI EKSTRAKURIKULER: ${eskul.nama.toUpperCase()}`, 15, 36);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.text(`Total Terdaftar: ${eskulStudents.length} Siswa`, 15, 41);
+
+        // 3. Draw Table Headers
+        let currentY = 46;
+        doc.setFillColor(29, 78, 216); // Blue header
+        doc.rect(15, currentY, 180, 8, 'F');
+        doc.setDrawColor(209, 213, 219);
+        doc.setLineWidth(0.2);
+
+        doc.setFontSize(8.5);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(255, 255, 255); // White text
+        doc.text('No', 18, currentY + 5.5);
+        doc.text('Nama Siswa', 28, currentY + 5.5);
+        doc.text('Kelas', 73, currentY + 5.5);
+        doc.text('No. HP Siswa', 88, currentY + 5.5);
+        doc.text('No. HP Ortu', 118, currentY + 5.5);
+        doc.text('Alamat', 148, currentY + 5.5);
+
+        // Grid lines for headers
+        doc.setDrawColor(255, 255, 255);
+        doc.line(25, currentY, 25, currentY + 8);
+        doc.line(70, currentY, 70, currentY + 8);
+        doc.line(85, currentY, 85, currentY + 8);
+        doc.line(115, currentY, 115, currentY + 8);
+        doc.line(145, currentY, 145, currentY + 8);
+
+        currentY += 8;
+
+        if (eskulStudents.length === 0) {
+          doc.setDrawColor(209, 213, 219);
+          doc.rect(15, currentY, 180, 10);
+          doc.setFont('helvetica', 'italic');
+          doc.setFontSize(8.5);
+          doc.setTextColor(107, 114, 128);
+          doc.text('Belum ada siswa yang mendaftar di ekstrakurikuler ini.', 105, currentY + 6.5, { align: 'center' });
+          currentY += 10;
+        } else {
+          doc.setFont('helvetica', 'normal');
+          doc.setFontSize(8);
+          doc.setTextColor(31, 41, 55);
+          doc.setDrawColor(209, 213, 219);
+
+          eskulStudents.forEach((s, idx) => {
+            // Handle row background (alternating white and light gray)
+            if (idx % 2 === 1) {
+              doc.setFillColor(249, 250, 251);
+              doc.rect(15, currentY, 180, 8, 'F');
+            }
+
+            // Draw content borders
+            doc.rect(15, currentY, 180, 8);
+            doc.line(25, currentY, 25, currentY + 8);
+            doc.line(70, currentY, 70, currentY + 8);
+            doc.line(85, currentY, 85, currentY + 8);
+            doc.line(115, currentY, 115, currentY + 8);
+            doc.line(145, currentY, 145, currentY + 8);
+
+            // Write row cells
+            doc.text(String(idx + 1), 18, currentY + 5);
+            doc.text(s.name.toUpperCase().substring(0, 25), 28, currentY + 5);
+            doc.text(s.kelas, 73, currentY + 5);
+            doc.text(s.hpSiswa, 88, currentY + 5);
+            doc.text(s.hpOrtu, 118, currentY + 5);
+            
+            const alamatTrunc = s.alamat.substring(0, 22) + (s.alamat.length > 22 ? '..' : '');
+            doc.text(alamatTrunc, 148, currentY + 5);
+
+            currentY += 8;
+
+            // Handle page overflow if the student list is exceptionally long
+            if (currentY > 265 && idx < eskulStudents.length - 1) {
+              doc.addPage();
+              currentY = 20;
+
+              // Redraw minimal headers on the new page
+              doc.setFillColor(29, 78, 216);
+              doc.rect(15, currentY, 180, 8, 'F');
+              doc.setFont('helvetica', 'bold');
+              doc.setTextColor(255, 255, 255);
+              doc.text('No', 18, currentY + 5.5);
+              doc.text('Nama Siswa', 28, currentY + 5.5);
+              doc.text('Kelas', 73, currentY + 5.5);
+              doc.text('No. HP Siswa', 88, currentY + 5.5);
+              doc.text('No. HP Ortu', 118, currentY + 5.5);
+              doc.text('Alamat', 148, currentY + 5.5);
+              currentY += 8;
+
+              doc.setFont('helvetica', 'normal');
+              doc.setTextColor(31, 41, 55);
+            }
+          });
+        }
+
+        // Signature section at the bottom of the page
+        const sigY = Math.min(currentY + 12, 255);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(31, 41, 55);
+        doc.text('Mengetahui,', 160, sigY, { align: 'center' });
+        doc.setFont('helvetica', 'bold');
+        doc.text('Kepala Sekolah SMP PGRI', 160, sigY + 4, { align: 'center' });
+        doc.line(130, sigY + 24, 190, sigY + 24);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(8.5);
+        doc.text('NIP. .............................', 160, sigY + 28, { align: 'center' });
+      });
+
+      // Save the generated document
+      const fileSuffix = settings.tahunPelajaranAktif.replace(/\//g, '-');
+      const filename = filterEskul && eskulsToPrint[0]
+        ? `LAPORAN_SISWA_${eskulsToPrint[0].nama.replace(/\s+/g, '_').toUpperCase()}_${fileSuffix}.pdf`
+        : `LAPORAN_SISWA_PER_ESKUL_${fileSuffix}.pdf`;
+
+      doc.save(filename);
+      Swal.close();
+
+      Swal.fire({
+        icon: 'success',
+        title: 'Cetak Berhasil',
+        text: 'Laporan PDF per-ekstrakurikuler telah diunduh.',
+        confirmButtonColor: '#1d4ed8',
+        width: '340px'
+      });
+    } catch (error) {
+      console.error(error);
+      Swal.close();
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal Mencetak',
+        text: 'Terjadi kesalahan saat membuat file PDF.',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
     }
   };
 
@@ -1552,21 +1848,29 @@ export default function AdminDashboard({
               </div>
 
               {/* Print & Export buttons */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <button
                   onClick={handlePrintPDFRecap}
-                  className="bg-red-700 hover:bg-red-800 text-white text-[10px] sm:text-xs font-bold py-2 px-2 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-red-800"
+                  className="bg-red-700 hover:bg-red-800 text-white text-[10px] sm:text-xs font-bold py-2.5 px-2 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-red-800"
                 >
-                  <Printer className="w-3.5 h-3.5 text-white animate-pulse" />
+                  <Printer className="w-3.5 h-3.5 text-white" />
                   Cetak PDF Rekap
+                </button>
+
+                <button
+                  onClick={handlePrintPDFPerEskul}
+                  className="bg-blue-700 hover:bg-blue-800 text-white text-[10px] sm:text-xs font-bold py-2.5 px-2 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-blue-800"
+                >
+                  <FileText className="w-3.5 h-3.5 text-white" />
+                  Cetak PDF Per-Eskul
                 </button>
                 
                 <button
                   onClick={handleExportExcel}
-                  className="bg-green-700 hover:bg-green-800 text-white text-[10px] sm:text-xs font-bold py-2 px-2 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-green-800"
+                  className="bg-green-700 hover:bg-green-800 text-white text-[10px] sm:text-xs font-bold py-2.5 px-2 rounded-lg shadow-sm flex items-center justify-center gap-1.5 cursor-pointer transition-all border border-green-800"
                 >
                   <Download className="w-3.5 h-3.5 text-white" />
-                  Ekspor Excel (CSV)
+                  Ekspor Excel (XLSX)
                 </button>
               </div>
 
@@ -1692,6 +1996,8 @@ export default function AdminDashboard({
                       <th className="py-3 px-3 text-center w-20">Kelas</th>
                       <th className="py-3 px-3">Eskul 1</th>
                       <th className="py-3 px-3">Eskul 2</th>
+                      <th className="py-3 px-3">Eskul 3</th>
+                      <th className="py-3 px-3">Email</th>
                       <th className="py-3 px-3">Kontak HP</th>
                       <th className="py-3 px-3.5 text-center w-24">Aksi</th>
                     </tr>
@@ -1730,6 +2036,16 @@ export default function AdminDashboard({
                             <span className="text-slate-400 italic font-medium">-</span>
                           )}
                         </td>
+                        <td className="py-3.5 px-3 text-[11px] max-w-[140px] truncate" title={s.eskulName3 || '-'}>
+                          {s.eskulName3 ? (
+                            <span className="text-slate-600">{s.eskulName3}</span>
+                          ) : (
+                            <span className="text-slate-400 italic font-medium">-</span>
+                          )}
+                        </td>
+                        <td className="py-3.5 px-3 text-[11px] max-w-[120px] truncate text-slate-600" title={s.email || '-'}>
+                          {s.email || <span className="text-slate-400 italic font-medium">-</span>}
+                        </td>
                         <td className="py-3.5 px-3 font-mono text-slate-600 text-[11px]">
                           {formatToIndoPhone(s.hpSiswa)}
                         </td>
@@ -1747,7 +2063,7 @@ export default function AdminDashboard({
                     ))}
                     {filteredStudents.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="text-center py-16 text-slate-400 font-semibold bg-slate-50/50">
+                        <td colSpan={11} className="text-center py-16 text-slate-400 font-semibold bg-slate-50/50">
                           Tidak ada pendaftar yang cocok dengan filter pencarian Anda.
                         </td>
                       </tr>
@@ -2098,9 +2414,11 @@ export default function AdminDashboard({
               </div>
   
               {/* Panduan Integrasi Backend & Spreadsheet */}
-              <div className="lg:col-span-3 mt-6">
-                <ApiSetupGuide />
-              </div>
+              {isLoggedAdminUtama && (
+                <div className="lg:col-span-3 mt-6">
+                  <ApiSetupGuide />
+                </div>
+              )}
   
             </div>
         )}
@@ -2150,7 +2468,7 @@ export default function AdminDashboard({
                   </div>
                 )}
                 
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 w-full">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-4 gap-4 w-full">
                   <div className="space-y-1">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Kelas Siswa</span>
                     <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">Kelas {selectedStudentDetail.kelas}</span>
@@ -2158,6 +2476,12 @@ export default function AdminDashboard({
                   <div className="space-y-1">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Jenis Kelamin</span>
                     <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">{selectedStudentDetail.jenisKelamin}</span>
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Tempat, Tgl Lahir</span>
+                    <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">
+                      {selectedStudentDetail.tempatLahir || '-'}, {selectedStudentDetail.tanggalLahir ? new Date(selectedStudentDetail.tanggalLahir).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : '-'}
+                    </span>
                   </div>
                   <div className="space-y-1">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Tanggal Daftar</span>
@@ -2169,7 +2493,7 @@ export default function AdminDashboard({
               </div>
 
               {/* Eskul Choices */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-blue-50/50 p-4 rounded-2xl border border-blue-100/50">
                 <div className="space-y-1">
                   <span className="text-[9px] font-bold text-blue-900 block uppercase tracking-wider">Ekstrakurikuler Pilihan 1</span>
                   <span className="font-extrabold text-slate-800 text-sm">{selectedStudentDetail.eskulName}</span>
@@ -2177,6 +2501,10 @@ export default function AdminDashboard({
                 <div className="space-y-1">
                   <span className="text-[9px] font-bold text-blue-900 block uppercase tracking-wider">Ekstrakurikuler Pilihan 2</span>
                   <span className="font-extrabold text-slate-800 text-sm">{selectedStudentDetail.eskulName2 || <span className="text-slate-400 italic font-medium">Tidak memilih</span>}</span>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[9px] font-bold text-blue-900 block uppercase tracking-wider">Ekstrakurikuler Pilihan 3</span>
+                  <span className="font-extrabold text-slate-800 text-sm">{selectedStudentDetail.eskulName3 || <span className="text-slate-400 italic font-medium">Tidak memilih</span>}</span>
                 </div>
               </div>
 

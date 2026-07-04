@@ -451,13 +451,19 @@ export default function App() {
 
   const gasPost = async (gasUrl: string, body: any): Promise<any> => {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000); // 7 seconds timeout
+
       const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+
       if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
@@ -468,18 +474,22 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.warn('Proxy POST failed, trying direct Google Apps Script POST...', e);
+      console.warn('Proxy POST failed or timed out, trying direct Google Apps Script POST...', e);
     }
 
     // Direct GAS Web App POST via no-cors (e.g. for Vercel/serverless environments where proxy is not running)
-    await fetch(gasUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: {
-        'Content-Type': 'text/plain'
-      },
-      body: JSON.stringify(body)
-    });
+    try {
+      await fetch(gasUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain'
+        },
+        body: JSON.stringify(body)
+      });
+    } catch (e) {
+      console.error('Direct POST failed:', e);
+    }
 
     return { status: 'success', isDirectPost: true };
   };

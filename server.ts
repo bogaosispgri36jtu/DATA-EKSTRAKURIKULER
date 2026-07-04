@@ -43,6 +43,44 @@ async function startServer() {
   });
 
   // API Route to proxy Google Apps Script requests to avoid browser CORS/firewall blocks
+  app.get("/api/proxy-image", async (req, res) => {
+    try {
+      let imageUrl = req.query.url as string;
+      if (!imageUrl) {
+        return res.status(400).json({ status: "error", message: "URL parameter required" });
+      }
+
+      // Convert Google Drive view URL to direct image link if detected
+      if (imageUrl.includes("drive.google.com")) {
+        const matches = imageUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+        if (matches && matches[1]) {
+          const fileId = matches[1];
+          imageUrl = `https://docs.google.com/uc?export=download&id=${fileId}`;
+        }
+      }
+
+      console.log(`[Proxy Image] Fetching image from: ${imageUrl}`);
+      const response = await fetch(imageUrl);
+      if (!response.ok) {
+        return res.status(response.status).json({ status: "error", message: `Failed to fetch image: ${response.statusText}` });
+      }
+
+      const buffer = await response.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString("base64");
+      const contentType = response.headers.get("content-type") || "image/png";
+
+      return res.json({
+        status: "success",
+        contentType,
+        base64: `data:${contentType};base64,${base64}`
+      });
+    } catch (err: any) {
+      console.error("[Proxy Image Error]:", err);
+      return res.status(500).json({ status: "error", message: err.message || err.toString() });
+    }
+  });
+
+  // API Route to proxy Google Apps Script requests to avoid browser CORS/firewall blocks
   app.all("/api/gas", async (req, res) => {
     try {
       let targetUrl = (req.query.url || (req.body && req.body.url)) as string;

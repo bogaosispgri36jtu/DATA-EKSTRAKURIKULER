@@ -16,6 +16,8 @@ export interface Student {
   hpSiswa: string;
   hpOrtu: string;
   email?: string;
+  tempatLahir?: string;
+  tanggalLahir?: string;
   prestasiChecked: boolean;
   namaLomba?: string;
   cabangLomba?: string;

@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   User, Camera, School, Users, FileText, Phone, Award, MapPin, 
-  Send, FileCheck, CheckCircle2, RefreshCw, AlertTriangle, X, Mail
+  Send, FileCheck, CheckCircle2, RefreshCw, AlertTriangle, X, Mail, Calendar
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -55,6 +55,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   const [hpSiswa, setHpSiswa] = useState('');
   const [hpOrtu, setHpOrtu] = useState('');
   const [email, setEmail] = useState('');
+  const [tempatLahir, setTempatLahir] = useState('');
+  const [tanggalLahir, setTanggalLahir] = useState('');
   
   // Achievements state
   const [hasAchievements, setHasAchievements] = useState(false);
@@ -324,8 +326,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         let width = img.width;
         let height = img.height;
 
-        // Max dimension bounds for scaling
-        const MAX_DIM = 800;
+        // Max dimension bounds for scaling (Optimized to 350 for fast upload and clear profile display)
+        const MAX_DIM = 350;
         if (width > height) {
           if (width > MAX_DIM) {
             height *= MAX_DIM / width;
@@ -338,34 +340,25 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           }
         }
 
-        // Start compression quality and dimension scaling loop to guarantee < 200 kb
-        let quality = 0.8;
-        let dataUrl = '';
-        let sizeInKb = 999;
-        let scale = 1.0;
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+        }
 
-        while (sizeInKb > 195 && scale > 0.1) {
-          const currentWidth = Math.round(width * scale);
-          const currentHeight = Math.round(height * scale);
-          canvas.width = currentWidth;
-          canvas.height = currentHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.clearRect(0, 0, currentWidth, currentHeight);
-            ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
-          }
+        // Fast and efficient compression check without slow nested loops
+        let quality = 0.7;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const head = 'data:image/jpeg;base64,'.length;
+        let sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
 
-          quality = 0.8;
-          do {
-            dataUrl = canvas.toDataURL('image/jpeg', quality);
-            const head = 'data:image/jpeg;base64,'.length;
-            sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-            quality -= 0.1;
-          } while (sizeInKb > 195 && quality > 0.1);
-
-          if (sizeInKb > 195) {
-            scale -= 0.15; // scale down dimensions further if quality adjustment alone is insufficient
-          }
+        if (sizeInKb > 65) {
+          // Fallback if still over 65 KB (very rare at 350px width), do a fast single step down
+          quality = 0.5;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
         }
 
         setPhoto(dataUrl);
@@ -390,6 +383,23 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   const handleCertUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    // Fast-fail: Reject files larger than 1MB to avoid network choke during submission
+    if (file.size > 1024 * 1024) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Ukuran File Terlalu Besar',
+        text: 'Maksimal ukuran file sertifikat adalah 1MB (1024 KB) agar proses pendaftaran cepat.',
+        confirmButtonColor: '#1d4ed8',
+        width: '360px',
+        timer: 5000,
+        timerProgressBar: true
+      });
+      if (certInputRef.current) {
+        certInputRef.current.value = '';
+      }
+      return;
+    }
 
     const fileType = file.type;
     const isImage = fileType.startsWith('image/');
@@ -434,8 +444,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           let width = img.width;
           let height = img.height;
 
-          // Max dimension bounds for scaling
-          const MAX_DIM = 800;
+          // Max dimension bounds for scaling (Optimized to 600 for clear text and fast transmission)
+          const MAX_DIM = 600;
           if (width > height) {
             if (width > MAX_DIM) {
               height *= MAX_DIM / width;
@@ -448,34 +458,25 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
             }
           }
 
-          // Start compression loop to target <= 100 KB
-          let quality = 0.8;
-          let dataUrl = '';
-          let sizeInKb = 999;
-          let scale = 1.0;
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+          }
 
-          while (sizeInKb > 100 && scale > 0.1) {
-            const currentWidth = Math.round(width * scale);
-            const currentHeight = Math.round(height * scale);
-            canvas.width = currentWidth;
-            canvas.height = currentHeight;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              ctx.clearRect(0, 0, currentWidth, currentHeight);
-              ctx.drawImage(img, 0, 0, currentWidth, currentHeight);
-            }
+          // Fast and efficient compression check without slow nested loops
+          let quality = 0.75;
+          let dataUrl = canvas.toDataURL('image/jpeg', quality);
+          const head = 'data:image/jpeg;base64,'.length;
+          let sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
 
-            quality = 0.7;
-            do {
-              dataUrl = canvas.toDataURL('image/jpeg', quality);
-              const head = 'data:image/jpeg;base64,'.length;
-              sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-              quality -= 0.15;
-            } while (sizeInKb > 100 && quality > 0.05);
-
-            if (sizeInKb > 100) {
-              scale -= 0.15; // scale down dimensions further if quality adjustment alone is insufficient
-            }
+          if (sizeInKb > 80) {
+            // Fallback step if still slightly over 80 KB
+            quality = 0.55;
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+            sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
           }
 
           setCertificateFile(dataUrl);
@@ -579,6 +580,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       photo !== '' &&
       kelas !== '' &&
       jenisKelamin !== '' &&
+      tempatLahir.trim() !== '' &&
+      tanggalLahir.trim() !== '' &&
       email.trim() !== '' &&
       email.trim().toLowerCase().endsWith('@gmail.com') &&
       namaAyah.trim() !== '' &&
@@ -622,6 +625,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     if (!photo) missing.push('Pas Foto');
     if (!kelas) missing.push('Kelas');
     if (!jenisKelamin) missing.push('Jenis Kelamin');
+    if (!tempatLahir.trim()) missing.push('Tempat Lahir');
+    if (!tanggalLahir.trim()) missing.push('Tanggal Lahir');
     if (!email.trim()) {
       missing.push('Email Siswa');
     } else if (!email.trim().toLowerCase().endsWith('@gmail.com')) {
@@ -723,6 +728,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           kelas,
           jenisKelamin: jenisKelamin as 'Laki-laki' | 'Perempuan',
           email: email.trim(),
+          tempatLahir: tempatLahir.trim(),
+          tanggalLahir: tanggalLahir,
           namaAyah,
           namaIbu,
           hpSiswa: formattedHpSiswa,
@@ -755,6 +762,19 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           tahunPelajaran: tahunPelajaranAktif
         };
 
+        // Show loading screen with SweetAlert2 during network submission
+        Swal.fire({
+          title: 'Mengirim Pendaftaran...',
+          html: 'Sedang menyimpan data ke server, mohon tunggu sebentar...',
+          allowOutsideClick: false,
+          allowEscapeKey: false,
+          didOpen: () => {
+            Swal.showLoading();
+          },
+          width: '340px',
+          customClass: { popup: 'rounded-2xl' }
+        });
+
         const res = await onSubmitRegistration(studentData);
         setRegisteredStudent(res);
         
@@ -763,7 +783,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           title: 'Pendaftaran Berhasil!',
           text: `Selamat, Anda berhasil terdaftar dengan Nomor: ${res.regNo}`,
           confirmButtonColor: '#1d4ed8',
-          width: '360px'
+          width: '360px',
+          customClass: { popup: 'rounded-2xl' }
         });
       } catch (error) {
         Swal.fire({
@@ -793,6 +814,21 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       }
     });
 
+    // Fetch Kop Surat Logo from proxy to avoid CORS
+    let kopSuratBase64 = '';
+    try {
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q/view?usp=sharing')}`;
+      const response = await fetch(proxyUrl);
+      if (response.ok) {
+        const resJson = await response.json();
+        if (resJson.status === 'success' && resJson.base64) {
+          kopSuratBase64 = resJson.base64;
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to fetch kop surat image via proxy:', err);
+    }
+
     try {
       const doc = new jsPDF({
         orientation: 'portrait',
@@ -800,216 +836,105 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         format: 'a4'
       });
 
-      // Colors
-      const primaryColor = [29, 78, 216]; // #1d4ed8
-      const accentColor = [234, 179, 8]; // #eab308
-      const darkColor = [31, 41, 55]; // #1f2937
-
-      // Border frame
-      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setLineWidth(1);
-      doc.rect(5, 5, 200, 287);
-
-      doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.setLineWidth(0.5);
-      doc.rect(6.5, 6.5, 197, 284);
-
-      // Draw Logo
-      if (logoImgElement) {
-        try {
-          doc.addImage(logoImgElement, 'PNG', 15, 9, 20, 20);
-        } catch (e) {
-          console.error("Failed to add preloaded logo to PDF", e);
-        }
-      }
-
-      // KOP SURAT Header
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(16);
-      doc.text('SMP PGRI JATIUWUNG', 114, 17, { align: 'center' });
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(100, 116, 139);
-      doc.text('Tahun Pelajaran ' + registeredStudent.tahunPelajaran, 114, 22, { align: 'center' });
-      doc.text('Jl. Gatot Subroto KM. 5 No. 4 Jatiuwung Kota Tangerang', 114, 27, { align: 'center' });
-      
-      // Divider Line
-      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setLineWidth(0.8);
-      doc.line(12, 32, 198, 32);
-      
-      doc.setDrawColor(accentColor[0], accentColor[1], accentColor[2]);
-      doc.setLineWidth(0.4);
-      doc.line(12, 33.5, 198, 33.5);
-
-      // Form Title
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(13);
-      doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
-      doc.text('BUKTI PENDAFTARAN EKSTRAKURIKULER', 105, 43, { align: 'center' });
-
-      // Registration Number Box
-      doc.setDrawColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.setFillColor(243, 244, 246);
-      doc.rect(55, 47, 100, 10, 'FD');
-      doc.setFontSize(11);
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text(`NO. REGISTRASI: ${registeredStudent.regNo}`, 105, 53.5, { align: 'center' });
-
-      // Student Photo (Base64 JPEG)
-      if (registeredStudent.photo) {
-        try {
-          doc.addImage(registeredStudent.photo, 'JPEG', 150, 62, 40, 50);
-          doc.setDrawColor(156, 163, 175);
-          doc.setLineWidth(0.3);
-          doc.rect(149.8, 61.8, 40.4, 50.4);
-        } catch (e) {
-          doc.rect(150, 62, 40, 50);
-          doc.setFontSize(8);
-          doc.text('Photo Error', 170, 87, { align: 'center' });
-        }
-      }
-
-      // Write Data Helper
-      let currentY = 66;
-      const drawField = (label: string, value: string, boldVal: boolean = false) => {
+      // Draw Kop Surat (Letterhead Banner)
+      if (kopSuratBase64) {
+        doc.addImage(kopSuratBase64, 'PNG', 12, 10, 186, 32);
+      } else {
+        // Fallback KOP SURAT Header (if network fails)
+        doc.setTextColor(31, 41, 55);
         doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS)', 105, 16, { align: 'center' });
+        doc.setFontSize(20);
+        doc.text('SMP PGRI JATIUWUNG', 105, 24, { align: 'center' });
         doc.setFontSize(10);
-        doc.setTextColor(75, 85, 99);
-        doc.text(label, 15, currentY);
-        doc.text(':', 55, currentY);
-        doc.setFont('helvetica', boldVal ? 'bold' : 'normal');
-        doc.setTextColor(darkColor[0], darkColor[1], darkColor[2]);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(100, 116, 139);
+        doc.text('JL. GATOT SUBROTO KM. 5 NO. 4 JATIUWUNG (021) 29576484 KOTA TANGERANG', 105, 30, { align: 'center' });
         
-        // Wrap text for long address
-        if (value.length > 45) {
-          const splitText = doc.splitTextToSize(value, 90);
-          doc.text(splitText, 58, currentY);
-          currentY += (splitText.length - 1) * 4.5 + 6;
+        // Double Divider line
+        doc.setDrawColor(31, 41, 55);
+        doc.setLineWidth(0.8);
+        doc.line(12, 35, 198, 35);
+        doc.setLineWidth(0.3);
+        doc.line(12, 36.5, 198, 36.5);
+      }
+
+      // Title Section (BUKTI PENDAFTARAN ESKTRAKURIKULLER - spelling matched exactly with image)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(31, 41, 55);
+      doc.text('BUKTI PENDAFTARAN ESKTRAKURIKULLER', 105, 48, { align: 'center' });
+      
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(55, 65, 81);
+      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 105, 53, { align: 'center' });
+
+      // Fields Section Start
+      let currentY = 64;
+
+      const drawField = (label: string, value: string) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(31, 41, 55);
+        doc.text(label, 15, currentY);
+        doc.text(':', 62, currentY);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        
+        // Wrap text for long value (e.g. Alamat Lengkap)
+        if (value.length > 55) {
+          const splitText = doc.splitTextToSize(value, 125);
+          doc.text(splitText, 65, currentY);
+          currentY += (splitText.length - 1) * 5 + 5.5;
         } else {
-          doc.text(value, 58, currentY);
-          currentY += 6;
+          doc.text(value, 65, currentY);
+          currentY += 5.5;
         }
       };
 
-      // 1. DATA PRIBADI SISWA (Section Header)
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text('A. DATA PRIBADI SISWA', 15, 61);
-      doc.setDrawColor(229, 231, 235);
-      doc.line(15, 62, 135, 62);
-
-      drawField('Nama Lengkap', registeredStudent.name.toUpperCase(), true);
+      // Draw all fields in a clean sequence (NO sections, matching the image exactly)
+      drawField('Nama Lengkap', registeredStudent.name);
       drawField('Kelas', registeredStudent.kelas);
       drawField('Jenis Kelamin', registeredStudent.jenisKelamin);
+      const birthStr = `${registeredStudent.tempatLahir || '-'}, ${registeredStudent.tanggalLahir ? new Date(registeredStudent.tanggalLahir).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : '-'}`;
+      drawField('Tempat/Tanggal Lahir', birthStr);
       drawField('Email Siswa', registeredStudent.email || '-');
       drawField('No. HP WhatsApp', registeredStudent.hpSiswa);
-
-      // Reset alignment or adjust for photo boundary
-      if (currentY < 118) currentY = 118;
-
-      // 2. DATA PILIHAN EKSTRAKURIKULER
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text('B. PILIHAN EKSTRAKURIKULER', 15, currentY);
-      doc.line(15, currentY + 1, 195, currentY + 1);
-      currentY += 6;
-
-      drawField('Ekstrakurikuler Wajib', registeredStudent.eskulName.toUpperCase(), true);
+      drawField('Ekstrakurikuler Wajib', registeredStudent.eskulName.toUpperCase());
       if (registeredStudent.eskulName2) {
-        drawField('Pilihan Ekstrakurikuler 2', registeredStudent.eskulName2.toUpperCase(), true);
+        drawField('Pilihan Ekstrakurikuler 2', registeredStudent.eskulName2.toUpperCase());
       }
       if (registeredStudent.eskulName3) {
-        drawField('Pilihan Ekstrakurikuler 3', registeredStudent.eskulName3.toUpperCase(), true);
+        drawField('Pilihan Ekstrakurikuler 3', registeredStudent.eskulName3.toUpperCase());
       }
-
-      // 3. DATA ORANG TUA
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text('C. DATA ORANG TUA / WALI', 15, currentY);
-      doc.line(15, currentY + 1, 195, currentY + 1);
-      currentY += 6;
-
       drawField('Nama Ayah Kandung', registeredStudent.namaAyah);
       drawField('Nama Ibu Kandung', registeredStudent.namaIbu);
       drawField('No. HP Orang Tua / Wali', registeredStudent.hpOrtu);
 
-      // 4. PRESTASI SISWA
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text('D. PRESTASI SISWA', 15, currentY);
-      doc.line(15, currentY + 1, 195, currentY + 1);
-      currentY += 6;
-
       if (registeredStudent.prestasiChecked) {
         drawField('Nama Lomba', registeredStudent.namaLomba || '-');
         drawField('Cabang Lomba', registeredStudent.cabangLomba || '-');
-        drawField('Tingkat / Juara', `${registeredStudent.tingkatLomba || '-'} / Juara ${registeredStudent.juaraKe || '-'}`);
+        
+        const tingkatStr = registeredStudent.tingkatLomba || '-';
+        const juaraStr = registeredStudent.juaraKe ? `Juara ${registeredStudent.juaraKe}` : '-';
+        drawField('Tingkat / Juara', `${tingkatStr} / ${juaraStr}`);
+        
         drawField('Penyelenggara', registeredStudent.penyelenggara || '-');
         if (registeredStudent.certificateFile) {
           drawField('Sertifikat Lomba', 'Terlampir (Ada)');
         }
-      } else {
-        doc.setFont('helvetica', 'italic');
-        doc.setFontSize(9.5);
-        doc.setTextColor(107, 114, 128);
-        doc.text('Tidak memiliki prestasi khusus yang dilampirkan.', 15, currentY);
-        currentY += 6;
       }
-
-      // 5. ALAMAT LENGKAP
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-      doc.text('E. ALAMAT TEMPAT TINGGAL', 15, currentY);
-      doc.line(15, currentY + 1, 195, currentY + 1);
-      currentY += 6;
 
       const fullAlamatStr = `${registeredStudent.alamat}, RT ${registeredStudent.rt} / RW ${registeredStudent.rw}, Kel. ${registeredStudent.kelurahanName}, Kec. ${registeredStudent.kecamatanName}, ${registeredStudent.kabupatenName}, Prov. ${registeredStudent.provinsiName}`;
       drawField('Alamat Lengkap', fullAlamatStr);
 
-      // 6. BOTTOM SIGNATURES SECTION
-      const signY = 232;
-      doc.setDrawColor(209, 213, 219);
-      doc.line(15, signY - 8, 195, signY - 8);
+      // Signatures & Metadata Section (Fixed at bottom part Y = 205 to ensure beautiful spacing)
+      const signY = 205;
 
-      // Date of Registration
-      const registrationDate = new Date(registeredStudent.createdAt);
-      const optDate: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
-      const formattedDate = registrationDate.toLocaleDateString('id-ID', optDate);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(55, 65, 81);
-      doc.text(`Tangerang, ${formattedDate}`, 155, signY - 2, { align: 'center' });
-
-      // Left: Parent Signature
-      doc.setFont('helvetica', 'normal');
-      doc.text('Mengetahui,', 45, signY + 3, { align: 'center' });
-      doc.setFont('helvetica', 'bold');
-      doc.text('Orang Tua / Wali', 45, signY + 8, { align: 'center' });
-      doc.line(20, signY + 34, 70, signY + 34); // Signature line
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.text('( Tanda Tangan & Nama Jelas )', 45, signY + 38, { align: 'center' });
-
-      // Right: Student Signature
-      doc.setFontSize(9.5);
-      doc.text('Pendaftar,', 155, signY + 3, { align: 'center' });
-      doc.setFont('helvetica', 'bold');
-      doc.text('Siswa Bersangkutan', 155, signY + 8, { align: 'center' });
-      doc.line(130, signY + 34, 180, signY + 34); // Signature line
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.text('( Tanda Tangan & Nama Jelas )', 155, signY + 38, { align: 'center' });
-
-      // Center: QR Code (Scannable verification)
+      // Draw QR Code on the bottom-left
       const qrText = `SMP PGRI Jatiuwung - Bukti Registrasi Resmi
 No: ${registeredStudent.regNo}
 Nama: ${registeredStudent.name}
@@ -1018,10 +943,71 @@ Eskul Wajib: ${registeredStudent.eskulName}${registeredStudent.eskulName2 ? `\nE
 Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       
       const qrDataUrl = await QRCode.toDataURL(qrText, { margin: 1 });
-      doc.addImage(qrDataUrl, 'JPEG', 88, signY + 6, 30, 30);
+      doc.addImage(qrDataUrl, 'JPEG', 15, signY, 30, 30);
+
+      // Draw Student Photo next to QR code on bottom-left
+      if (registeredStudent.photo) {
+        try {
+          doc.addImage(registeredStudent.photo, 'JPEG', 49, signY, 24, 32);
+          doc.setDrawColor(156, 163, 175);
+          doc.setLineWidth(0.2);
+          doc.rect(49, signY, 24, 32);
+        } catch (e) {
+          console.error("Failed to add photo next to QR code", e);
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.2);
+          doc.rect(49, signY, 24, 32);
+          doc.setFontSize(8);
+          doc.text('Foto', 61, signY + 16, { align: 'center' });
+        }
+      }
+
+      // Column 1 (Pendaftar)
+      const registrationDate = new Date(registeredStudent.createdAt);
+      const optDate: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+      const formattedDate = registrationDate.toLocaleDateString('id-ID', optDate);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(31, 41, 55);
+      doc.text(`Tangerang, ${formattedDate}`, 110, signY + 2, { align: 'center' });
+      doc.text('Pendaftar,', 110, 212, { align: 'center' });
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text(registeredStudent.name, 110, 237, { align: 'center' });
+      const nameWidth = doc.getTextWidth(registeredStudent.name);
+      doc.line(110 - nameWidth / 2, 238, 110 + nameWidth / 2, 238); // Underline
+
+      // Column 2 (Parent)
+      doc.setFont('helvetica', 'normal');
+      doc.text('Mengetahui,', 165, signY + 2, { align: 'center' });
+      doc.text('Orang Tua/Wali Murid', 165, 212, { align: 'center' });
+      doc.text('........................................', 165, 237, { align: 'center' });
+      
+      doc.setFont('helvetica', 'italic');
       doc.setFontSize(7.5);
-      doc.setTextColor(156, 163, 175);
-      doc.text('Pindai untuk Verifikasi', 103, signY + 38, { align: 'center' });
+      doc.setTextColor(100, 116, 139);
+      doc.text('tanda tangan & nama jelas', 165, 241, { align: 'center' });
+
+      // Footer divider line and text
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.2);
+      doc.line(12, 276, 198, 276);
+
+      const regDateObj = new Date(registeredStudent.createdAt);
+      const yyyy = regDateObj.getFullYear();
+      const mm = String(regDateObj.getMonth() + 1).padStart(2, '0');
+      const dd = String(regDateObj.getDate()).padStart(2, '0');
+      const hh = String(regDateObj.getHours()).padStart(2, '0');
+      const min = String(regDateObj.getMinutes()).padStart(2, '0');
+      const ss = String(regDateObj.getSeconds()).padStart(2, '0');
+      const formattedDateTime = `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Sistem Pendaftaran Esktrakurikuller | SMP PGRI JATIUWUNG', 12, 281);
+      doc.text(formattedDateTime, 198, 281, { align: 'right' });
 
       // Save PDF
       doc.save(`BUKTI_REG_${registeredStudent.regNo.replace(/\//g, '_')}.pdf`);
@@ -1038,6 +1024,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       });
     } catch (e) {
       Swal.close();
+      console.error(e);
       Swal.fire({
         icon: 'error',
         title: 'PDF Error',
@@ -1056,6 +1043,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
     setKelas('');
     setJenisKelamin('');
     setEmail('');
+    setTempatLahir('');
+    setTanggalLahir('');
     setNamaAyah('');
     setNamaIbu('');
     setHpSiswa('');
@@ -1105,7 +1094,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
           
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Pendaftaran Berhasil!</h2>
           <p className="text-slate-500 text-sm mb-6 px-4">
-            Selamat <span className="font-semibold text-slate-700">{registeredStudent.name}</span>, data pendaftaran Anda telah terekam di sistem kami secara permanen.
+            Selamat <span className="font-semibold text-slate-700">{registeredStudent.name}</span>, data pendaftaran Anda telah berhasil.
           </p>
 
           {/* Registrasi info box */}
@@ -1311,6 +1300,38 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                 </div>
               </div>
 
+              {/* Row: Tempat & Tanggal Lahir */}
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">TEMPAT LAHIR <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <MapPin className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <input 
+                      type="text" 
+                      value={tempatLahir} 
+                      onChange={(e) => setTempatLahir(e.target.value)}
+                      placeholder="Kota/Kabupaten" 
+                      className="w-full pl-8 pr-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block">TANGGAL LAHIR <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                    <input 
+                      type="date" 
+                      value={tanggalLahir} 
+                      onChange={(e) => setTanggalLahir(e.target.value)}
+                      className="w-full pl-8 pr-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold cursor-pointer"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
               {/* Email Siswa */}
               <div className="space-y-1">
                 <label className="text-[9px] sm:text-[10px] font-bold text-slate-700 block uppercase">EMAIL SISWA <span className="text-red-500">*</span></label>
@@ -1499,8 +1520,10 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">RT <span className="text-red-500">*</span></label>
                     <input 
                       type="text" 
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={rt} 
-                      onChange={(e) => setRt(e.target.value)}
+                      onChange={(e) => setRt(e.target.value.replace(/\D/g, ''))}
                       placeholder="000" 
                       className="w-full px-2.5 py-1 bg-white border border-slate-100 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
                       required
@@ -1510,8 +1533,10 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     <label className="text-[8px] sm:text-[9px] font-bold text-slate-600 block">RW <span className="text-red-500">*</span></label>
                     <input 
                       type="text" 
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       value={rw} 
-                      onChange={(e) => setRw(e.target.value)}
+                      onChange={(e) => setRw(e.target.value.replace(/\D/g, ''))}
                       placeholder="000" 
                       className="w-full px-2.5 py-1 bg-white border border-slate-100 rounded-lg text-[11px] focus:outline-none focus:border-blue-700 text-slate-800 font-mono font-bold"
                       required
