@@ -1381,7 +1381,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     required
                   />
                 </div>
-                <p className="text-[8px] sm:text-[9px] text-slate-400 font-semibold">
+                <p className="text-[8px] sm:text-[9px] text-slate-400 font-semibold italic">
                   * Harus diisi dengan alamat email aktif berakhiran <span className="text-blue-700 font-bold">@gmail.com</span>
                 </p>
                 {email && !email.toLowerCase().endsWith('@gmail.com') && (
