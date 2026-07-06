@@ -137,7 +137,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
   // Show SweetAlert2 loading popup when loading data from spreadsheet initially
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading && !registeredStudent) {
       Swal.fire({
         html: `
           <div class="flex flex-col items-center justify-center py-4">
@@ -164,7 +164,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         Swal.close();
       }
     }
-  }, [isLoading]);
+  }, [isLoading, registeredStudent]);
 
   // Auto-select Pramuka as soon as a class is selected
   useEffect(() => {
@@ -825,34 +825,74 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       }
     });
 
-    // Fetch Kop Image, Left Logo, and Right Logo from proxy in parallel to avoid CORS
+    // Helper to fetch local asset and convert to base64 to prevent CORS issues on Vercel
+    const fetchLocalBase64 = async (pathUrl: string): Promise<string> => {
+      try {
+        const response = await fetch(pathUrl);
+        if (!response.ok) return '';
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(blob);
+        });
+      } catch (e) {
+        console.warn(`Failed to fetch local asset ${pathUrl}:`, e);
+        return '';
+      }
+    };
+
     let kopBase64 = '';
     let logoKiriBase64 = '';
     let logoKananBase64 = '';
+
+    // 1. Try to fetch from local public folder first (works perfectly on Vercel static hosting)
     try {
-      const [resKop, resKiri, resKanan] = await Promise.all([
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q/view')}`),
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`),
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`)
+      const [localKop, localKiri, localKanan] = await Promise.all([
+        fetchLocalBase64('/kop_surat.png'),
+        fetchLocalBase64('/logo_kiri.png'),
+        fetchLocalBase64('/logo_kanan.png')
       ]);
-      
-      if (resKop.ok) {
-        const json = await resKop.json();
-        if (json.status === 'success' && json.base64) {
-          kopBase64 = json.base64;
-        }
+      kopBase64 = localKop;
+      logoKiriBase64 = localKiri;
+      logoKananBase64 = localKanan;
+    } catch (err) {
+      console.warn('Failed to fetch local assets:', err);
+    }
+
+    // 2. Fallback to API proxy if local fetching returned empty (e.g. during development/preview if not cached)
+    try {
+      const proxyPromises = [];
+      if (!kopBase64) {
+        proxyPromises.push(
+          fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q/view')}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(json => {
+              if (json && json.status === 'success' && json.base64) kopBase64 = json.base64;
+            })
+        );
       }
-      if (resKiri.ok) {
-        const json = await resKiri.json();
-        if (json.status === 'success' && json.base64) {
-          logoKiriBase64 = json.base64;
-        }
+      if (!logoKiriBase64) {
+        proxyPromises.push(
+          fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(json => {
+              if (json && json.status === 'success' && json.base64) logoKiriBase64 = json.base64;
+            })
+        );
       }
-      if (resKanan.ok) {
-        const json = await resKanan.json();
-        if (json.status === 'success' && json.base64) {
-          logoKananBase64 = json.base64;
-        }
+      if (!logoKananBase64) {
+        proxyPromises.push(
+          fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`)
+            .then(res => res.ok ? res.json() : null)
+            .then(json => {
+              if (json && json.status === 'success' && json.base64) logoKananBase64 = json.base64;
+            })
+        );
+      }
+      if (proxyPromises.length > 0) {
+        await Promise.all(proxyPromises);
       }
     } catch (err) {
       console.warn('Failed to fetch logos or kop via proxy:', err);
@@ -890,42 +930,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           console.error("Failed to add Kop image", e);
         }
       } else {
-        // Fallback to original text Kop if image fetching fails
-        if (logoKiriBase64) {
-          try {
-            doc.addImage(logoKiriBase64, 'PNG', 12, 10, 22, 22);
-          } catch (e) {
-            console.error("Failed to add left logo", e);
-          }
-        }
-
-        if (logoKananBase64) {
-          try {
-            doc.addImage(logoKananBase64, 'PNG', 176, 10, 22, 22);
-          } catch (e) {
-            console.error("Failed to add right logo", e);
-          }
-        }
-
-        // Draw Kop Surat Text
-        doc.setTextColor(15, 23, 42); // slate-900
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS)', 105, 18, { align: 'center' });
-        doc.setFontSize(16);
-        doc.text('SMP PGRI JATIUWUNG KOTA TANGERANG', 105, 25, { align: 'center' });
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(7.5);
-        doc.setTextColor(71, 85, 105); // slate-600
-        doc.text('Alamat: Jl. Gatot Subroto Km. 5 No. 4 Jatiuwung Kota Tangerang 15134 | Telp: (021) 29576484', 105, 33, { align: 'center' });
-
-        // Double Divider line
-        doc.setDrawColor(15, 23, 42); // slate-900
-        doc.setLineWidth(0.8);
-        doc.line(12, 38.5, 198, 38.5);
-        doc.setLineWidth(0.3);
-        doc.line(12, 40, 198, 40);
-
+        // Fallback: If Kop Image is not loaded, we do not print any text Kop as per user instruction.
+        // We simply keep startYAfterKop = 45.
         startYAfterKop = 45;
       }
 
