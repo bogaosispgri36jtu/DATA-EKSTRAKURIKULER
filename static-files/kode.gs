@@ -563,11 +563,26 @@ function saveStudent(ss, s) {
       var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
       val = (prest === true || prest === "TRUE" || prest === "true") ? "TRUE" : "FALSE";
     }
-    else if (header === "namalomba" || header === "nama lomba") val = getPropCaseInsensitive(s, ["namaLomba", "nama_lomba", "namalomba", "nama lomba"]);
-    else if (header === "cabanglomba" || header === "cabang lomba") val = getPropCaseInsensitive(s, ["cabangLomba", "cabang_lomba", "cabanglomba", "cabang lomba"]);
-    else if (header === "tingkatlomba" || header === "tingkat lomba") val = getPropCaseInsensitive(s, ["tingkatLomba", "tingkat_lomba", "tingkatlomba", "tingkat lomba"]);
-    else if (header === "juarake" || header === "juara ke") val = getPropCaseInsensitive(s, ["juaraKe", "juara_ke", "juarake", "juara ke"]);
-    else if (header === "penyelenggara") val = getPropCaseInsensitive(s, ["penyelenggara", "penyelenggaraLomba"]);
+    else if (header === "namalomba" || header === "nama lomba") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["namaLomba", "nama_lomba", "namalomba", "nama lomba"]) : "";
+    }
+    else if (header === "cabanglomba" || header === "cabang lomba") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["cabangLomba", "cabang_lomba", "cabanglomba", "cabang lomba"]) : "";
+    }
+    else if (header === "tingkatlomba" || header === "tingkat lomba") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["tingkatLomba", "tingkat_lomba", "tingkatlomba", "tingkat lomba"]) : "";
+    }
+    else if (header === "juarake" || header === "juara ke") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["juaraKe", "juara_ke", "juarake", "juara ke"]) : "";
+    }
+    else if (header === "penyelenggara") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["penyelenggara", "penyelenggaraLomba"]) : "";
+    }
     else if (header === "alamat") val = getPropCaseInsensitive(s, ["alamat", "alamatLengkap"]);
     else if (header === "rt") val = getPropCaseInsensitive(s, ["rt"]);
     else if (header === "rw") val = getPropCaseInsensitive(s, ["rw"]);
@@ -585,8 +600,14 @@ function saveStudent(ss, s) {
     else if (header === "eskulname2" || header === "eskul name 2") val = getPropCaseInsensitive(s, ["eskulName2", "eskul_name_2", "eskul2"]);
     else if (header === "eskulid3" || header === "eskul id 3") val = getPropCaseInsensitive(s, ["eskulid3", "eskul_id_3", "eskulId3"]);
     else if (header === "eskulname3" || header === "eskul name 3") val = getPropCaseInsensitive(s, ["eskulname3", "eskul_name_3", "eskulName3"]);
-    else if (header === "certificatefile" || header === "certificate file") val = getPropCaseInsensitive(s, ["certificateFile", "certificate_file", "certificatefile"]);
-    else if (header === "certificatefilename" || header === "certificate file name") val = getPropCaseInsensitive(s, ["certificateFileName", "certificate_file_name", "certificatefilename"]);
+    else if (header === "certificatefile" || header === "certificate file") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["certificateFile", "certificate_file", "certificatefile"]) : "";
+    }
+    else if (header === "certificatefilename" || header === "certificate file name") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["certificateFileName", "certificate_file_name", "certificatefilename"]) : "";
+    }
     else if (header === "tahunpelajaran" || header === "tahun pelajaran") val = targetTP;
     else if (header === "createdat" || header === "created at") val = createdAt;
     

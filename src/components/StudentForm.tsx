@@ -28,9 +28,10 @@ interface StudentFormProps {
   isLive: boolean;
   classList?: string[];
   isLoading?: boolean;
+  onRefresh?: () => void;
 }
 
-export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRegistration, isLive, classList = [], isLoading = false }: StudentFormProps) {
+export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRegistration, isLive, classList = [], isLoading = false, onRefresh }: StudentFormProps) {
   const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
 
   useEffect(() => {
@@ -826,7 +827,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       }
     });
 
-    let kopBase64 = KOP_SURAT_BASE64;
+    let kopImageSrc = 'https://lh3.googleusercontent.com/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q';
 
     try {
       const doc = new jsPDF({
@@ -836,45 +837,47 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       });
 
       let startYAfterKop = 45;
+      let kopHeight = 31; // default fallback proportional height
 
-      if (kopBase64) {
-        let kopHeight = 31; // default fallback proportional height
-        try {
-          const img = new Image();
-          img.src = kopBase64;
-          await new Promise((resolve) => {
-            img.onload = resolve;
-            img.onerror = resolve;
-          });
-          if (img.naturalWidth && img.naturalHeight) {
-            kopHeight = (img.naturalHeight / img.naturalWidth) * 194;
-          }
-        } catch (e) {
-          console.error("Failed to calculate image dimensions", e);
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = kopImageSrc;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+        if (img.naturalWidth && img.naturalHeight) {
+          // lebarkan/besarkan ukuran gambar kop agar profesional di lihatnya saat di download
+          kopHeight = (img.naturalHeight / img.naturalWidth) * 196;
+          doc.addImage(img, 'PNG', 7, 7, 196, kopHeight);
+          startYAfterKop = 7 + kopHeight + 8; // add 8mm spacing after kop
+        } else {
+          startYAfterKop = 45;
         }
-
-        try {
-          doc.addImage(kopBase64, 'PNG', 8, 10, 194, kopHeight);
-          startYAfterKop = 10 + kopHeight + 10; // add 10mm spacing
-        } catch (e) {
-          console.error("Failed to add Kop image", e);
-        }
-      } else {
-        // Fallback: If Kop Image is not loaded, we do not print any text Kop as per user instruction.
-        // We simply keep startYAfterKop = 45.
+      } catch (e) {
+        console.error("Failed to load or add Kop image", e);
         startYAfterKop = 45;
       }
 
-      // Title Section (BUKTI PENDAFTARAN ESKTRAKURIKULLER - spelling matched exactly with image)
+      // Title Section (BUKTI PENDAFTARAN EKSTRAKURIKULER)
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
-      doc.setTextColor(31, 41, 55);
-      doc.text('BUKTI PENDAFTARAN ESKTRAKURIKULLER', 105, startYAfterKop, { align: 'center' });
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text('BUKTI PENDAFTARAN EKSTRAKURIKULER', 105, startYAfterKop, { align: 'center' });
       doc.setFontSize(10);
-      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, startYAfterKop + 6, { align: 'center' });
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(55, 65, 81); // slate-700
+      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, startYAfterKop + 7, { align: 'center' });
+
+      // No. Registrasi: left-aligned directly above Nama Lengkap
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(15, 23, 42);
+      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 15, startYAfterKop + 15);
       
-      // Fields Section Start
-      let currentY = startYAfterKop + 17;
+      // Fields Section Start (Not too close to Tahun Pelajaran and No. Registrasi)
+      let currentY = startYAfterKop + 23;
 
       const drawField = (label: string, value: string) => {
         doc.setFont('helvetica', 'normal');
@@ -898,7 +901,6 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       };
 
       // Draw all fields in a clean sequence (NO sections, matching the image exactly)
-      drawField('No. Registrasi', registeredStudent.regNo);
       drawField('Nama Lengkap', registeredStudent.name);
       drawField('Kelas', registeredStudent.kelas);
       drawField('Jenis Kelamin', registeredStudent.jenisKelamin);
@@ -943,8 +945,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       const fullAlamatStr = `${registeredStudent.alamat}, RT ${registeredStudent.rt} / RW ${registeredStudent.rw}, Kel. ${registeredStudent.kelurahanName}, Kec. ${registeredStudent.kecamatanName}, ${registeredStudent.kabupatenName}, Prov. ${registeredStudent.provinsiName}`;
       drawField('Alamat Lengkap', fullAlamatStr);
 
-      // Signatures & Metadata Section (Dynamic to prevent huge blank gaps)
-      const signY = currentY + 12;
+      // Signatures & Metadata Section (drawn closer to fields as requested)
+      const signY = currentY + 8;
 
       // Draw QR Code on the bottom-left
       const qrText = `SMP PGRI Jatiuwung - Bukti Registrasi Resmi
@@ -1091,6 +1093,9 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
     setSelectedEskul(null);
     setSelectedEskul2(null);
     setRegisteredStudent(null);
+    if (onRefresh) {
+      onRefresh();
+    }
   };
 
   // If successfully registered, show the Success Screen

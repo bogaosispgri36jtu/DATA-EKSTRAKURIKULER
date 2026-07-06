@@ -119,6 +119,10 @@ const SEED_STUDENTS: Student[] = [
 
 const mapStudentData = (s: any): Student => {
   if (!s) return s;
+  
+  const prest = s.prestasiChecked !== undefined ? s.prestasiChecked : (s.prestasi_checked !== undefined ? s.prestasi_checked : (s.PrestasiChecked !== undefined ? s.PrestasiChecked : false));
+  const isPrestasiTrue = (prest === true || prest === 'TRUE' || prest === 'true');
+
   return {
     ...s,
     name: s.name || s.nama || s.Nama || '',
@@ -142,6 +146,17 @@ const mapStudentData = (s: any): Student => {
     eskulName: s.eskulName || s.eskul_name || s.EskulName || s.eskulname || '',
     eskulName2: s.eskulName2 || s.eskul_name2 || s.EskulName2 || s.eskulname2 || '',
     eskulName3: s.eskulName3 || s.eskul_name3 || s.EskulName3 || s.eskulname3 || '',
+    
+    // Achievement fields mapped safely
+    prestasiChecked: isPrestasiTrue,
+    namaLomba: isPrestasiTrue ? (s.namaLomba || s.nama_lomba || s.NamaLomba || '') : '',
+    cabangLomba: isPrestasiTrue ? (s.cabangLomba || s.cabang_lomba || s.CabangLomba || '') : '',
+    tingkatLomba: isPrestasiTrue ? (s.tingkatLomba || s.tingkat_lomba || s.TingkatLomba || '') : '',
+    juaraKe: isPrestasiTrue ? (s.juaraKe || s.juara_ke || s.JuaraKe || '') : '',
+    penyelenggara: isPrestasiTrue ? (s.penyelenggara || s.Penyelenggara || '') : '',
+    certificateFile: isPrestasiTrue ? (s.certificateFile || s.certificate_file || s.CertificateFile || '') : '',
+    certificateFileName: isPrestasiTrue ? (s.certificateFileName || s.certificate_file_name || s.CertificateFileName || '') : '',
+    
     tahunPelajaran: s.tahunPelajaran || s.tahun_pelajaran || s.TahunPelajaran || s.tahunpelajaran || '',
     createdAt: s.createdAt || s.created_at || s.CreatedAt || s.createdat || ''
   };
@@ -445,7 +460,7 @@ export default function App() {
     }
   };
 
-  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwZmJoC81wDxkuoSsZV4FK8Vy5mq7X1j3GkmUkQ4s4m2zvCcJLXH6_CjN47KcsPc323Ew/exec';
+  const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbzMFLeXiLw4mbTMpYEofvjb0gT5oJxqVONk_nYmeEjp3s8CjnnKVhlelL6PIUN7D0QooA/exec';
 
   const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}, timeoutMs: number = 15000): Promise<any> => {
     const cleanUrl = cleanGasUrl(gasUrl);
@@ -861,15 +876,11 @@ export default function App() {
             return mappedData;
           } else {
             // direct post fallback (no-cors)
-            setTimeout(() => fetchAppData(settings), 2000);
             const mockReg = mapStudentData(generateMockStudentResponse(studentData));
             setStudents(prev => [mockReg, ...prev]);
             return mockReg;
           }
         }
-
-        // Fallback re-fetch trigger just in case
-        setTimeout(() => fetchAppData(settings), 2000);
         
         const mockReg = mapStudentData(generateMockStudentResponse(studentData));
         setStudents(prev => [mockReg, ...prev]);
@@ -1274,6 +1285,7 @@ export default function App() {
                   isLive={isLiveConnection}
                   classList={classList}
                   isLoading={isLoading || isInitializing}
+                  onRefresh={handleRefresh}
                 />
               ) : (
                 <div className="max-w-2xl mx-auto px-4 py-16 sm:py-24 text-center">
