@@ -825,15 +825,23 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       }
     });
 
-    // Fetch Left Logo and Right Logo from proxy in parallel to avoid CORS
+    // Fetch Kop Image, Left Logo, and Right Logo from proxy in parallel to avoid CORS
+    let kopBase64 = '';
     let logoKiriBase64 = '';
     let logoKananBase64 = '';
     try {
-      const [resKiri, resKanan] = await Promise.all([
+      const [resKop, resKiri, resKanan] = await Promise.all([
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q/view')}`),
         fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`),
         fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`)
       ]);
       
+      if (resKop.ok) {
+        const json = await resKop.json();
+        if (json.status === 'success' && json.base64) {
+          kopBase64 = json.base64;
+        }
+      }
       if (resKiri.ok) {
         const json = await resKiri.json();
         if (json.status === 'success' && json.base64) {
@@ -847,7 +855,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         }
       }
     } catch (err) {
-      console.warn('Failed to fetch logos via proxy:', err);
+      console.warn('Failed to fetch logos or kop via proxy:', err);
     }
 
     try {
@@ -857,58 +865,85 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         format: 'a4'
       });
 
-      // Draw Left Logo (SMP PGRI Jatiuwung / Kiri)
-      if (logoKiriBase64) {
+      let startYAfterKop = 45;
+
+      if (kopBase64) {
+        let kopHeight = 31; // default fallback proportional height
         try {
-          doc.addImage(logoKiriBase64, 'PNG', 12, 10, 22, 22);
+          const img = new Image();
+          img.src = kopBase64;
+          await new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+          if (img.naturalWidth && img.naturalHeight) {
+            kopHeight = (img.naturalHeight / img.naturalWidth) * 186;
+          }
         } catch (e) {
-          console.error("Failed to add left logo", e);
+          console.error("Failed to calculate image dimensions", e);
         }
-      }
 
-      // Draw Right Logo (Cibodas / Banten / Kanan)
-      if (logoKananBase64) {
         try {
-          doc.addImage(logoKananBase64, 'PNG', 176, 10, 22, 22);
+          doc.addImage(kopBase64, 'PNG', 12, 10, 186, kopHeight);
+          startYAfterKop = 10 + kopHeight + 8; // add 8mm spacing
         } catch (e) {
-          console.error("Failed to add right logo", e);
+          console.error("Failed to add Kop image", e);
         }
+      } else {
+        // Fallback to original text Kop if image fetching fails
+        if (logoKiriBase64) {
+          try {
+            doc.addImage(logoKiriBase64, 'PNG', 12, 10, 22, 22);
+          } catch (e) {
+            console.error("Failed to add left logo", e);
+          }
+        }
+
+        if (logoKananBase64) {
+          try {
+            doc.addImage(logoKananBase64, 'PNG', 176, 10, 22, 22);
+          } catch (e) {
+            console.error("Failed to add right logo", e);
+          }
+        }
+
+        // Draw Kop Surat Text
+        doc.setTextColor(15, 23, 42); // slate-900
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS)', 105, 18, { align: 'center' });
+        doc.setFontSize(16);
+        doc.text('SMP PGRI JATIUWUNG KOTA TANGERANG', 105, 25, { align: 'center' });
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(7.5);
+        doc.setTextColor(71, 85, 105); // slate-600
+        doc.text('Alamat: Jl. Gatot Subroto Km. 5 No. 4 Jatiuwung Kota Tangerang 15134 | Telp: (021) 29576484', 105, 33, { align: 'center' });
+
+        // Double Divider line
+        doc.setDrawColor(15, 23, 42); // slate-900
+        doc.setLineWidth(0.8);
+        doc.line(12, 38.5, 198, 38.5);
+        doc.setLineWidth(0.3);
+        doc.line(12, 40, 198, 40);
+
+        startYAfterKop = 45;
       }
-
-      // Draw Kop Surat Text
-      doc.setTextColor(15, 23, 42); // slate-900
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.text('ORGANISASI SISWA INTRA SEKOLAH (OSIS)', 105, 18, { align: 'center' });
-      doc.setFontSize(16);
-      doc.text('SMP PGRI JATIUWUNG KOTA TANGERANG', 105, 25, { align: 'center' });
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7.5);
-      doc.setTextColor(71, 85, 105); // slate-600
-      doc.text('Alamat: Jl. Gatot Subroto Km. 5 No. 4 Jatiuwung Kota Tangerang 15134 | Telp: (021) 29576484', 105, 33, { align: 'center' });
-
-      // Double Divider line
-      doc.setDrawColor(15, 23, 42); // slate-900
-      doc.setLineWidth(0.8);
-      doc.line(12, 38.5, 198, 38.5);
-      doc.setLineWidth(0.3);
-      doc.line(12, 40, 198, 40);
 
       // Title Section (BUKTI PENDAFTARAN ESKTRAKURIKULLER - spelling matched exactly with image)
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
       doc.setTextColor(31, 41, 55);
-      doc.text('BUKTI PENDAFTARAN ESKTRAKURIKULLER', 105, 47, { align: 'center' });
+      doc.text('BUKTI PENDAFTARAN ESKTRAKURIKULLER', 105, startYAfterKop, { align: 'center' });
       doc.setFontSize(10);
-      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, 52, { align: 'center' });
+      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, startYAfterKop + 5, { align: 'center' });
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9.5);
       doc.setTextColor(55, 65, 81);
-      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 105, 58, { align: 'center' });
+      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 105, startYAfterKop + 11, { align: 'center' });
 
       // Fields Section Start
-      let currentY = 64;
+      let currentY = startYAfterKop + 17;
 
       const drawField = (label: string, value: string) => {
         doc.setFont('helvetica', 'normal');
