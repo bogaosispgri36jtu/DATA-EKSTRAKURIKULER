@@ -1263,8 +1263,25 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       <p>• Foto wajib berseragam sekolah.</p>
                       <p>• Foto Setengah badan</p>
                       <p>• Latar Belakang Foto (Background) berwarna merah</p>
-                      
                       <p>• Maksimal ukuran Foto 200 kb</p>
+                      <p>• <a 
+                          href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRnH_G-C-qvHPROzQadI0v56Sq0fZv8OwaLooQ1wSZSC2tW50ba2uSsSd9I&s=10"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            Swal.fire({
+                              title: 'Contoh Foto',
+                              imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRnH_G-C-qvHPROzQadI0v56Sq0fZv8OwaLooQ1wSZSC2tW50ba2uSsSd9I&s=10',
+                              imageAlt: 'Contoh Foto',
+                              confirmButtonText: 'Tutup',
+                              confirmButtonColor: '#3085d6',
+                              customClass: {
+                                popup: 'rounded-xl',
+                                confirmButton: 'rounded-lg px-4 py-2 text-xs font-semibold'
+                              }
+                            });
+                          }}
+                          className="text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
+                        >contoh foto</a></p>
                     </div>
                   </div>
                 </div>

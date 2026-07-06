@@ -505,8 +505,9 @@ export default function App() {
     isPublished: true
   });
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isLiveConnection, setIsLiveConnection] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Initialize and load data (from backend API or local storage fallback)
   useEffect(() => {
@@ -549,10 +550,19 @@ export default function App() {
           if (contentType.includes('application/json')) {
             const serverSettings = await response.json();
             // Merge server settings, but do not overwrite a valid local GAS URL with an empty server URL
+            let isPublishedVal = activeSettings.isPublished;
+            if (serverSettings.isPublished !== undefined) {
+              if (typeof serverSettings.isPublished === 'boolean') {
+                isPublishedVal = serverSettings.isPublished;
+              } else if (typeof serverSettings.isPublished === 'string') {
+                isPublishedVal = serverSettings.isPublished.toLowerCase() === 'true';
+              }
+            }
+
             activeSettings = {
               ...activeSettings,
               tahunPelajaranAktif: serverSettings.tahunPelajaranAktif || activeSettings.tahunPelajaranAktif,
-              isPublished: serverSettings.isPublished !== undefined ? serverSettings.isPublished : activeSettings.isPublished,
+              isPublished: isPublishedVal,
               googleAppsScriptUrl: (serverSettings.googleAppsScriptUrl && serverSettings.googleAppsScriptUrl.trim().startsWith('http'))
                 ? serverSettings.googleAppsScriptUrl
                 : activeSettings.googleAppsScriptUrl
@@ -649,6 +659,7 @@ export default function App() {
           localStorage.setItem('smp_pgri_settings', JSON.stringify(updatedSettings));
           setIsLiveConnection(true);
           setIsLoading(false);
+          setIsInitializing(false);
           return;
         }
       } catch (error) {
@@ -709,6 +720,7 @@ export default function App() {
     }
 
     setIsLoading(false);
+    setIsInitializing(false);
   };
 
   // -------------------- CORE ACTION PROXIES (POST HANDLERS) --------------------
@@ -1125,7 +1137,12 @@ export default function App() {
 
       {/* MAIN LAYOUT */}
       <main className="flex-grow">
-        {isLoading && activeView === 'admin' ? (
+        {isInitializing ? (
+          <div className="h-96 flex flex-col items-center justify-center text-slate-500 gap-3">
+            <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
+            <span className="text-xs font-bold text-slate-600 animate-pulse">Menghubungi Server...</span>
+          </div>
+        ) : isLoading && activeView === 'admin' ? (
           <div className="h-96 flex flex-col items-center justify-center text-slate-500 gap-3">
             <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
             <span className="text-xs font-bold">Sinkronisasi Database...</span>
