@@ -150,7 +150,7 @@ const mapStudentData = (s: any): Student => {
 const cleanGasUrl = (url: string): string => {
   if (!url) return '';
   const trimmed = url.trim();
-  const match = trimmed.match(/(https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec)/);
+  const match = trimmed.match(/(https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/(?:exec|dev))/);
   if (match) {
     return match[1];
   }
@@ -447,7 +447,7 @@ export default function App() {
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwZmJoC81wDxkuoSsZV4FK8Vy5mq7X1j3GkmUkQ4s4m2zvCcJLXH6_CjN47KcsPc323Ew/exec';
 
-  const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}, timeoutMs: number = 3500): Promise<any> => {
+  const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}, timeoutMs: number = 15000): Promise<any> => {
     const cleanUrl = cleanGasUrl(gasUrl);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

@@ -101,7 +101,7 @@ async function startServer() {
 
       if (targetUrl) {
         targetUrl = targetUrl.trim();
-        const match = targetUrl.match(/(https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec)/);
+        const match = targetUrl.match(/(https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/(?:exec|dev))/);
         if (match) {
           targetUrl = match[1];
         } else {
