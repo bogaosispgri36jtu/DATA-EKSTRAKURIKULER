@@ -147,6 +147,16 @@ const mapStudentData = (s: any): Student => {
   };
 };
 
+const cleanGasUrl = (url: string): string => {
+  if (!url) return '';
+  const trimmed = url.trim();
+  const match = trimmed.match(/(https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec)/);
+  if (match) {
+    return match[1];
+  }
+  return trimmed.split(/[\s\n\r]+/)[0];
+};
+
 export default function App() {
   // Navigation / Frame toggles
   const [activeView, setActiveView] = useState<'student' | 'admin' | 'guide'>(() => {
@@ -438,12 +448,13 @@ export default function App() {
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwZmJoC81wDxkuoSsZV4FK8Vy5mq7X1j3GkmUkQ4s4m2zvCcJLXH6_CjN47KcsPc323Ew/exec';
 
   const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}, timeoutMs: number = 3500): Promise<any> => {
+    const cleanUrl = cleanGasUrl(gasUrl);
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const urlObj = new URL('/api/gas', window.location.origin);
-      urlObj.searchParams.set('url', gasUrl);
+      urlObj.searchParams.set('url', cleanUrl);
       urlObj.searchParams.set('action', action);
       Object.entries(params).forEach(([key, val]) => {
         urlObj.searchParams.set(key, val);
@@ -469,7 +480,7 @@ export default function App() {
     const directTimeoutId = setTimeout(() => directController.abort(), timeoutMs);
 
     try {
-      const directUrl = new URL(gasUrl);
+      const directUrl = new URL(cleanUrl);
       directUrl.searchParams.set('action', action);
       Object.entries(params).forEach(([key, val]) => {
         directUrl.searchParams.set(key, val);
@@ -494,11 +505,12 @@ export default function App() {
   };
 
   const gasPost = async (gasUrl: string, body: any): Promise<any> => {
+    const cleanUrl = cleanGasUrl(gasUrl);
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 7000); // 7 seconds timeout
 
-      const response = await fetch(`/api/gas?url=${encodeURIComponent(gasUrl)}`, {
+      const response = await fetch(`/api/gas?url=${encodeURIComponent(cleanUrl)}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

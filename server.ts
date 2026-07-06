@@ -99,6 +99,16 @@ async function startServer() {
         targetUrl = defaultSettings.googleAppsScriptUrl;
       }
 
+      if (targetUrl) {
+        targetUrl = targetUrl.trim();
+        const match = targetUrl.match(/(https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/exec)/);
+        if (match) {
+          targetUrl = match[1];
+        } else {
+          targetUrl = targetUrl.split(/[\s\n\r]+/)[0];
+        }
+      }
+
       if (!targetUrl || !targetUrl.startsWith("http")) {
         return res.status(400).json({ status: "error", message: "Google Apps Script URL tidak terkonfigurasi." });
       }
