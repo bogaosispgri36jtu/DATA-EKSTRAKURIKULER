@@ -2480,7 +2480,16 @@ export default function AdminDashboard({
                   <div className="space-y-1">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Tempat, Tgl Lahir</span>
                     <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">
-                      {selectedStudentDetail.tempatLahir || '-'}, {selectedStudentDetail.tanggalLahir ? new Date(selectedStudentDetail.tanggalLahir).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : '-'}
+                      {selectedStudentDetail.tempatLahir || '-'}, {(() => {
+                        if (!selectedStudentDetail.tanggalLahir) return '-';
+                        try {
+                          const d = new Date(selectedStudentDetail.tanggalLahir);
+                          if (isNaN(d.getTime())) return selectedStudentDetail.tanggalLahir;
+                          return d.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
+                        } catch {
+                          return selectedStudentDetail.tanggalLahir;
+                        }
+                      })()}
                     </span>
                   </div>
                   <div className="space-y-1">

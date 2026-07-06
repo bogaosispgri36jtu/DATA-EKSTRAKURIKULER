@@ -830,8 +830,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     let logoKananBase64 = '';
     try {
       const [resKiri, resKanan] = await Promise.all([
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`),
-        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`)
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`),
+        fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`)
       ]);
       
       if (resKiri.ok) {
@@ -935,7 +935,16 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       drawField('Nama Lengkap', registeredStudent.name);
       drawField('Kelas', registeredStudent.kelas);
       drawField('Jenis Kelamin', registeredStudent.jenisKelamin);
-      const birthStr = `${registeredStudent.tempatLahir || '-'}, ${registeredStudent.tanggalLahir ? new Date(registeredStudent.tanggalLahir).toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'}) : '-'}`;
+      const birthStr = `${registeredStudent.tempatLahir || '-'}, ${(() => {
+        if (!registeredStudent.tanggalLahir) return '-';
+        try {
+          const d = new Date(registeredStudent.tanggalLahir);
+          if (isNaN(d.getTime())) return registeredStudent.tanggalLahir;
+          return d.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
+        } catch {
+          return registeredStudent.tanggalLahir;
+        }
+      })()}`;
       drawField('Tempat/Tanggal Lahir', birthStr);
       drawField('Email Siswa', registeredStudent.email || '-');
       drawField('No. HP WhatsApp', registeredStudent.hpSiswa);
@@ -1026,10 +1035,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.text('tanda tangan & nama jelas', 165, 241, { align: 'center' });
 
       // Footer divider line and text
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.2);
-      doc.line(12, 276, 198, 276);
-
+     
       const regDateObj = new Date(registeredStudent.createdAt);
       const yyyy = regDateObj.getFullYear();
       const mm = String(regDateObj.getMonth() + 1).padStart(2, '0');
@@ -1174,7 +1180,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
             >
               <FileCheck className="w-5 h-5 text-yellow-300" />
-              Download Formulir PDF Resmi
+              Download Bukti Pendaftar (PDF)
             </button>
             
             <button

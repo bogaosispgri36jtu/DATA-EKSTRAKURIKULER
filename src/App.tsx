@@ -117,6 +117,36 @@ const SEED_STUDENTS: Student[] = [
   }
 ];
 
+const mapStudentData = (s: any): Student => {
+  if (!s) return s;
+  return {
+    ...s,
+    name: s.name || s.nama || s.Nama || '',
+    tempatLahir: s.tempatLahir || s.tempat_lahir || s.TempatLahir || s.tempatlahir || s['tempat lahir'] || '',
+    tanggalLahir: s.tanggalLahir || s.tanggal_lahir || s.TanggalLahir || s.tanggallahir || s['tanggal lahir'] || '',
+    namaAyah: s.namaAyah || s.nama_ayah || s.NamaAyah || s.namaayah || s['nama ayah'] || '',
+    namaIbu: s.namaIbu || s.nama_ibu || s.NamaIbu || s.namaibu || s['nama ibu'] || '',
+    hpSiswa: s.hpSiswa || s.hp_siswa || s.HpSiswa || s.hpsiswa || s['hp siswa'] || '',
+    hpOrtu: s.hpOrtu || s.hp_ortu || s.HpOrtu || s.hportu || s['hp ortu'] || '',
+    jenisKelamin: s.jenisKelamin || s.jenis_kelamin || s.JenisKelamin || s.jeniskelamin || s['jenis kelamin'] || '',
+    regNo: s.regNo || s.reg_no || s.RegNo || s.regno || s['no. registrasi'] || '',
+    photo: s.photo || s.Photo || s.foto || s.Foto || '',
+    kelas: s.kelas || s.Kelas || '',
+    alamat: s.alamat || s.Alamat || '',
+    rt: s.rt || s.RT || '',
+    rw: s.rw || s.RW || '',
+    provinsiName: s.provinsiName || s.provinsi_name || s.ProvinsiName || s.provinsiname || s.provinsi || '',
+    kabupatenName: s.kabupatenName || s.kabupaten_name || s.KabupatenName || s.kabupatenname || s.kabupaten || '',
+    kecamatanName: s.kecamatanName || s.kecamatan_name || s.KecamatanName || s.kecamatanname || s.kecamatan || '',
+    kelurahanName: s.kelurahanName || s.kelurahan_name || s.KelurahanName || s.kelurahanname || s.kelurahan || '',
+    eskulName: s.eskulName || s.eskul_name || s.EskulName || s.eskulname || '',
+    eskulName2: s.eskulName2 || s.eskul_name2 || s.EskulName2 || s.eskulname2 || '',
+    eskulName3: s.eskulName3 || s.eskul_name3 || s.EskulName3 || s.eskulname3 || '',
+    tahunPelajaran: s.tahunPelajaran || s.tahun_pelajaran || s.TahunPelajaran || s.tahunpelajaran || '',
+    createdAt: s.createdAt || s.created_at || s.CreatedAt || s.createdat || ''
+  };
+};
+
 export default function App() {
   // Navigation / Frame toggles
   const [activeView, setActiveView] = useState<'student' | 'admin' | 'guide'>(() => {
@@ -260,7 +290,7 @@ export default function App() {
           localStorage.setItem('smp_pgri_settings', JSON.stringify(newSettings));
 
           // Sync other data as well
-          setStudents(resJson.students || []);
+          setStudents((resJson.students || []).map(mapStudentData));
           setEskulList(resJson.eskul || []);
           if (resJson.classes && Array.isArray(resJson.classes)) {
             setClassList(resJson.classes);
@@ -369,7 +399,7 @@ export default function App() {
           console.error('Failed to save settings to server', e);
         }
         
-        setStudents(resJson.students || []);
+        setStudents((resJson.students || []).map(mapStudentData));
         setEskulList(resJson.eskul || []);
         if (resJson.classes && Array.isArray(resJson.classes)) {
           setClassList(resJson.classes);
@@ -512,7 +542,7 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>(() => {
     try {
       const saved = localStorage.getItem('smp_pgri_students');
-      return saved ? JSON.parse(saved) : [];
+      return saved ? JSON.parse(saved).map(mapStudentData) : [];
     } catch {
       return [];
     }
@@ -671,10 +701,7 @@ export default function App() {
         const resJson = await gasFetch(gasUrl, 'getData');
         
         if (resJson.status === 'success') {
-          const mappedStudents = (resJson.students || []).map((s: any) => ({
-            ...s,
-            name: s.name || s.nama || ''
-          }));
+          const mappedStudents = (resJson.students || []).map(mapStudentData);
           setStudents(mappedStudents);
           setEskulList(resJson.eskul || []);
           if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
@@ -778,7 +805,7 @@ export default function App() {
     const savedStudents = localStorage.getItem('smp_pgri_students');
     if (savedStudents) {
       try {
-        setStudents(JSON.parse(savedStudents));
+        setStudents(JSON.parse(savedStudents).map(mapStudentData));
       } catch (e) {
         setStudents([]);
       }
@@ -817,12 +844,13 @@ export default function App() {
 
         if (resJson && resJson.status === 'success') {
           if (resJson.data) {
-            setStudents(prev => [resJson.data, ...prev]);
-            return resJson.data;
+            const mappedData = mapStudentData(resJson.data);
+            setStudents(prev => [mappedData, ...prev]);
+            return mappedData;
           } else {
             // direct post fallback (no-cors)
             setTimeout(() => fetchAppData(settings), 2000);
-            const mockReg = generateMockStudentResponse(studentData);
+            const mockReg = mapStudentData(generateMockStudentResponse(studentData));
             setStudents(prev => [mockReg, ...prev]);
             return mockReg;
           }
@@ -831,7 +859,7 @@ export default function App() {
         // Fallback re-fetch trigger just in case
         setTimeout(() => fetchAppData(settings), 2000);
         
-        const mockReg = generateMockStudentResponse(studentData);
+        const mockReg = mapStudentData(generateMockStudentResponse(studentData));
         setStudents(prev => [mockReg, ...prev]);
         return mockReg;
       } catch (err) {
@@ -840,7 +868,7 @@ export default function App() {
     }
 
     // Local Storage save
-    const mockReg = generateMockStudentResponse(studentData);
+    const mockReg = mapStudentData(generateMockStudentResponse(studentData));
     const updatedStudents = [mockReg, ...students];
     setStudents(updatedStudents);
     localStorage.setItem('smp_pgri_students', JSON.stringify(updatedStudents));
@@ -979,10 +1007,7 @@ export default function App() {
       if (resJson.status === 'success') {
         setIsLiveConnection(true);
         if (resJson.students) {
-          const mappedStudents = resJson.students.map((s: any) => ({
-            ...s,
-            name: s.name || s.nama || ''
-          }));
+          const mappedStudents = resJson.students.map(mapStudentData);
           setStudents(mappedStudents);
         }
         if (resJson.eskul) setEskulList(resJson.eskul);
@@ -1057,7 +1082,7 @@ export default function App() {
         const savedEskul = localStorage.getItem('smp_pgri_eskul');
         if (savedEskul) setEskulList(JSON.parse(savedEskul));
         const savedStudents = localStorage.getItem('smp_pgri_students');
-        if (savedStudents) setStudents(JSON.parse(savedStudents));
+        if (savedStudents) setStudents(JSON.parse(savedStudents).map(mapStudentData));
         const savedAdmins = localStorage.getItem('smp_pgri_admins');
         if (savedAdmins) setAdmins(JSON.parse(savedAdmins));
       } else {
