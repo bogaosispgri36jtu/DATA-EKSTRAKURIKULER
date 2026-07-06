@@ -11,6 +11,7 @@ import {
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
 import QRCode from 'qrcode';
+import { KOP_SURAT_BASE64 } from '../assets/kop_surat_base64';
 import { Student, Extracurricular } from '../types';
 import { 
   fetchProvinces, 
@@ -825,78 +826,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       }
     });
 
-    // Helper to fetch local asset and convert to base64 to prevent CORS issues on Vercel
-    const fetchLocalBase64 = async (pathUrl: string): Promise<string> => {
-      try {
-        const response = await fetch(pathUrl);
-        if (!response.ok) return '';
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.onerror = () => resolve('');
-          reader.readAsDataURL(blob);
-        });
-      } catch (e) {
-        console.warn(`Failed to fetch local asset ${pathUrl}:`, e);
-        return '';
-      }
-    };
-
-    let kopBase64 = '';
-    let logoKiriBase64 = '';
-    let logoKananBase64 = '';
-
-    // 1. Try to fetch from local public folder first (works perfectly on Vercel static hosting)
-    try {
-      const [localKop, localKiri, localKanan] = await Promise.all([
-        fetchLocalBase64('/kop_surat.png'),
-        fetchLocalBase64('/logo_kiri.png'),
-        fetchLocalBase64('/logo_kanan.png')
-      ]);
-      kopBase64 = localKop;
-      logoKiriBase64 = localKiri;
-      logoKananBase64 = localKanan;
-    } catch (err) {
-      console.warn('Failed to fetch local assets:', err);
-    }
-
-    // 2. Fallback to API proxy if local fetching returned empty (e.g. during development/preview if not cached)
-    try {
-      const proxyPromises = [];
-      if (!kopBase64) {
-        proxyPromises.push(
-          fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q/view')}`)
-            .then(res => res.ok ? res.json() : null)
-            .then(json => {
-              if (json && json.status === 'success' && json.base64) kopBase64 = json.base64;
-            })
-        );
-      }
-      if (!logoKiriBase64) {
-        proxyPromises.push(
-          fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/12P5BRN317BqMQf8HiCCplnTFCc_EhAOC/view?usp=sharing')}`)
-            .then(res => res.ok ? res.json() : null)
-            .then(json => {
-              if (json && json.status === 'success' && json.base64) logoKiriBase64 = json.base64;
-            })
-        );
-      }
-      if (!logoKananBase64) {
-        proxyPromises.push(
-          fetch(`/api/proxy-image?url=${encodeURIComponent('https://drive.google.com/file/d/1Jfb6nl1FHxlA3tL8qNNrgyPrc1ob2SfT/view?usp=sharing')}`)
-            .then(res => res.ok ? res.json() : null)
-            .then(json => {
-              if (json && json.status === 'success' && json.base64) logoKananBase64 = json.base64;
-            })
-        );
-      }
-      if (proxyPromises.length > 0) {
-        await Promise.all(proxyPromises);
-      }
-    } catch (err) {
-      console.warn('Failed to fetch logos or kop via proxy:', err);
-    }
+    let kopBase64 = KOP_SURAT_BASE64;
 
     try {
       const doc = new jsPDF({
@@ -917,14 +847,14 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
             img.onerror = resolve;
           });
           if (img.naturalWidth && img.naturalHeight) {
-            kopHeight = (img.naturalHeight / img.naturalWidth) * 186;
+            kopHeight = (img.naturalHeight / img.naturalWidth) * 194;
           }
         } catch (e) {
           console.error("Failed to calculate image dimensions", e);
         }
 
         try {
-          doc.addImage(kopBase64, 'PNG', 12, 10, 186, kopHeight);
+          doc.addImage(kopBase64, 'PNG', 8, 10, 194, kopHeight);
           startYAfterKop = 10 + kopHeight + 8; // add 8mm spacing
         } catch (e) {
           console.error("Failed to add Kop image", e);
@@ -1446,7 +1376,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     type="email" 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="nama.siswa@gmail.com" 
+                    placeholder="namaemail@gmail.com" 
                     className="w-full pl-8 pr-2.5 py-1 sm:py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] sm:text-xs focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800 transition-all duration-300 font-semibold"
                     required
                   />
