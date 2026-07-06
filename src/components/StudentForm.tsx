@@ -855,7 +855,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
         try {
           doc.addImage(kopBase64, 'PNG', 8, 10, 194, kopHeight);
-          startYAfterKop = 10 + kopHeight + 8; // add 8mm spacing
+          startYAfterKop = 10 + kopHeight + 10; // add 10mm spacing
         } catch (e) {
           console.error("Failed to add Kop image", e);
         }
@@ -871,13 +871,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       doc.setTextColor(31, 41, 55);
       doc.text('BUKTI PENDAFTARAN ESKTRAKURIKULLER', 105, startYAfterKop, { align: 'center' });
       doc.setFontSize(10);
-      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, startYAfterKop + 5, { align: 'center' });
+      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, startYAfterKop + 6, { align: 'center' });
       
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9.5);
-      doc.setTextColor(55, 65, 81);
-      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 105, startYAfterKop + 11, { align: 'center' });
-
       // Fields Section Start
       let currentY = startYAfterKop + 17;
 
@@ -903,6 +898,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       };
 
       // Draw all fields in a clean sequence (NO sections, matching the image exactly)
+      drawField('No. Registrasi', registeredStudent.regNo);
       drawField('Nama Lengkap', registeredStudent.name);
       drawField('Kelas', registeredStudent.kelas);
       drawField('Jenis Kelamin', registeredStudent.jenisKelamin);
@@ -947,8 +943,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       const fullAlamatStr = `${registeredStudent.alamat}, RT ${registeredStudent.rt} / RW ${registeredStudent.rw}, Kel. ${registeredStudent.kelurahanName}, Kec. ${registeredStudent.kecamatanName}, ${registeredStudent.kabupatenName}, Prov. ${registeredStudent.provinsiName}`;
       drawField('Alamat Lengkap', fullAlamatStr);
 
-      // Signatures & Metadata Section (Fixed at bottom part Y = 205 to ensure beautiful spacing)
-      const signY = 205;
+      // Signatures & Metadata Section (Dynamic to prevent huge blank gaps)
+      const signY = currentY + 12;
 
       // Draw QR Code on the bottom-left
       const qrText = `SMP PGRI Jatiuwung - Bukti Registrasi Resmi
@@ -987,23 +983,23 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.setFontSize(9.5);
       doc.setTextColor(31, 41, 55);
       doc.text(`Tangerang, ${formattedDate}`, 110, signY + 2, { align: 'center' });
-      doc.text('Pendaftar,', 110, 212, { align: 'center' });
+      doc.text('Pendaftar,', 110, signY + 7, { align: 'center' });
       
       doc.setFont('helvetica', 'bold');
-      doc.text(registeredStudent.name, 110, 237, { align: 'center' });
+      doc.text(registeredStudent.name, 110, signY + 32, { align: 'center' });
       const nameWidth = doc.getTextWidth(registeredStudent.name);
-      doc.line(110 - nameWidth / 2, 238, 110 + nameWidth / 2, 238); // Underline
+      doc.line(110 - nameWidth / 2, signY + 33, 110 + nameWidth / 2, signY + 33); // Underline
 
       // Column 2 (Parent)
       doc.setFont('helvetica', 'normal');
       doc.text('Mengetahui,', 165, signY + 2, { align: 'center' });
-      doc.text('Orang Tua/Wali Murid', 165, 212, { align: 'center' });
-      doc.text('........................................', 165, 237, { align: 'center' });
+      doc.text('Orang Tua/Wali Murid', 165, signY + 7, { align: 'center' });
+      doc.text('........................................', 165, signY + 32, { align: 'center' });
       
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(7.5);
       doc.setTextColor(100, 116, 139);
-      doc.text('tanda tangan & nama jelas', 165, 241, { align: 'center' });
+      doc.text('tanda tangan & nama jelas', 165, signY + 36, { align: 'center' });
 
       // Footer divider line and text
      
