@@ -137,7 +137,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
   // Show SweetAlert2 loading popup when loading data from spreadsheet initially
   useEffect(() => {
-    if (isLoading && finalKelasList.length === 0) {
+    if (isLoading) {
       Swal.fire({
         html: `
           <div class="flex flex-col items-center justify-center py-4">
@@ -147,8 +147,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
               <div class="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></div>
             </div>
             <!-- Aesthetic Description below spinner -->
-            <p class="text-xs sm:text-[13px] text-slate-500 font-base tracking-wider mt-4">
-              Mohon Tunggu Sebentar ...
+            <p class="text-xs sm:text-[13px] text-slate-500 font-bold tracking-wider mt-4 animate-pulse">
+              Mohon tunggu sebentar...
             </p>
           </div>
         `,
@@ -160,11 +160,11 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         }
       });
     } else {
-      if (Swal.isVisible() && !isLoading) {
+      if (Swal.isVisible()) {
         Swal.close();
       }
     }
-  }, [isLoading, finalKelasList.length]);
+  }, [isLoading]);
 
   // Auto-select Pramuka as soon as a class is selected
   useEffect(() => {
@@ -384,12 +384,12 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Fast-fail: Reject files larger than 1MB to avoid network choke during submission
-    if (file.size > 1024 * 1024) {
+    // Reject files larger than 10MB
+    if (file.size > 10 * 1024 * 1024) {
       Swal.fire({
         icon: 'warning',
         title: 'Ukuran File Terlalu Besar',
-        text: 'Maksimal ukuran file sertifikat adalah 1MB (1024 KB)',
+        text: 'Maksimal ukuran file sertifikat adalah 10MB.',
         confirmButtonColor: '#1d4ed8',
         width: '360px',
         timer: 5000,
@@ -403,25 +403,27 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
     const fileType = file.type;
     const isImage = fileType.startsWith('image/');
-    const isPdf = fileType === 'application/pdf';
 
-    if (!isImage && !isPdf) {
+    if (!isImage) {
       Swal.fire({
         icon: 'error',
         title: 'Format File Tidak Didukung',
-        text: 'Harap unggah file sertifikat dalam format JPG/JPEG/PNG atau PDF.',
+        text: 'Harap unggah file sertifikat dalam format gambar (JPG/JPEG/PNG).',
         confirmButtonColor: '#1d4ed8',
         width: '360px',
         timer: 5000,
         timerProgressBar: true
       });
+      if (certInputRef.current) {
+        certInputRef.current.value = '';
+      }
       return;
     }
 
     // Show loading SweetAlert
     Swal.fire({
-      title: 'Memproses...',
-      html: 'Sedang memproses ...',
+      title: 'Memproses Sertifikat...',
+      html: 'Sedang mengompres gambar otomatis di bawah 100 KB...',
       allowOutsideClick: false,
       allowEscapeKey: false,
       didOpen: () => {
@@ -437,76 +439,85 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     reader.onload = (event) => {
       const base64Data = event.target?.result as string;
 
-      if (isImage) {
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
+      const img = new Image();
+      img.onload = () => {
+        let width = img.width;
+        let height = img.height;
 
-          // Max dimension bounds for scaling (Optimized to 600 for clear text and fast transmission)
-          const MAX_DIM = 600;
-          if (width > height) {
-            if (width > MAX_DIM) {
-              height *= MAX_DIM / width;
-              width = MAX_DIM;
-            }
-          } else {
-            if (height > MAX_DIM) {
-              width *= MAX_DIM / height;
-              height = MAX_DIM;
-            }
+        // Target max dimension of 800 to maintain legible certificate text
+        const MAX_DIM = 800;
+        if (width > height) {
+          if (width > MAX_DIM) {
+            height *= MAX_DIM / width;
+            width = MAX_DIM;
           }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.clearRect(0, 0, width, height);
-            ctx.drawImage(img, 0, 0, width, height);
+        } else {
+          if (height > MAX_DIM) {
+            width *= MAX_DIM / height;
+            height = MAX_DIM;
           }
+        }
 
-          // Fast and efficient compression check without slow nested loops
-          let quality = 0.75;
-          let dataUrl = canvas.toDataURL('image/jpeg', quality);
-          const head = 'data:image/jpeg;base64,'.length;
-          let sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+        }
 
-          if (sizeInKb > 80) {
-            // Fallback step if still slightly over 80 KB
+        // Target under 100 KB (98 KB buffer)
+        let quality = 0.8;
+        let dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const head = 'data:image/jpeg;base64,'.length;
+        let sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+
+        if (sizeInKb >= 100) {
+          quality = 0.6;
+          dataUrl = canvas.toDataURL('image/jpeg', quality);
+          sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+        }
+
+        if (sizeInKb >= 100) {
+          const narrowCanvas = document.createElement('canvas');
+          narrowCanvas.width = width * 0.75;
+          narrowCanvas.height = height * 0.75;
+          const nCtx = narrowCanvas.getContext('2d');
+          if (nCtx) {
+            nCtx.drawImage(canvas, 0, 0, narrowCanvas.width, narrowCanvas.height);
             quality = 0.55;
-            dataUrl = canvas.toDataURL('image/jpeg', quality);
+            dataUrl = narrowCanvas.toDataURL('image/jpeg', quality);
             sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
           }
+        }
 
-          setCertificateFile(dataUrl);
-          Swal.fire({
-            icon: 'success',
-            title: 'Berhasil Diproses',
-            text: `Gambar sertifikat berhasil dikompres menjadi ${sizeInKb} KB.`,
-            confirmButtonColor: '#1d4ed8',
-            width: '340px',
-            timer: 2000,
-            timerProgressBar: true,
-            customClass: { popup: 'rounded-2xl' }
-          });
-        };
-        img.src = base64Data;
-      } else {
-        // For PDF, we cannot compress it in client JS easily, so we keep it as is
-        setCertificateFile(base64Data);
-        const originalSizeKb = Math.round(file.size / 1024);
+        if (sizeInKb >= 100) {
+          const tinyCanvas = document.createElement('canvas');
+          tinyCanvas.width = width * 0.5;
+          tinyCanvas.height = height * 0.5;
+          const tCtx = tinyCanvas.getContext('2d');
+          if (tCtx) {
+            tCtx.drawImage(canvas, 0, 0, tinyCanvas.width, tinyCanvas.height);
+            quality = 0.45;
+            dataUrl = tinyCanvas.toDataURL('image/jpeg', quality);
+            sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+          }
+        }
+
+        setCertificateFile(dataUrl);
         Swal.fire({
           icon: 'success',
           title: 'Berhasil Diproses',
-          text: `File PDF sertifikat (${originalSizeKb} KB) siap diunggah.`,
+          text: `Gambar sertifikat berhasil di upload`,
           confirmButtonColor: '#1d4ed8',
           width: '340px',
           timer: 2000,
           timerProgressBar: true,
           customClass: { popup: 'rounded-2xl' }
         });
-      }
+      };
+      img.src = base64Data;
     };
     reader.readAsDataURL(file);
   };
@@ -1119,10 +1130,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
           </div>
           
           <h2 className="text-2xl font-bold text-slate-800 mb-2">Pendaftaran Berhasil!</h2>
-          <p className="text-slate-500 text-sm mb-6 px-4">
-            Selamat <span className="text-sm font-base text-slate-700">{registeredStudent.name}</span>, data pendaftaran Anda telah berhasil, silahkan di download bukti pendaftaran di file PDF di bawah ini untuk kemudian di print 2 lembar  dan di serahkan kepada 1 lbr Pembina OSIS dan 1 lbr untuk Pelatih Ekstrakurikuler
-          </p>
-
+          
           {/* Registrasi info box */}
           <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 w-full mb-8 text-left">
             <div className="flex justify-between border-b border-blue-100 pb-2 mb-2">
@@ -1154,6 +1162,10 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
               <span className="text-sm font-semibold text-blue-900">{registeredStudent.tahunPelajaran}</span>
             </div>
           </div>
+		  
+		  <p className="text-slate-500 text-sm mb-6 px-4">
+            Selamat <span className="text-sm font-base text-slate-700">{registeredStudent.name}</span>, data pendaftaran Anda telah berhasil, silahkan di download bukti pendaftaran di file PDF di bawah ini untuk kemudian di print 2 lembar  dan di serahkan kepada 1 lbr Pembina OSIS dan 1 lbr untuk Pelatih Ekstrakurikuler
+          </p>
 
           <div className="space-y-3 w-full">
             <button
@@ -1258,7 +1270,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       onChange={handlePhotoUpload} 
                       className="hidden" 
                     />
-                    <div className="text-[9px] sm:text-[8px] text-slate-400 font-normal leading-normal">
+                    <div className="text-[8px] sm:text-[6px] text-slate-400 font-normal leading-normal">
                       <p className="font-bold text-slate-500 mb-0.5">Syarat foto :</p>
                       <p>• Foto wajib berseragam sekolah.</p>
                       <p>• Foto Setengah badan</p>
@@ -1273,7 +1285,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                               imageUrl: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRnH_G-C-qvHPROzQadI0v56Sq0fZv8OwaLooQ1wSZSC2tW50ba2uSsSd9I&s=10',
                               imageAlt: 'Contoh Foto',
                               confirmButtonText: 'Tutup',
-                              confirmButtonColor: '#3085d6',
+                              confirmButtonColor: '#FF0000',
                               customClass: {
                                 popup: 'rounded-xl',
                                 confirmButton: 'rounded-lg px-4 py-2 text-xs font-semibold'
@@ -1281,7 +1293,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                             });
                           }}
                           className="text-blue-600 hover:text-blue-800 font-semibold underline cursor-pointer"
-                        >contoh foto</a></p>
+                        >Lihat contoh foto</a></p>
                     </div>
                   </div>
                 </div>
@@ -1429,7 +1441,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                     disabled={true}
                     className="w-full pl-8 pr-2 py-1 sm:py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-[11px] sm:text-xs text-slate-500 font-semibold cursor-not-allowed appearance-none"
                   >
-                    <option value={selectedEskul?.id || ''}>{selectedEskul ? selectedEskul.nama : 'PRAMUKA (Wajib)'}</option>
+                    <option value={selectedEskul?.id || ''}>{selectedEskul ? selectedEskul.nama : 'Pramuka'}</option>
                   </select>
                 </div>
                 {kelas && eligibleEskuls.length === 0 && (
@@ -1764,10 +1776,10 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                       </select>
                     </div>
 
-                    {/* Lampiran Sertifikat (JPG / PDF) */}
+                    {/* Lampiran Sertifikat (JPG) */}
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">LAMPIRAN SERTIFIKAT JUARA (JPG / PDF) <span className="text-red-500">*</span></label>
+                        <label className="text-[8px] sm:text-[9px] font-bold text-slate-700 block">LAMPIRAN SERTIFIKAT JUARA (JPG) <span className="text-red-500">*</span></label>
                         {certificateFile && (
                           <span className="text-[8px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase">Terlampir</span>
                         )}
@@ -1777,18 +1789,14 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                           type="file"
                           ref={certInputRef}
                           onChange={handleCertUpload}
-                          accept="image/jpeg,image/png,application/pdf"
+                          accept="image/jpeg,image/png"
                           className="hidden"
                           id="input-cert"
                         />
                         {certificateFile ? (
                           <div className="flex items-center justify-between gap-2 p-1 bg-slate-50 rounded border border-slate-100">
                             <div className="flex items-center gap-1.5 overflow-hidden">
-                              {certificateFile.startsWith('data:application/pdf') ? (
-                                <FileCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                              ) : (
-                                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                              )}
+                              <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
                               <span className="text-[10px] sm:text-xs font-semibold text-slate-700 truncate">{certificateFileName}</span>
                             </div>
                             <button
@@ -1807,7 +1815,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                             className="w-full flex items-center justify-center gap-2 py-1.5 text-[10px] sm:text-xs font-bold text-slate-500 hover:text-blue-700 transition-all cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5" />
-                            Pilih Gambar / PDF (Min. 1MB)
+                            Gambar Max.100kb
                           </button>
                         )}
                       </div>
@@ -1839,7 +1847,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
                 </>
               )}
             </button>
-            <p className="text-[8px] sm:text-[9px] text-slate-400 text-center mt-2 font-semibold leading-normal max-w-sm mx-auto">
+            <p className="text-[8px] sm:text-[9px] text-slate-400 text-center mt-2 font-semibold leading-normal max-w-sm md:max-w-2xl mx-auto">
               Dengan mengirim pendaftaran, Anda menyatakan bahwa data di atas diisi dengan jujur, benar, dan bersedia mengikuti seluruh kegiatan esktrakurikuller SMP PGRI Jatiuwung.
             </p>
           </div>

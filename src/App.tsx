@@ -407,7 +407,10 @@ export default function App() {
 
   const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbwZmJoC81wDxkuoSsZV4FK8Vy5mq7X1j3GkmUkQ4s4m2zvCcJLXH6_CjN47KcsPc323Ew/exec';
 
-  const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}): Promise<any> => {
+  const gasFetch = async (gasUrl: string, action: string, params: Record<string, string> = {}, timeoutMs: number = 3500): Promise<any> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
     try {
       const urlObj = new URL('/api/gas', window.location.origin);
       urlObj.searchParams.set('url', gasUrl);
@@ -416,7 +419,8 @@ export default function App() {
         urlObj.searchParams.set(key, val);
       });
 
-      const response = await fetch(urlObj.toString());
+      const response = await fetch(urlObj.toString(), { signal: controller.signal });
+      clearTimeout(timeoutId);
       if (response.ok) {
         const contentType = response.headers.get('content-type') || '';
         if (contentType.includes('application/json')) {
@@ -427,26 +431,36 @@ export default function App() {
         }
       }
     } catch (e) {
-      console.warn('Proxy fetch failed, trying direct Google Apps Script fetch...', e);
+      console.warn('Proxy fetch failed or timed out, trying direct Google Apps Script fetch...', e);
     }
 
     // Direct GAS Web App fetch (e.g. for Vercel/serverless environments where proxy is not running)
-    const directUrl = new URL(gasUrl);
-    directUrl.searchParams.set('action', action);
-    Object.entries(params).forEach(([key, val]) => {
-      directUrl.searchParams.set(key, val);
-    });
+    const directController = new AbortController();
+    const directTimeoutId = setTimeout(() => directController.abort(), timeoutMs);
 
-    const response = await fetch(directUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'Accept': 'application/json'
+    try {
+      const directUrl = new URL(gasUrl);
+      directUrl.searchParams.set('action', action);
+      Object.entries(params).forEach(([key, val]) => {
+        directUrl.searchParams.set(key, val);
+      });
+
+      const response = await fetch(directUrl.toString(), {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json'
+        },
+        signal: directController.signal
+      });
+      clearTimeout(directTimeoutId);
+      if (!response.ok) {
+        throw new Error(`Direct connection to Google Apps Script failed: ${response.status}`);
       }
-    });
-    if (!response.ok) {
-      throw new Error(`Direct connection to Google Apps Script failed: ${response.status}`);
+      return await response.json();
+    } catch (e) {
+      clearTimeout(directTimeoutId);
+      throw e;
     }
-    return await response.json();
   };
 
   const gasPost = async (gasUrl: string, body: any): Promise<any> => {
@@ -495,19 +509,71 @@ export default function App() {
   };
 
   // Core Data state
-  const [students, setStudents] = useState<Student[]>([]);
-  const [eskulList, setEskulList] = useState<Extracurricular[]>([]);
-  const [classList, setClassList] = useState<string[]>([]);
-  const [admins, setAdmins] = useState<any[]>([]);
+  const [students, setStudents] = useState<Student[]>(() => {
+    try {
+      const saved = localStorage.getItem('smp_pgri_students');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [eskulList, setEskulList] = useState<Extracurricular[]>(() => {
+    try {
+      const saved = localStorage.getItem('smp_pgri_eskul');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_EXTRACURRICULARS;
+  });
+  const [classList, setClassList] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('smp_pgri_classes');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return ['VII', 'VIII', 'IX'];
+  });
+  const [admins, setAdmins] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('smp_pgri_admins');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
   const [settings, setSettings] = useState<AppSettings>({
     googleAppsScriptUrl: '',
     tahunPelajaranAktif: '2026/2027',
     isPublished: true
   });
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(() => {
+    try {
+      const cachedClasses = localStorage.getItem('smp_pgri_classes');
+      const cachedEskul = localStorage.getItem('smp_pgri_eskul');
+      const activeView = localStorage.getItem('smp_pgri_active_view') || 'student';
+      if (activeView === 'student' && cachedClasses && cachedEskul) {
+        return false;
+      }
+    } catch {}
+    return true;
+  });
   const [isLiveConnection, setIsLiveConnection] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+  const [isInitializing, setIsInitializing] = useState(() => {
+    try {
+      const cachedClasses = localStorage.getItem('smp_pgri_classes');
+      const cachedEskul = localStorage.getItem('smp_pgri_eskul');
+      const activeView = localStorage.getItem('smp_pgri_active_view') || 'student';
+      if (activeView === 'student' && cachedClasses && cachedEskul) {
+        return false;
+      }
+    } catch {}
+    return true;
+  });
 
   // Initialize and load data (from backend API or local storage fallback)
   useEffect(() => {
@@ -582,7 +648,20 @@ export default function App() {
   }, []);
 
   const fetchAppData = async (currentSettings: AppSettings) => {
-    setIsLoading(true);
+    const hasCachedData = (() => {
+      try {
+        const cachedClasses = localStorage.getItem('smp_pgri_classes');
+        const cachedEskul = localStorage.getItem('smp_pgri_eskul');
+        const activeViewVal = localStorage.getItem('smp_pgri_active_view') || 'student';
+        return !!(cachedClasses && cachedEskul && activeViewVal === 'student');
+      } catch {
+        return false;
+      }
+    })();
+
+    if (!hasCachedData) {
+      setIsLoading(true);
+    }
     // FALLBACK TO DEFAULT SPREADSHEET URL FOR THE PUBLIC STUDENT REGISTRATION FORM
     const gasUrl = currentSettings.googleAppsScriptUrl || DEFAULT_GAS_URL;
 
@@ -677,10 +756,10 @@ export default function App() {
       try {
         setEskulList(JSON.parse(savedEskul));
       } catch (e) {
-        setEskulList([]);
+        setEskulList(DEFAULT_EXTRACURRICULARS);
       }
     } else {
-      setEskulList([]);
+      setEskulList(DEFAULT_EXTRACURRICULARS);
     }
 
     // Load Classes Fallback
@@ -689,10 +768,10 @@ export default function App() {
       try {
         setClassList(JSON.parse(savedClasses));
       } catch (e) {
-        setClassList([]);
+        setClassList(['VII', 'VIII', 'IX']);
       }
     } else {
-      setClassList([]);
+      setClassList(['VII', 'VIII', 'IX']);
     }
 
     // Load Students Fallback
@@ -1137,7 +1216,7 @@ export default function App() {
 
       {/* MAIN LAYOUT */}
       <main className="flex-grow">
-        {isInitializing ? (
+        {isInitializing && activeView !== 'student' ? (
           <div className="h-96 flex flex-col items-center justify-center text-slate-500 gap-3">
             <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
             <span className="text-xs font-bold text-slate-600 animate-pulse">Menghubungi Server...</span>
@@ -1157,7 +1236,7 @@ export default function App() {
                   onSubmitRegistration={handleRegisterStudent}
                   isLive={isLiveConnection}
                   classList={classList}
-                  isLoading={isLoading}
+                  isLoading={isLoading || isInitializing}
                 />
               ) : (
                 <div className="max-w-2xl mx-auto px-4 py-16 sm:py-24 text-center">
