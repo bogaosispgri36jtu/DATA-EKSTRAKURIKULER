@@ -1209,9 +1209,9 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
         
         <div className="max-w-4xl mx-auto flex flex-col items-center justify-center text-center gap-1.5 relative z-10">
           <div className="flex flex-col items-center text-center">
-            <h1 className="text-lg sm:text-2xl md:text-3xl font-black tracking-wide leading-tight">SMP PGRI JATIUWUNG</h1>
-            <div className="text-[10px] sm:text-xs md:text-sm text-yellow-300 font-bold tracking-wider mt-0.5">
-              Pendaftaran Ekstrakurikuler
+            <h1 className="text-lg sm:text-xl md:text-3xl font-bold tracking-wide leading-tight">Pendaftaran Ekstrakurikuler</h1>
+            <div className="text-[16px] sm:text-xs md:text-sm text-yellow-300 font-black tracking-wider mt-0.5">
+              SMP PGRI JATIUWUNG
             </div>
             <p className="text-[10px] sm:text-xs text-blue-200 font-extrabold tracking-wider uppercase mt-1 bg-blue-950/40 px-2.5 py-0.5 rounded-full inline-block">
               Tahun Pelajaran: <span className="text-yellow-300 font-mono font-black">{tahunPelajaranAktif}</span>
