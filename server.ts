@@ -104,7 +104,8 @@ async function startServer() {
   app.all("/api/gas", async (req, res) => {
     try {
       const currentSettings = getSettings();
-      const isSupabase = currentSettings.dbProvider === "supabase";
+      const forceGas = req.query.forceGas === "true" || req.body?.forceGas === "true";
+      const isSupabase = currentSettings.dbProvider === "supabase" && !forceGas;
 
       if (isSupabase) {
         const supabaseUrl = currentSettings.supabaseUrl || process.env.SUPABASE_URL;
@@ -232,6 +233,43 @@ async function startServer() {
           if (insertErr) {
             console.error("Supabase student insertion failed:", insertErr);
             return res.status(500).json({ status: "error", message: insertErr.message });
+          }
+
+          // Forward to Google Apps Script if URL is configured
+          let gasUrl = currentSettings.googleAppsScriptUrl;
+          if (gasUrl && gasUrl.trim().startsWith("http")) {
+            let targetUrl = gasUrl.trim();
+            const match = targetUrl.match(/(https:\/\/script\.google\.com\/macros\/s\/[a-zA-Z0-9_-]+\/(?:exec|dev))/);
+            if (match) {
+              targetUrl = match[1];
+            } else {
+              targetUrl = targetUrl.split(/[\s\n\r]+/)[0];
+            }
+
+            console.log(`[Supabase -> GAS Sync] Forwarding registration of ${newStudent.name || newStudent.nama || ''} to: ${targetUrl}`);
+            try {
+              const gasPayload = {
+                action: "registerStudent",
+                data: inserted ? inserted[0] : newStudent
+              };
+              
+              const response = await fetch(targetUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Accept": "application/json"
+                },
+                body: JSON.stringify(gasPayload)
+              });
+
+              if (response.ok) {
+                console.log(`[Supabase -> GAS Sync] Sync success`);
+              } else {
+                console.warn(`[Supabase -> GAS Sync] GAS returned status ${response.status}`);
+              }
+            } catch (syncErr) {
+              console.error("[Supabase -> GAS Sync] Sync failed:", syncErr);
+            }
           }
 
           return res.json({ status: "success", data: inserted ? inserted[0] : newStudent });

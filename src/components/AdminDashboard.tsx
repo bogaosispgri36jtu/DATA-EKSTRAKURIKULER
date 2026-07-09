@@ -1517,6 +1517,7 @@ export default function AdminDashboard({
           const urlObj = new URL('/api/gas', window.location.origin);
           urlObj.searchParams.set('url', cleanUrl);
           urlObj.searchParams.set('action', 'getData');
+          urlObj.searchParams.set('forceGas', 'true');
           
           const gasRes = await fetch(urlObj.toString());
           if (gasRes.ok) {
