@@ -58,6 +58,9 @@ export interface AppSettings {
   googleAppsScriptUrl: string;
   tahunPelajaranAktif: string;
   isPublished?: boolean;
+  dbProvider?: 'gas' | 'supabase';
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 export interface AdminUser {

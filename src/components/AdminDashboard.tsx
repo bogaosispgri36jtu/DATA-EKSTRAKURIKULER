@@ -8,7 +8,7 @@ import {
   Lock, LayoutDashboard, FileText, Settings, Plus, Trash2, 
   Download, Printer, Search, Filter, ShieldAlert, CheckCircle2,
   RefreshCcw, Eye, EyeOff, ArrowUpDown, Layers, Database, UserCheck, LogOut,
-  UserPlus, User, Shield
+  UserPlus, User, Shield, Key
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -35,11 +35,13 @@ interface AdminDashboardProps {
   isLive?: boolean;
   onRefresh?: () => Promise<void> | void;
   classList?: string[];
+  isSupabaseSchemaIncomplete?: boolean;
 }
 
-const formatToIndoPhone = (num: string): string => {
+const formatToIndoPhone = (num: any): string => {
   if (!num) return '';
-  let clean = num.replace(/\D/g, '');
+  const str = String(num);
+  let clean = str.replace(/\D/g, '');
   if (clean.startsWith('0')) {
     clean = '62' + clean.slice(1);
   } else if (clean.startsWith('8')) {
@@ -48,6 +50,56 @@ const formatToIndoPhone = (num: string): string => {
     clean = '62' + clean;
   }
   return '+' + clean;
+};
+
+const parseDateSafely = (dateStr: any): Date => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? new Date() : dateStr;
+  
+  const s = String(dateStr).trim();
+  if (!s) return new Date();
+
+  // Try standard Date parsing
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+
+  // Handle dd/MM/yyyy HH:mm:ss or dd-MM-yyyy HH:mm:ss
+  const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/;
+  const match = s.match(dmyRegex);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // 0-indexed
+    const year = parseInt(match[3], 10);
+    const hour = match[4] ? parseInt(match[4], 10) : 0;
+    const minute = match[5] ? parseInt(match[5], 10) : 0;
+    const second = match[6] ? parseInt(match[6], 10) : 0;
+    
+    d = new Date(year, month, day, hour, minute, second);
+    if (!isNaN(d.getTime())) {
+      return d;
+    }
+  }
+
+  // Handle yyyy-MM-dd HH:mm:ss or yyyy/MM/dd HH:mm:ss
+  const ymdRegex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/;
+  const matchYmd = s.match(ymdRegex);
+  if (matchYmd) {
+    const year = parseInt(matchYmd[1], 10);
+    const month = parseInt(matchYmd[2], 10) - 1;
+    const day = parseInt(matchYmd[3], 10);
+    const hour = matchYmd[4] ? parseInt(matchYmd[4], 10) : 0;
+    const minute = matchYmd[5] ? parseInt(matchYmd[5], 10) : 0;
+    const second = matchYmd[6] ? parseInt(matchYmd[6], 10) : 0;
+    
+    d = new Date(year, month, day, hour, minute, second);
+    if (!isNaN(d.getTime())) {
+      return d;
+    }
+  }
+
+  return new Date(); // Fallback to current date/time to avoid throwing Uncaught RangeError
 };
 
 export default function AdminDashboard({
@@ -67,7 +119,8 @@ export default function AdminDashboard({
   setIsLoggedIn,
   isLive = false,
   onRefresh,
-  classList = []
+  classList = [],
+  isSupabaseSchemaIncomplete = false
 }: AdminDashboardProps) {
   const isLoggedAdminUtama = !loggedAdmin ? false : (
     (loggedAdmin.status && loggedAdmin.status.toLowerCase().includes('utama'))
@@ -89,6 +142,9 @@ export default function AdminDashboard({
     setActiveYearInput(settings.tahunPelajaranAktif);
     setNewEskulTahun(settings.tahunPelajaranAktif);
     setIsPublishedInput(settings.isPublished !== false);
+    setDbProviderInput(settings.dbProvider || 'gas');
+    setSupabaseUrlInput(settings.supabaseUrl || '');
+    setSupabaseAnonKeyInput(settings.supabaseAnonKey || '');
   }, [settings]);
 
   // Login State
@@ -228,6 +284,10 @@ export default function AdminDashboard({
   const [activeYearInput, setActiveYearInput] = useState(settings.tahunPelajaranAktif);
   const [isPublishedInput, setIsPublishedInput] = useState(settings.isPublished !== false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [dbProviderInput, setDbProviderInput] = useState<'gas' | 'supabase'>(settings.dbProvider || 'gas');
+  const [supabaseUrlInput, setSupabaseUrlInput] = useState(settings.supabaseUrl || '');
+  const [supabaseAnonKeyInput, setSupabaseAnonKeyInput] = useState(settings.supabaseAnonKey || '');
+  const [isMigrating, setIsMigrating] = useState(false);
 
   // New Admin Form State
   const [newAdminUsername, setNewAdminUsername] = useState('');
@@ -555,7 +615,7 @@ export default function AdminDashboard({
       s.certificateFile || "",
       s.certificateFileName || "",
       s.tahunPelajaran,
-      new Date(s.createdAt).toISOString()
+      parseDateSafely(s.createdAt).toISOString()
     ]);
 
     // Convert to SheetJS format
@@ -1295,6 +1355,73 @@ export default function AdminDashboard({
     e.preventDefault();
     setIsSavingSettings(true);
     
+    if (dbProviderInput === 'supabase') {
+      if (!supabaseUrlInput.trim() || !supabaseAnonKeyInput.trim()) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Form Tidak Lengkap',
+          text: 'Supabase URL dan Anon Key wajib diisi jika memilih provider Supabase.',
+          confirmButtonColor: '#ef4444',
+          width: '340px'
+        });
+        setIsSavingSettings(false);
+        return;
+      }
+
+      const isPostgresUri = supabaseAnonKeyInput.trim().startsWith('postgresql://') || 
+                            supabaseAnonKeyInput.trim().startsWith('postgres://') || 
+                            supabaseAnonKeyInput.trim().includes('@db.');
+                            
+      if (isPostgresUri) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Format Kunci Salah',
+          html: 'Sepertinya Anda memasukkan <b>Database Connection String (postgresql://...)</b> di kolom Supabase Anon Key.<br/><br/>Harap masukkan <b>Anon/Public API Key (token JWT panjang berawalan eyJ...)</b> yang bisa disalin dari dashboard Supabase Anda di menu <b>Project Settings &gt; API &gt; anon public</b>.',
+          confirmButtonColor: '#ef4444',
+          width: '380px'
+        });
+        setIsSavingSettings(false);
+        return;
+      }
+
+      const isSbPublishable = supabaseAnonKeyInput.trim().startsWith('sb_publishable_');
+      if (isSbPublishable) {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Jenis Kunci Salah',
+          html: 'Anda memasukkan kunci dengan format <b>sb_publishable_...</b>.<br/><br/>Kunci jenis ini <b>bukan</b> JWT Anon Key standar, melainkan kunci platform baru Supabase Auth yang tidak didukung untuk interaksi database langsung (PostgREST). Database membutuhkan token JWT panjang berawalan <b>eyJ...</b>.<br/><br/><b>Solusi:</b> Silakan salin kunci <b>anon public</b> di tab <b>Project Settings &gt; API</b> pada kolom <b>Project API keys</b> di dashboard Supabase Anda.',
+          confirmButtonColor: '#ef4444',
+          width: '380px'
+        });
+        setIsSavingSettings(false);
+        return;
+      }
+
+      try {
+        await onUpdateSettings({
+          dbProvider: 'supabase',
+          supabaseUrl: supabaseUrlInput.trim(),
+          supabaseAnonKey: supabaseAnonKeyInput.trim(),
+          tahunPelajaranAktif: isLoggedAdminUtama ? activeYearInput : settings.tahunPelajaranAktif,
+          isPublished: isLoggedAdminUtama ? isPublishedInput : (settings.isPublished !== false)
+        });
+        
+        Swal.fire({
+          icon: 'success',
+          title: 'Pengaturan Tersimpan',
+          text: 'Aplikasi sekarang terhubung menggunakan database Supabase.',
+          timer: 1500,
+          showConfirmButton: false,
+          width: '340px'
+        });
+      } catch (e) {
+        Swal.fire({ icon: 'error', title: 'Gagal Menyimpan', width: '340px' });
+      } finally {
+        setIsSavingSettings(false);
+      }
+      return;
+    }
+
     let targetUrl = gasUrlInput ? gasUrlInput.trim() : '';
     
     if (targetUrl !== '' && !targetUrl.startsWith('https://script.google.com/')) {
@@ -1318,6 +1445,7 @@ export default function AdminDashboard({
 
     try {
       await onUpdateSettings({
+        dbProvider: 'gas',
         googleAppsScriptUrl: targetUrl,
         tahunPelajaranAktif: isLoggedAdminUtama ? activeYearInput : settings.tahunPelajaranAktif,
         isPublished: isLoggedAdminUtama ? isPublishedInput : (settings.isPublished !== false)
@@ -1345,6 +1473,136 @@ export default function AdminDashboard({
       Swal.fire({ icon: 'error', title: 'Gagal Menyimpan', width: '340px' });
     } finally {
       setIsSavingSettings(false);
+    }
+  };
+
+  // Migrate Data to Supabase
+  const handleMigrateToSupabase = async () => {
+    setIsMigrating(true);
+    Swal.fire({
+      title: 'Memulai Migrasi...',
+      text: 'Mempersiapkan data lokal dan Google Sheets...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    try {
+      // Fetch latest values from localStorage or props
+      const localAdmins = JSON.parse(localStorage.getItem('smp_pgri_admins') || '[]');
+      const localClasses = JSON.parse(localStorage.getItem('smp_pgri_classes') || '[]');
+      const localStudents = JSON.parse(localStorage.getItem('smp_pgri_students') || '[]');
+      const localEskul = JSON.parse(localStorage.getItem('smp_pgri_eskul') || '[]');
+      
+      let finalStudents = [...students];
+      let finalEskul = [...eskulList];
+
+      // If we are currently connected to Supabase, our active state might be empty.
+      // We should check if we can fetch fresh data from Google Apps Script first.
+      let gasUrl = '';
+      try {
+        const savedSettings = JSON.parse(localStorage.getItem('smp_pgri_settings') || '{}');
+        gasUrl = savedSettings.googleAppsScriptUrl || '';
+      } catch {}
+
+      let sourceInfo = "Data lokal";
+
+      if (gasUrl && gasUrl.startsWith('http')) {
+        Swal.update({
+          text: 'Mengambil data segar dari Google Sheets...'
+        });
+        try {
+          const cleanUrl = gasUrl.replace(/\/edit\?usp=sharing$/, '/exec').replace(/\/edit$/, '/exec');
+          const urlObj = new URL('/api/gas', window.location.origin);
+          urlObj.searchParams.set('url', cleanUrl);
+          urlObj.searchParams.set('action', 'getData');
+          
+          const gasRes = await fetch(urlObj.toString());
+          if (gasRes.ok) {
+            const gasJson = await gasRes.json();
+            if (gasJson && gasJson.status === 'success') {
+              if (gasJson.students && Array.isArray(gasJson.students) && gasJson.students.length > 0) {
+                finalStudents = gasJson.students;
+                sourceInfo = "Google Sheets (Siswa & Eskul)";
+              }
+              if (gasJson.eskul && Array.isArray(gasJson.eskul) && gasJson.eskul.length > 0) {
+                finalEskul = gasJson.eskul;
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[Migration] Gagal mengambil data segar dari Google Sheets:', e);
+        }
+      }
+
+      // Fallback to localStorage cache if still empty
+      if (finalStudents.length === 0 && localStudents.length > 0) {
+        finalStudents = localStudents;
+        sourceInfo = "Penyimpanan Lokal (Cache Browser)";
+      }
+      if (finalEskul.length === 0 && localEskul.length > 0) {
+        finalEskul = localEskul;
+      }
+
+      Swal.update({
+        text: `Mengunggah data (${finalStudents.length} siswa, ${finalEskul.length} eskul) dari ${sourceInfo} ke Supabase...`
+      });
+
+      const payload = {
+        students: finalStudents,
+        eskul: finalEskul,
+        classes: classList && classList.length > 0 ? classList : localClasses,
+        admins: admins && admins.length > 0 ? admins : localAdmins
+      };
+
+      const response = await fetch('/api/migrate-to-supabase', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      
+      if (result.status === 'success') {
+        Swal.fire({
+          icon: 'success',
+          title: 'Migrasi Berhasil!',
+          html: `<div class="text-left text-xs mb-2 font-semibold text-slate-600" style="text-align: left;">
+            Sumber Data: <span class="text-emerald-700 font-bold">${sourceInfo}</span>
+          </div>
+          <div class="text-left text-xs space-y-1 max-h-48 overflow-y-auto font-mono bg-slate-50 p-2 rounded border border-slate-200" style="text-align: left;">
+            ${result.logs.map((log: string) => `<div>${log}</div>`).join('')}
+          </div>`,
+          confirmButtonText: 'Selesai',
+          confirmButtonColor: '#10b981',
+          width: '450px'
+        });
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } else {
+        Swal.fire({
+          icon: 'error',
+          title: 'Migrasi Gagal',
+          text: result.message || 'Terjadi kesalahan saat berkomunikasi dengan server.',
+          confirmButtonColor: '#ef4444',
+          width: '340px'
+        });
+      }
+    } catch (err: any) {
+      console.error('Migration error:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Kesalahan Sistem',
+        text: err.message || 'Gagal terhubung ke endpoint migrasi server.',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -2144,59 +2402,423 @@ export default function AdminDashboard({
                     )}
                   </div>
   
-                  <div className="space-y-1">
-                    <label className="text-[8px] sm:text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider">GOOGLE APPS SCRIPT WEB APP URL</label>
-                    <div className="flex gap-2">
-                      <div className="relative flex-1">
-                        <Database className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
-                        <input
-                          type="url"
-                          value={gasUrlInput}
-                          onChange={(e) => setGasUrlInput(e.target.value)}
-                          placeholder="https://script.google.com/macros/s/.../exec"
-                          className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
-                        />
+                  {/* Database Provider Selector */}
+                  <div className="space-y-1 bg-slate-50 border border-slate-200 rounded-xl p-3 sm:p-4">
+                    <label className="text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider mb-2">PROVIDER DATABASE / DATA SOURCE</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setDbProviderInput('gas')}
+                        className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          dbProviderInput === 'gas'
+                            ? 'bg-blue-50 border-blue-200 text-blue-700 shadow-sm font-black'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 font-medium'
+                        }`}
+                      >
+                        🟢 Google Sheets (GAS)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setDbProviderInput('supabase')}
+                        className={`px-3 py-2 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                          dbProviderInput === 'supabase'
+                            ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm font-black'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 font-medium'
+                        }`}
+                      >
+                        ⚡ Supabase Database
+                      </button>
+                    </div>
+                  </div>
+
+                  {dbProviderInput === 'gas' ? (
+                    <div className="space-y-1">
+                      <label className="text-[8px] sm:text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider">GOOGLE APPS SCRIPT WEB APP URL</label>
+                      <div className="flex gap-2">
+                        <div className="relative flex-1">
+                          <Database className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                          <input
+                            type="url"
+                            value={gasUrlInput}
+                            onChange={(e) => setGasUrlInput(e.target.value)}
+                            placeholder="https://script.google.com/macros/s/.../exec"
+                            className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                          />
+                        </div>
+                        {gasUrlInput && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              setGasUrlInput('');
+                              if (onUpdateSettings) {
+                                await onUpdateSettings({ googleAppsScriptUrl: '' });
+                              }
+                              Swal.fire({
+                                icon: 'success',
+                                title: 'URL Dihapus',
+                                text: 'Google Apps Script URL berhasil dihapus. Status Database beralih ke Mode Simulasi Lokal (Tidak Terhubung).',
+                                confirmButtonColor: '#ef4444',
+                                width: '340px'
+                              });
+                            }}
+                            className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
+                            title="Hapus URL"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                            <span className="hidden sm:inline">Hapus URL</span>
+                          </button>
+                        )}
                       </div>
-                      {gasUrlInput && (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            setGasUrlInput('');
-                            if (onUpdateSettings) {
-                              await onUpdateSettings({ googleAppsScriptUrl: '' });
-                            }
-                            Swal.fire({
-                              icon: 'success',
-                              title: 'URL Dihapus',
-                              text: 'Google Apps Script URL berhasil dihapus. Status Database beralih ke Mode Simulasi Lokal (Tidak Terhubung).',
-                              confirmButtonColor: '#ef4444',
-                              width: '340px'
-                            });
-                          }}
-                          className="px-3 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 cursor-pointer"
-                          title="Hapus URL"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span className="hidden sm:inline">Hapus URL</span>
-                        </button>
+                      <p className="text-[9px] text-slate-400 leading-normal">
+                        Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
+                      </p>
+                      
+                      {gasUrlInput && gasUrlInput.trim().endsWith('/dev') && (
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[10px] p-3 rounded-xl leading-relaxed mt-2 space-y-1">
+                          <p className="font-bold text-amber-900 flex items-center gap-1">⚠️ Peringatan: URL Pengembangan (/dev) Terdeteksi</p>
+                          <p>
+                            URL yang berakhiran <b>/dev</b> tidak dapat menerima data dari luar karena Google membatasi aksesnya hanya untuk akun pemilik skrip. Aplikasi pendaftaran ini tidak akan bisa menyimpan data ke Spreadsheet Anda.
+                          </p>
+                          <p>
+                            <b>Solusi:</b> Di Google Apps Script, lakukan <b>Deploy (Terapkan) &gt; New deployment (Terapkan baru)</b>. Pilih jenis <b>Web App</b>, ubah akses "Who has access" menjadi <b>Anyone (Siapa saja)</b>, klik Deploy, lalu salin URL yang berakhiran <b>/exec</b> ke kolom ini.
+                          </p>
+                        </div>
                       )}
                     </div>
-                    <p className="text-[9px] text-slate-400 leading-normal">
-                      Kosongkan kolom ini untuk menggunakan database simulasi lokal (`localStorage`). Isi dengan URL Deployment Apps Script Anda untuk menghubungkan data nyata di Google Spreadsheet.
-                    </p>
-                    
-                    {gasUrlInput && gasUrlInput.trim().endsWith('/dev') && (
-                      <div className="bg-amber-50 border border-amber-200 text-amber-800 text-[10px] p-3 rounded-xl leading-relaxed mt-2 space-y-1">
-                        <p className="font-bold text-amber-900 flex items-center gap-1">⚠️ Peringatan: URL Pengembangan (/dev) Terdeteksi</p>
-                        <p>
-                          URL yang berakhiran <b>/dev</b> tidak dapat menerima data dari luar karena Google membatasi aksesnya hanya untuk akun pemilik skrip. Aplikasi pendaftaran ini tidak akan bisa menyimpan data ke Spreadsheet Anda.
-                        </p>
-                        <p>
-                          <b>Solusi:</b> Di Google Apps Script, lakukan <b>Deploy (Terapkan) &gt; New deployment (Terapkan baru)</b>. Pilih jenis <b>Web App</b>, ubah akses "Who has access" menjadi <b>Anyone (Siapa saja)</b>, klik Deploy, lalu salin URL yang berakhiran <b>/exec</b> ke kolom ini.
-                        </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Supabase inputs */}
+                      <div className="space-y-1">
+                        <label className="text-[8px] sm:text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider">SUPABASE PROJECT URL</label>
+                        <div className="relative">
+                          <Database className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                          <input
+                            type="text"
+                            value={supabaseUrlInput}
+                            onChange={(e) => setSupabaseUrlInput(e.target.value)}
+                            placeholder="https://xyzabcdefg.supabase.co"
+                            className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                          />
+                        </div>
+                        <p className="text-[9px] text-slate-400">Dapatkan URL ini di dashboard Supabase proyek Anda -&gt; Project Settings -&gt; API.</p>
                       </div>
-                    )}
-                  </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[8px] sm:text-[9px] font-extrabold text-slate-700 block uppercase tracking-wider">SUPABASE ANON / PUBLIC KEY</label>
+                        <div className="relative">
+                          <Key className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                          <input
+                            type="password"
+                            value={supabaseAnonKeyInput}
+                            onChange={(e) => setSupabaseAnonKeyInput(e.target.value)}
+                            placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                            className="w-full pl-8 pr-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-mono font-medium focus:outline-none focus:border-blue-700 focus:bg-white text-slate-800"
+                          />
+                        </div>
+                        <p className="text-[9px] text-slate-400">Dapatkan Anon Key (Public) ini di dashboard Supabase -&gt; Project Settings -&gt; API.</p>
+                        
+                        {supabaseAnonKeyInput && (supabaseAnonKeyInput.startsWith('postgresql://') || supabaseAnonKeyInput.startsWith('postgres://') || supabaseAnonKeyInput.includes('@db.')) && (
+                          <div className="bg-rose-50 border border-rose-200 text-rose-800 text-[10px] p-3 rounded-xl leading-relaxed mt-2 space-y-1">
+                            <p className="font-bold text-rose-950 flex items-center gap-1">⚠️ Terdeteksi String Koneksi Database (PostgreSQL URI)!</p>
+                            <p>
+                              Kolom ini membutuhkan <b>Anon/Public API Key</b> (token JWT sangat panjang berawalan <b>eyJ...</b>). Anda keliru memasukkan Database Connection String (postgresql://...).
+                            </p>
+                            <p>
+                              <b>Solusi:</b> Di dashboard Supabase Anda, buka <b>Project Settings &gt; API</b>. Cari bagian <b>Project API keys</b>, temukan kunci <b>anon public</b>, salin, lalu tempel di sini.
+                            </p>
+                          </div>
+                        )}
+
+                        {supabaseAnonKeyInput && supabaseAnonKeyInput.trim().startsWith('sb_publishable_') && (
+                          <div className="bg-rose-50 border border-rose-200 text-rose-800 text-[10px] p-3 rounded-xl leading-relaxed mt-2 space-y-1">
+                            <p className="font-bold text-rose-950 flex items-center gap-1">⚠️ Terdeteksi Kunci Publishable Baru (sb_publishable_...)!</p>
+                            <p>
+                              Kolom ini membutuhkan <b>Anon/Public API Key</b> standar yang merupakan token JWT panjang berawalan <b>eyJ...</b>. Kunci format <code>sb_publishable_...</code> hanya digunakan untuk Supabase Auth saja dan akan diblokir oleh API database utama (PostgREST) dengan galat <i>"Invalid API key"</i>.
+                            </p>
+                            <p>
+                              <b>Solusi:</b> Di dashboard Supabase Anda, buka <b>Project Settings &gt; API</b>. Pada bagian <b>Project API keys</b>, temukan kunci berlabel <b>anon public</b> (biasanya berawalan <code>eyJ...</code>), salin, lalu tempel di sini.
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Schema/Setup alert and script code */}
+                      {isSupabaseSchemaIncomplete && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 text-[11px]">
+                          <p className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                            ⚠️ Tabel Supabase Belum Terdeteksi atau Tidak Lengkap!
+                          </p>
+                          <p className="text-slate-700 leading-normal">
+                            Supabase memerlukan struktur tabel tertentu agar aplikasi pendaftaran dapat berfungsi dengan normal. Silakan salin script SQL Setup di bawah ini, lalu jalankan di **SQL Editor** dashboard Supabase Anda:
+                          </p>
+                          
+                          <div className="relative bg-slate-900 text-slate-100 p-3 rounded-lg font-mono text-[9.5px] max-h-48 overflow-y-auto leading-relaxed border border-slate-800 select-all">
+                            {`-- Buat Tabel Pilihan Ekstrakurikuler
+CREATE TABLE IF NOT EXISTS eskul (
+  id TEXT PRIMARY KEY,
+  nama TEXT NOT NULL,
+  "kelasAllowed" TEXT[],
+  "tahunPelajaran" TEXT NOT NULL
+);
+
+-- Buat Tabel Daftar Kelas
+CREATE TABLE IF NOT EXISTS classes (
+  name TEXT PRIMARY KEY
+);
+
+-- Buat Tabel Akun Administrator
+CREATE TABLE IF NOT EXISTS admins (
+  username TEXT PRIMARY KEY,
+  password TEXT NOT NULL,
+  status TEXT NOT NULL,
+  "namaLengkap" TEXT
+);
+
+-- Buat Tabel Pendaftar Siswa
+CREATE TABLE IF NOT EXISTS students (
+  id TEXT PRIMARY KEY,
+  "regNo" TEXT UNIQUE NOT NULL,
+  name TEXT,
+  nama TEXT,
+  photo TEXT,
+  kelas TEXT,
+  "jenisKelamin" TEXT,
+  "namaAyah" TEXT,
+  "namaIbu" TEXT,
+  "hpSiswa" TEXT,
+  "hpOrtu" TEXT,
+  email TEXT,
+  "tempatLahir" TEXT,
+  "tanggalLahir" TEXT,
+  "prestasiChecked" BOOLEAN DEFAULT false,
+  "namaLomba" TEXT,
+  "cabangLomba" TEXT,
+  "tingkatLomba" TEXT,
+  "juaraKe" TEXT,
+  "penyelenggara" TEXT,
+  "certificateFile" TEXT,
+  "certificateFileName" TEXT,
+  alamat TEXT,
+  rt TEXT,
+  rw TEXT,
+  "provinsiId" TEXT,
+  "provinsiName" TEXT,
+  "kabupatenId" TEXT,
+  "kabupatenName" TEXT,
+  "kecamatanId" TEXT,
+  "kecamatanName" TEXT,
+  "kelurahanId" TEXT,
+  "kelurahanName" TEXT,
+  "eskulId" TEXT REFERENCES eskul(id) ON DELETE SET NULL,
+  "eskulName" TEXT,
+  "eskulId2" TEXT REFERENCES eskul(id) ON DELETE SET NULL,
+  "eskulName2" TEXT,
+  "eskulId3" TEXT REFERENCES eskul(id) ON DELETE SET NULL,
+  "eskulName3" TEXT,
+  nisn TEXT,
+  "noWa" TEXT,
+  alasan TEXT,
+  "tahunPelajaran" TEXT NOT NULL,
+  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Aktifkan Row Level Security (RLS) atau Bypass untuk API Pendaftaran
+ALTER TABLE eskul ENABLE ROW LEVEL SECURITY;
+ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+
+-- Izinkan Semua Akses Anonim (agar form pendaftaran sekolah bekerja tanpa login siswa)
+DROP POLICY IF EXISTS "Allow public select eskul" ON eskul;
+CREATE POLICY "Allow public select eskul" ON eskul FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public select classes" ON classes;
+CREATE POLICY "Allow public select classes" ON classes FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public select admins" ON admins;
+CREATE POLICY "Allow public select admins" ON admins FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public select students" ON students;
+CREATE POLICY "Allow public select students" ON students FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert eskul" ON eskul;
+CREATE POLICY "Allow public insert eskul" ON eskul FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public insert classes" ON classes;
+CREATE POLICY "Allow public insert classes" ON classes FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public insert admins" ON admins;
+CREATE POLICY "Allow public insert admins" ON admins FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public insert students" ON students;
+CREATE POLICY "Allow public insert students" ON students FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update eskul" ON eskul;
+CREATE POLICY "Allow public update eskul" ON eskul FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public update classes" ON classes;
+CREATE POLICY "Allow public update classes" ON classes FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public update admins" ON admins;
+CREATE POLICY "Allow public update admins" ON admins FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public update students" ON students;
+CREATE POLICY "Allow public update students" ON students FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow public delete eskul" ON eskul;
+CREATE POLICY "Allow public delete eskul" ON eskul FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Allow public delete classes" ON classes;
+CREATE POLICY "Allow public delete classes" ON classes FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Allow public delete admins" ON admins;
+CREATE POLICY "Allow public delete admins" ON admins FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Allow public delete students" ON students;
+CREATE POLICY "Allow public delete students" ON students FOR DELETE USING (true);`}
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const sqlText = `-- Buat Tabel Pilihan Ekstrakurikuler
+CREATE TABLE IF NOT EXISTS eskul (
+  id TEXT PRIMARY KEY,
+  nama TEXT NOT NULL,
+  "kelasAllowed" TEXT[],
+  "tahunPelajaran" TEXT NOT NULL
+);
+
+-- Buat Tabel Daftar Kelas
+CREATE TABLE IF NOT EXISTS classes (
+  name TEXT PRIMARY KEY
+);
+
+-- Buat Tabel Akun Administrator
+CREATE TABLE IF NOT EXISTS admins (
+  username TEXT PRIMARY KEY,
+  password TEXT NOT NULL,
+  status TEXT NOT NULL,
+  "namaLengkap" TEXT
+);
+
+-- Buat Tabel Pendaftar Siswa
+CREATE TABLE IF NOT EXISTS students (
+  id TEXT PRIMARY KEY,
+  "regNo" TEXT UNIQUE NOT NULL,
+  name TEXT,
+  nama TEXT,
+  photo TEXT,
+  kelas TEXT,
+  "jenisKelamin" TEXT,
+  "namaAyah" TEXT,
+  "namaIbu" TEXT,
+  "hpSiswa" TEXT,
+  "hpOrtu" TEXT,
+  email TEXT,
+  "tempatLahir" TEXT,
+  "tanggalLahir" TEXT,
+  "prestasiChecked" BOOLEAN DEFAULT false,
+  "namaLomba" TEXT,
+  "cabangLomba" TEXT,
+  "tingkatLomba" TEXT,
+  "juaraKe" TEXT,
+  "penyelenggara" TEXT,
+  "certificateFile" TEXT,
+  "certificateFileName" TEXT,
+  alamat TEXT,
+  rt TEXT,
+  rw TEXT,
+  "provinsiId" TEXT,
+  "provinsiName" TEXT,
+  "kabupatenId" TEXT,
+  "kabupatenName" TEXT,
+  "kecamatanId" TEXT,
+  "kecamatanName" TEXT,
+  "kelurahanId" TEXT,
+  "kelurahanName" TEXT,
+  "eskulId" TEXT REFERENCES eskul(id) ON DELETE SET NULL,
+  "eskulName" TEXT,
+  "eskulId2" TEXT REFERENCES eskul(id) ON DELETE SET NULL,
+  "eskulName2" TEXT,
+  "eskulId3" TEXT REFERENCES eskul(id) ON DELETE SET NULL,
+  "eskulName3" TEXT,
+  nisn TEXT,
+  "noWa" TEXT,
+  alasan TEXT,
+  "tahunPelajaran" TEXT NOT NULL,
+  "createdAt" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- Aktifkan Row Level Security (RLS) atau Bypass untuk API Pendaftaran
+ALTER TABLE eskul ENABLE ROW LEVEL SECURITY;
+ALTER TABLE classes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admins ENABLE ROW LEVEL SECURITY;
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+
+-- Izinkan Semua Akses Anonim (agar form pendaftaran sekolah bekerja tanpa login siswa)
+DROP POLICY IF EXISTS "Allow public select eskul" ON eskul;
+CREATE POLICY "Allow public select eskul" ON eskul FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public select classes" ON classes;
+CREATE POLICY "Allow public select classes" ON classes FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public select admins" ON admins;
+CREATE POLICY "Allow public select admins" ON admins FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow public select students" ON students;
+CREATE POLICY "Allow public select students" ON students FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Allow public insert eskul" ON eskul;
+CREATE POLICY "Allow public insert eskul" ON eskul FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public insert classes" ON classes;
+CREATE POLICY "Allow public insert classes" ON classes FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public insert admins" ON admins;
+CREATE POLICY "Allow public insert admins" ON admins FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Allow public insert students" ON students;
+CREATE POLICY "Allow public insert students" ON students FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow public update eskul" ON eskul;
+CREATE POLICY "Allow public update eskul" ON eskul FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public update classes" ON classes;
+CREATE POLICY "Allow public update classes" ON classes FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public update admins" ON admins;
+CREATE POLICY "Allow public update admins" ON admins FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Allow public update students" ON students;
+CREATE POLICY "Allow public update students" ON students FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Allow public delete eskul" ON eskul;
+CREATE POLICY "Allow public delete eskul" ON eskul FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Allow public delete classes" ON classes;
+CREATE POLICY "Allow public delete classes" ON classes FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Allow public delete admins" ON admins;
+CREATE POLICY "Allow public delete admins" ON admins FOR DELETE USING (true);
+DROP POLICY IF EXISTS "Allow public delete students" ON students;
+CREATE POLICY "Allow public delete students" ON students FOR DELETE USING (true);`;
+                              navigator.clipboard.writeText(sqlText);
+                              Swal.fire({
+                                icon: 'success',
+                                title: 'Disalin!',
+                                text: 'Script SQL berhasil disalin ke clipboard.',
+                                timer: 1000,
+                                showConfirmButton: false,
+                                width: '300px'
+                              });
+                            }}
+                            className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            📋 Salin Script SQL Setup
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Migration launcher panel */}
+                      <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 space-y-3">
+                        <div className="flex items-start gap-2">
+                          <Database className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">Sinkronisasi & Migrasi ke Supabase</p>
+                            <p className="text-[10px] text-slate-500 leading-normal">
+                              Gunakan tombol di bawah untuk mentransfer seluruh data lokal (Siswa, Pilihan Eskul, Daftar Kelas, Akun Administrator) ke dalam database Supabase Anda.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={isMigrating}
+                          onClick={handleMigrateToSupabase}
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white text-xs font-bold py-2.5 px-4 rounded-xl shadow transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                        >
+                          {isMigrating ? 'Sedang Memigrasi...' : '🚀 Mulai Migrasi Seluruh Data ke Supabase'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
   
                   <button
                     type="submit"
@@ -2483,7 +3105,7 @@ export default function AdminDashboard({
                       {selectedStudentDetail.tempatLahir || '-'}, {(() => {
                         if (!selectedStudentDetail.tanggalLahir) return '-';
                         try {
-                          const d = new Date(selectedStudentDetail.tanggalLahir);
+                          const d = parseDateSafely(selectedStudentDetail.tanggalLahir);
                           if (isNaN(d.getTime())) return selectedStudentDetail.tanggalLahir;
                           return d.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
                         } catch {
@@ -2495,7 +3117,7 @@ export default function AdminDashboard({
                   <div className="space-y-1">
                     <span className="text-[9px] font-bold text-slate-400 block uppercase tracking-wider">Tanggal Daftar</span>
                     <span className="font-bold text-slate-800 text-xs bg-slate-100 px-2.5 py-1.5 rounded-lg inline-block">
-                      {new Date(selectedStudentDetail.createdAt).toLocaleString('id-ID')}
+                      {parseDateSafely(selectedStudentDetail.createdAt).toLocaleString('id-ID')}
                     </span>
                   </div>
                 </div>

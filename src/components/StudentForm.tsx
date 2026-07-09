@@ -31,6 +31,56 @@ interface StudentFormProps {
   onRefresh?: () => void;
 }
 
+const parseDateSafely = (dateStr: any): Date => {
+  if (!dateStr) return new Date();
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? new Date() : dateStr;
+  
+  const s = String(dateStr).trim();
+  if (!s) return new Date();
+
+  // Try standard Date parsing
+  let d = new Date(s);
+  if (!isNaN(d.getTime())) {
+    return d;
+  }
+
+  // Handle dd/MM/yyyy HH:mm:ss or dd-MM-yyyy HH:mm:ss
+  const dmyRegex = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/;
+  const match = s.match(dmyRegex);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1; // 0-indexed
+    const year = parseInt(match[3], 10);
+    const hour = match[4] ? parseInt(match[4], 10) : 0;
+    const minute = match[5] ? parseInt(match[5], 10) : 0;
+    const second = match[6] ? parseInt(match[6], 10) : 0;
+    
+    d = new Date(year, month, day, hour, minute, second);
+    if (!isNaN(d.getTime())) {
+      return d;
+    }
+  }
+
+  // Handle yyyy-MM-dd HH:mm:ss or yyyy/MM/dd HH:mm:ss
+  const ymdRegex = /^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/;
+  const matchYmd = s.match(ymdRegex);
+  if (matchYmd) {
+    const year = parseInt(matchYmd[1], 10);
+    const month = parseInt(matchYmd[2], 10) - 1;
+    const day = parseInt(matchYmd[3], 10);
+    const hour = matchYmd[4] ? parseInt(matchYmd[4], 10) : 0;
+    const minute = matchYmd[5] ? parseInt(matchYmd[5], 10) : 0;
+    const second = matchYmd[6] ? parseInt(matchYmd[6], 10) : 0;
+    
+    d = new Date(year, month, day, hour, minute, second);
+    if (!isNaN(d.getTime())) {
+      return d;
+    }
+  }
+
+  return new Date(); // Fallback to current date/time to avoid throwing Uncaught RangeError
+};
+
 export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRegistration, isLive, classList = [], isLoading = false, onRefresh }: StudentFormProps) {
   const [logoImgElement, setLogoImgElement] = useState<HTMLImageElement | null>(null);
 
@@ -718,9 +768,10 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     if (result.isConfirmed) {
       setIsSubmitting(true);
       try {
-        const formatToIndoPhone = (num: string): string => {
+        const formatToIndoPhone = (num: any): string => {
           if (!num) return '';
-          let clean = num.replace(/\D/g, '');
+          const str = String(num);
+          let clean = str.replace(/\D/g, '');
           if (clean.startsWith('0')) {
             clean = '62' + clean.slice(1);
           } else if (clean.startsWith('8')) {
@@ -907,7 +958,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       const birthStr = `${registeredStudent.tempatLahir || '-'}, ${(() => {
         if (!registeredStudent.tanggalLahir) return '-';
         try {
-          const d = new Date(registeredStudent.tanggalLahir);
+          const d = parseDateSafely(registeredStudent.tanggalLahir);
           if (isNaN(d.getTime())) return registeredStudent.tanggalLahir;
           return d.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
         } catch {
@@ -977,7 +1028,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       }
 
       // Column 1 (Pendaftar)
-      const registrationDate = new Date(registeredStudent.createdAt);
+      const registrationDate = parseDateSafely(registeredStudent.createdAt);
       const optDate: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
       const formattedDate = registrationDate.toLocaleDateString('id-ID', optDate);
 
@@ -1005,7 +1056,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
 
       // Footer divider line and text
      
-      const regDateObj = new Date(registeredStudent.createdAt);
+      const regDateObj = parseDateSafely(registeredStudent.createdAt);
       const yyyy = regDateObj.getFullYear();
       const mm = String(regDateObj.getMonth() + 1).padStart(2, '0');
       const dd = String(regDateObj.getDate()).padStart(2, '0');

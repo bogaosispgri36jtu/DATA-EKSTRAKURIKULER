@@ -620,6 +620,7 @@ export default function App() {
     return true;
   });
   const [isLiveConnection, setIsLiveConnection] = useState(false);
+  const [isSupabaseSchemaIncomplete, setIsSupabaseSchemaIncomplete] = useState(false);
   const [isInitializing, setIsInitializing] = useState(() => {
     try {
       const cachedClasses = localStorage.getItem('smp_pgri_classes');
@@ -722,12 +723,13 @@ export default function App() {
     // FALLBACK TO DEFAULT SPREADSHEET URL FOR THE PUBLIC STUDENT REGISTRATION FORM
     const gasUrl = currentSettings.googleAppsScriptUrl || DEFAULT_GAS_URL;
 
-    if (gasUrl && gasUrl.startsWith('http')) {
+    if (currentSettings.dbProvider === 'supabase' || (gasUrl && gasUrl.startsWith('http'))) {
       try {
-        // Try fetching from Google Apps Script Web App
-        const resJson = await gasFetch(gasUrl, 'getData');
+        // Try fetching from database/Sheets backend
+        const resJson = await gasFetch(gasUrl || 'supabase', 'getData');
         
         if (resJson.status === 'success') {
+          setIsSupabaseSchemaIncomplete(!!resJson.isSchemaIncomplete);
           const mappedStudents = (resJson.students || []).map(mapStudentData);
           setStudents(mappedStudents);
           setEskulList(resJson.eskul || []);
@@ -1021,12 +1023,12 @@ export default function App() {
 
   // Verify connection in background without full-screen loading overlay
   const checkLiveConnectionSilently = async (url: string) => {
-    if (!url || !url.startsWith('http')) {
+    if (settings.dbProvider !== 'supabase' && (!url || !url.startsWith('http'))) {
       setIsLiveConnection(false);
       return;
     }
     try {
-      const resJson = await gasFetch(url, 'getData');
+      const resJson = await gasFetch(settings.dbProvider === 'supabase' ? 'supabase' : url, 'getData');
       if (resJson.status === 'success') {
         setIsLiveConnection(true);
         if (resJson.students) {
@@ -1086,7 +1088,7 @@ export default function App() {
     }
 
     // If cloud link is active, update settings on sheet
-    if (isLiveConnection && updated.googleAppsScriptUrl) {
+    if (isLiveConnection && updated.dbProvider !== 'supabase' && updated.googleAppsScriptUrl) {
       try {
         await gasPost(updated.googleAppsScriptUrl, {
           action: 'updateSettings',
@@ -1097,9 +1099,15 @@ export default function App() {
       }
     }
 
-    // Hapus sinkronisasi Database (blocking loading) apabila mengedit atau menghapus URL
-    if (newSettings.googleAppsScriptUrl !== undefined) {
-      if (!updated.googleAppsScriptUrl || !updated.googleAppsScriptUrl.trim().startsWith('http')) {
+    // Hapus sinkronisasi Database (blocking loading) apabila mengedit atau menghapus URL / provider
+    if (newSettings.dbProvider !== undefined || newSettings.googleAppsScriptUrl !== undefined || newSettings.supabaseUrl !== undefined || newSettings.supabaseAnonKey !== undefined) {
+      if (updated.dbProvider === 'supabase') {
+        if (updated.supabaseUrl && updated.supabaseAnonKey) {
+          fetchAppData(updated);
+        } else {
+          setIsLiveConnection(false);
+        }
+      } else if (!updated.googleAppsScriptUrl || !updated.googleAppsScriptUrl.trim().startsWith('http')) {
         setIsLiveConnection(false);
         // Load local state data immediately
         const savedEskul = localStorage.getItem('smp_pgri_eskul');
@@ -1330,9 +1338,10 @@ export default function App() {
                 loggedAdmin={loggedAdmin}
                 isLoggedIn={isAdminLoggedIn}
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
-                isLive={isLiveConnection && !!settings.googleAppsScriptUrl}
+                isLive={isLiveConnection && (settings.dbProvider === 'supabase' ? true : !!settings.googleAppsScriptUrl)}
                 onRefresh={handleRefresh}
                 classList={classList}
+                isSupabaseSchemaIncomplete={isSupabaseSchemaIncomplete}
               />
             )}
           </div>
