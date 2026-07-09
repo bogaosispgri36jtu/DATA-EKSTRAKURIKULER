@@ -334,6 +334,85 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     setSelectedKelurahan(kel);
   };
 
+  // Helper to compress image until its base64 dataUrl is under a specified character limit
+  const compressImageToLimit = (
+    img: HTMLImageElement,
+    initialMaxDim: number,
+    targetCharLimit: number = 31000
+  ): { dataUrl: string; sizeInKb: number } => {
+    const canvas = document.createElement('canvas');
+    let width = img.width;
+    let height = img.height;
+
+    // Initial scale to max dimension
+    if (width > height) {
+      if (width > initialMaxDim) {
+        height *= initialMaxDim / width;
+        width = initialMaxDim;
+      }
+    } else {
+      if (height > initialMaxDim) {
+        width *= initialMaxDim / height;
+        height = initialMaxDim;
+      }
+    }
+
+    let quality = 0.8;
+    let dataUrl = '';
+    let sizeInKb = 0;
+
+    // Iteratively scale down or reduce quality until the base64 length is strictly under the character limit
+    for (let attempt = 0; attempt < 12; attempt++) {
+      canvas.width = Math.max(10, Math.round(width));
+      canvas.height = Math.max(10, Math.round(height));
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      }
+
+      dataUrl = canvas.toDataURL('image/jpeg', quality);
+      const head = 'data:image/jpeg;base64,'.length;
+      sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+
+      if (dataUrl.length < targetCharLimit) {
+        break;
+      }
+
+      // If too large, gradually degrade quality, then scale down dimension
+      if (quality > 0.3) {
+        quality -= 0.15;
+      } else {
+        width *= 0.7;
+        height *= 0.7;
+        quality = 0.4;
+      }
+    }
+
+    // Ultimate fallback if still over limit
+    if (dataUrl.length >= targetCharLimit) {
+      for (let attempt = 0; attempt < 5; attempt++) {
+        width *= 0.5;
+        height *= 0.5;
+        canvas.width = Math.max(5, Math.round(width));
+        canvas.height = Math.max(5, Math.round(height));
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        dataUrl = canvas.toDataURL('image/jpeg', 0.1);
+        const head = 'data:image/jpeg;base64,'.length;
+        sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
+        if (dataUrl.length < targetCharLimit) {
+          break;
+        }
+      }
+    }
+
+    return { dataUrl, sizeInKb };
+  };
+
   // Image compression utility
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -374,44 +453,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
     reader.onload = (event) => {
       const img = new Image();
       img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-
-        // Max dimension bounds for scaling (Optimized to 350 for fast upload and clear profile display)
-        const MAX_DIM = 350;
-        if (width > height) {
-          if (width > MAX_DIM) {
-            height *= MAX_DIM / width;
-            width = MAX_DIM;
-          }
-        } else {
-          if (height > MAX_DIM) {
-            width *= MAX_DIM / height;
-            height = MAX_DIM;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-        }
-
-        // Fast and efficient compression check without slow nested loops
-        let quality = 0.7;
-        let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        const head = 'data:image/jpeg;base64,'.length;
-        let sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-
-        if (sizeInKb > 65) {
-          // Fallback if still over 65 KB (very rare at 350px width), do a fast single step down
-          quality = 0.5;
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
-          sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-        }
+        // Use the new smart compression helper with a target of 31,000 characters
+        const { dataUrl, sizeInKb } = compressImageToLimit(img, 350, 31000);
 
         setPhoto(dataUrl);
         setPhotoSize(sizeInKb);
@@ -493,69 +536,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
       const img = new Image();
       img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        // Target max dimension of 800 to maintain legible certificate text
-        const MAX_DIM = 800;
-        if (width > height) {
-          if (width > MAX_DIM) {
-            height *= MAX_DIM / width;
-            width = MAX_DIM;
-          }
-        } else {
-          if (height > MAX_DIM) {
-            width *= MAX_DIM / height;
-            height = MAX_DIM;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-        }
-
-        // Target under 100 KB (98 KB buffer)
-        let quality = 0.8;
-        let dataUrl = canvas.toDataURL('image/jpeg', quality);
-        const head = 'data:image/jpeg;base64,'.length;
-        let sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-
-        if (sizeInKb >= 100) {
-          quality = 0.6;
-          dataUrl = canvas.toDataURL('image/jpeg', quality);
-          sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-        }
-
-        if (sizeInKb >= 100) {
-          const narrowCanvas = document.createElement('canvas');
-          narrowCanvas.width = width * 0.75;
-          narrowCanvas.height = height * 0.75;
-          const nCtx = narrowCanvas.getContext('2d');
-          if (nCtx) {
-            nCtx.drawImage(canvas, 0, 0, narrowCanvas.width, narrowCanvas.height);
-            quality = 0.55;
-            dataUrl = narrowCanvas.toDataURL('image/jpeg', quality);
-            sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-          }
-        }
-
-        if (sizeInKb >= 100) {
-          const tinyCanvas = document.createElement('canvas');
-          tinyCanvas.width = width * 0.5;
-          tinyCanvas.height = height * 0.5;
-          const tCtx = tinyCanvas.getContext('2d');
-          if (tCtx) {
-            tCtx.drawImage(canvas, 0, 0, tinyCanvas.width, tinyCanvas.height);
-            quality = 0.45;
-            dataUrl = tinyCanvas.toDataURL('image/jpeg', quality);
-            sizeInKb = Math.round(((dataUrl.length - head) * 3) / 4 / 1024);
-          }
-        }
+        // Use compressImageToLimit helper to ensure we never exceed 31000 base64 chars for certificate images too
+        const { dataUrl } = compressImageToLimit(img, 800, 31000);
 
         setCertificateFile(dataUrl);
         Swal.fire({
@@ -680,6 +662,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
   // Submit Handler with SweetAlert2
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
     
     // Detailed validation to show exact missing / incorrect fields using SweetAlert2
     const missing: string[] = [];
@@ -870,7 +853,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
 
     Swal.fire({
       title: 'Menyiapkan PDF...',
-      html: 'Sedang membuat bukti pendaftaran resmi.',
+      html: 'Sedang membuat bukti pendaftaran.',
       allowOutsideClick: false,
       width: '340px',
       didOpen: () => {
@@ -921,14 +904,8 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       doc.setTextColor(55, 65, 81); // slate-700
       doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, startYAfterKop + 7, { align: 'center' });
 
-      // No. Registrasi: left-aligned directly above Nama Lengkap
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(10);
-      doc.setTextColor(15, 23, 42);
-      doc.text(`No. Registrasi: ${registeredStudent.regNo}`, 15, startYAfterKop + 15);
-      
-      // Fields Section Start (Not too close to Tahun Pelajaran and No. Registrasi)
-      let currentY = startYAfterKop + 23;
+      // Fields Section Start (Not too close to Tahun Pelajaran)
+      let currentY = startYAfterKop + 15;
 
       const drawField = (label: string, value: string) => {
         doc.setFont('helvetica', 'normal');
@@ -952,6 +929,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       };
 
       // Draw all fields in a clean sequence (NO sections, matching the image exactly)
+      drawField('No. Registrasi', registeredStudent.regNo);
       drawField('Nama Lengkap', registeredStudent.name);
       drawField('Kelas', registeredStudent.kelas);
       drawField('Jenis Kelamin', registeredStudent.jenisKelamin);
@@ -1000,7 +978,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
       const signY = currentY + 8;
 
       // Draw QR Code on the bottom-left
-      const qrText = `SMP PGRI Jatiuwung - Bukti Registrasi Resmi
+      const qrText = `SMP PGRI Jatiuwung - Bukti Pendaftaran
 No: ${registeredStudent.regNo}
 Nama: ${registeredStudent.name}
 Kelas: ${registeredStudent.kelas}

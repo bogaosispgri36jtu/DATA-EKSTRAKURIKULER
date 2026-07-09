@@ -521,10 +521,10 @@ export default function App() {
 
   const gasPost = async (gasUrl: string, body: any): Promise<any> => {
     const cleanUrl = cleanGasUrl(gasUrl);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 7000); // 7 seconds timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000); // 45 seconds timeout for slower GAS operations
 
+    try {
       const response = await fetch(`/api/gas?url=${encodeURIComponent(cleanUrl)}`, {
         method: 'POST',
         headers: {
@@ -544,25 +544,12 @@ export default function App() {
           }
         }
       }
-    } catch (e) {
-      console.warn('Proxy POST failed or timed out, trying direct Google Apps Script POST...', e);
+      throw new Error(`Server returned status: ${response.status}`);
+    } catch (e: any) {
+      clearTimeout(timeoutId);
+      console.error('Proxy POST failed:', e);
+      throw e;
     }
-
-    // Direct GAS Web App POST via no-cors (e.g. for Vercel/serverless environments where proxy is not running)
-    try {
-      await fetch(gasUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'text/plain'
-        },
-        body: JSON.stringify(body)
-      });
-    } catch (e) {
-      console.error('Direct POST failed:', e);
-    }
-
-    return { status: 'success', isDirectPost: true };
   };
 
   // Core Data state
@@ -723,13 +710,13 @@ export default function App() {
     // FALLBACK TO DEFAULT SPREADSHEET URL FOR THE PUBLIC STUDENT REGISTRATION FORM
     const gasUrl = currentSettings.googleAppsScriptUrl || DEFAULT_GAS_URL;
 
-    if (currentSettings.dbProvider === 'supabase' || (gasUrl && gasUrl.startsWith('http'))) {
+    if (gasUrl && gasUrl.startsWith('http')) {
       try {
         // Try fetching from database/Sheets backend
-        const resJson = await gasFetch(gasUrl || 'supabase', 'getData');
+        const resJson = await gasFetch(gasUrl, 'getData');
         
         if (resJson.status === 'success') {
-          setIsSupabaseSchemaIncomplete(!!resJson.isSchemaIncomplete);
+          setIsSupabaseSchemaIncomplete(false);
           const mappedStudents = (resJson.students || []).map(mapStudentData);
           setStudents(mappedStudents);
           setEskulList(resJson.eskul || []);
@@ -864,36 +851,112 @@ export default function App() {
   const handleRegisterStudent = async (studentData: Omit<Student, 'id' | 'regNo' | 'createdAt'>): Promise<Student> => {
     const gasUrl = settings.googleAppsScriptUrl || DEFAULT_GAS_URL;
     
+    const isPrestasi = studentData.prestasiChecked === true || String(studentData.prestasiChecked) === 'true';
+    const cleanedData = {
+      name: String(studentData.name || studentData.nama || '').trim(),
+      nama: String(studentData.nama || studentData.name || '').trim(),
+      photo: String(studentData.photo || '').trim(),
+      kelas: String(studentData.kelas || '').trim(),
+      jenisKelamin: studentData.jenisKelamin,
+      jenis_kelamin: studentData.jenisKelamin,
+      namaAyah: String(studentData.namaAyah || '').trim(),
+      nama_ayah: String(studentData.namaAyah || '').trim(),
+      namaIbu: String(studentData.namaIbu || '').trim(),
+      nama_ibu: String(studentData.namaIbu || '').trim(),
+      hpSiswa: String(studentData.hpSiswa || '').trim(),
+      hp_siswa: String(studentData.hpSiswa || '').trim(),
+      hpOrtu: String(studentData.hpOrtu || '').trim(),
+      hp_ortu: String(studentData.hpOrtu || '').trim(),
+      email: String(studentData.email || '').trim(),
+      tempatLahir: String(studentData.tempatLahir || '').trim(),
+      tempat_lahir: String(studentData.tempatLahir || '').trim(),
+      tanggalLahir: String(studentData.tanggalLahir || '').trim(),
+      tanggal_lahir: String(studentData.tanggalLahir || '').trim(),
+      prestasiChecked: isPrestasi,
+      prestasi_checked: isPrestasi,
+      namaLomba: String(studentData.namaLomba || '').trim(),
+      nama_lomba: String(studentData.namaLomba || '').trim(),
+      cabangLomba: String(studentData.cabangLomba || '').trim(),
+      cabang_lomba: String(studentData.cabangLomba || '').trim(),
+      tingkatLomba: String(studentData.tingkatLomba || '').trim(),
+      tingkat_lomba: String(studentData.tingkatLomba || '').trim(),
+      juaraKe: String(studentData.juaraKe || '').trim(),
+      juara_ke: String(studentData.juaraKe || '').trim(),
+      penyelenggara: String(studentData.penyelenggara || '').trim(),
+      penyelenggara_lomba: String(studentData.penyelenggara || '').trim(),
+      certificateFile: String(studentData.certificateFile || '').trim(),
+      certificate_file: String(studentData.certificateFile || '').trim(),
+      certificateFileName: String(studentData.certificateFileName || '').trim(),
+      certificate_file_name: String(studentData.certificateFileName || '').trim(),
+      alamat: String(studentData.alamat || '').trim(),
+      rt: String(studentData.rt || '').trim(),
+      rw: String(studentData.rw || '').trim(),
+      provinsiId: String(studentData.provinsiId || '').trim(),
+      provinsi_id: String(studentData.provinsiId || '').trim(),
+      provinsiName: String(studentData.provinsiName || '').trim(),
+      provinsi_name: String(studentData.provinsiName || '').trim(),
+      kabupatenId: String(studentData.kabupatenId || '').trim(),
+      kabupaten_id: String(studentData.kabupatenId || '').trim(),
+      kabupatenName: String(studentData.kabupatenName || '').trim(),
+      kabupaten_name: String(studentData.kabupatenName || '').trim(),
+      kecamatanId: String(studentData.kecamatanId || '').trim(),
+      kecamatan_id: String(studentData.kecamatanId || '').trim(),
+      kecamatanName: String(studentData.kecamatanName || '').trim(),
+      kecamatan_name: String(studentData.kecamatanName || '').trim(),
+      kelurahanId: String(studentData.kelurahanId || '').trim(),
+      kelurahan_id: String(studentData.kelurahanId || '').trim(),
+      kelurahanName: String(studentData.kelurahanName || '').trim(),
+      kelurahan_name: String(studentData.kelurahanName || '').trim(),
+      eskulId: String(studentData.eskulId || '').trim(),
+      eskul_id: String(studentData.eskulId || '').trim(),
+      eskulName: String(studentData.eskulName || '').trim(),
+      eskul_name: String(studentData.eskulName || '').trim(),
+      eskulId2: String(studentData.eskulId2 || '').trim(),
+      eskul_id_2: String(studentData.eskulId2 || '').trim(),
+      eskulName2: String(studentData.eskulName2 || '').trim(),
+      eskul_name_2: String(studentData.eskulName2 || '').trim(),
+      eskulId3: String(studentData.eskulId3 || '').trim(),
+      eskul_id_3: String(studentData.eskulId3 || '').trim(),
+      eskulName3: String(studentData.eskulName3 || '').trim(),
+      eskul_name_3: String(studentData.eskulName3 || '').trim(),
+      tahunPelajaran: studentData.tahunPelajaran,
+      tahun_pelajaran: studentData.tahunPelajaran
+    };
+
     if (isLiveConnection && gasUrl) {
       try {
         const resJson = await gasPost(gasUrl, {
           action: 'registerStudent',
-          data: studentData
+          data: cleanedData
         });
 
-        if (resJson && resJson.status === 'success') {
-          if (resJson.data) {
-            const mappedData = mapStudentData(resJson.data);
-            setStudents(prev => [mappedData, ...prev]);
-            return mappedData;
+        if (resJson) {
+          if (resJson.status === 'success') {
+            if (resJson.data) {
+              const mappedData = mapStudentData(resJson.data);
+              setStudents(prev => [mappedData, ...prev]);
+              return mappedData;
+            } else {
+              // direct post fallback (no-cors)
+              const mockReg = mapStudentData(generateMockStudentResponse(cleanedData));
+              setStudents(prev => [mockReg, ...prev]);
+              return mockReg;
+            }
           } else {
-            // direct post fallback (no-cors)
-            const mockReg = mapStudentData(generateMockStudentResponse(studentData));
-            setStudents(prev => [mockReg, ...prev]);
-            return mockReg;
+            // Server explicitly returned an error (e.g., insertion failed)
+            throw new Error(resJson.message || 'Gagal menyimpan data ke database server.');
           }
+        } else {
+          throw new Error('Tidak ada respon dari server saat mendaftarkan siswa.');
         }
-        
-        const mockReg = mapStudentData(generateMockStudentResponse(studentData));
-        setStudents(prev => [mockReg, ...prev]);
-        return mockReg;
-      } catch (err) {
-        console.error('GAS Post failed, trying local fallback', err);
+      } catch (err: any) {
+        console.error('GAS Post failed during registration:', err);
+        throw err;
       }
     }
 
-    // Local Storage save
-    const mockReg = mapStudentData(generateMockStudentResponse(studentData));
+    // Local Storage save (when offline / local database mode)
+    const mockReg = mapStudentData(generateMockStudentResponse(cleanedData));
     const updatedStudents = [mockReg, ...students];
     setStudents(updatedStudents);
     localStorage.setItem('smp_pgri_students', JSON.stringify(updatedStudents));
@@ -1023,12 +1086,12 @@ export default function App() {
 
   // Verify connection in background without full-screen loading overlay
   const checkLiveConnectionSilently = async (url: string) => {
-    if (settings.dbProvider !== 'supabase' && (!url || !url.startsWith('http'))) {
+    if (!url || !url.startsWith('http')) {
       setIsLiveConnection(false);
       return;
     }
     try {
-      const resJson = await gasFetch(settings.dbProvider === 'supabase' ? 'supabase' : url, 'getData');
+      const resJson = await gasFetch(url, 'getData');
       if (resJson.status === 'success') {
         setIsLiveConnection(true);
         if (resJson.students) {
@@ -1088,7 +1151,7 @@ export default function App() {
     }
 
     // If cloud link is active, update settings on sheet
-    if (isLiveConnection && updated.dbProvider !== 'supabase' && updated.googleAppsScriptUrl) {
+    if (isLiveConnection && updated.googleAppsScriptUrl) {
       try {
         await gasPost(updated.googleAppsScriptUrl, {
           action: 'updateSettings',
@@ -1100,14 +1163,8 @@ export default function App() {
     }
 
     // Hapus sinkronisasi Database (blocking loading) apabila mengedit atau menghapus URL / provider
-    if (newSettings.dbProvider !== undefined || newSettings.googleAppsScriptUrl !== undefined || newSettings.supabaseUrl !== undefined || newSettings.supabaseAnonKey !== undefined) {
-      if (updated.dbProvider === 'supabase') {
-        if (updated.supabaseUrl && updated.supabaseAnonKey) {
-          fetchAppData(updated);
-        } else {
-          setIsLiveConnection(false);
-        }
-      } else if (!updated.googleAppsScriptUrl || !updated.googleAppsScriptUrl.trim().startsWith('http')) {
+    if (newSettings.googleAppsScriptUrl !== undefined) {
+      if (!updated.googleAppsScriptUrl || !updated.googleAppsScriptUrl.trim().startsWith('http')) {
         setIsLiveConnection(false);
         // Load local state data immediately
         const savedEskul = localStorage.getItem('smp_pgri_eskul');
@@ -1338,7 +1395,7 @@ export default function App() {
                 loggedAdmin={loggedAdmin}
                 isLoggedIn={isAdminLoggedIn}
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
-                isLive={isLiveConnection && (settings.dbProvider === 'supabase' ? true : !!settings.googleAppsScriptUrl)}
+                isLive={isLiveConnection && !!settings.googleAppsScriptUrl}
                 onRefresh={handleRefresh}
                 classList={classList}
                 isSupabaseSchemaIncomplete={isSupabaseSchemaIncomplete}

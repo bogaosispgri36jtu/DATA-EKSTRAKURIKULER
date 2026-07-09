@@ -2,7 +2,5 @@
   "googleAppsScriptUrl": "https://script.google.com/macros/s/AKfycbyHwTkpTwb9GU0dgKunUBX7kIKEdzn-CLs6A8wQX5WGLORe5FRx0TEuDksp-GyHCRFnAw/exec",
   "tahunPelajaranAktif": "2026/2027",
   "isPublished": true,
-  "dbProvider": "supabase",
-  "supabaseUrl": "https://oybwfgcpajyeqfyswzfx.supabase.co",
-  "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95YndmZ2NwYWp5ZXFmeXN3emZ4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM1NjYxMDksImV4cCI6MjA5OTE0MjEwOX0.g6QK27RnuUSehYFtdG4BU3dOcaJRm4ISuteC1i8M5fs"
+  "dbProvider": "gas"
 }

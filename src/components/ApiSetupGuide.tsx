@@ -577,11 +577,26 @@ function saveStudent(ss, s) {
       var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
       val = (prest === true || prest === "TRUE" || prest === "true") ? "TRUE" : "FALSE";
     }
-    else if (header === "namalomba" || header === "nama lomba") val = getPropCaseInsensitive(s, ["namaLomba", "nama_lomba", "namalomba", "nama lomba"]);
-    else if (header === "cabanglomba" || header === "cabang lomba") val = getPropCaseInsensitive(s, ["cabangLomba", "cabang_lomba", "cabanglomba", "cabang lomba"]);
-    else if (header === "tingkatlomba" || header === "tingkat lomba") val = getPropCaseInsensitive(s, ["tingkatLomba", "tingkat_lomba", "tingkatlomba", "tingkat lomba"]);
-    else if (header === "juarake" || header === "juara ke") val = getPropCaseInsensitive(s, ["juaraKe", "juara_ke", "juarake", "juara ke"]);
-    else if (header === "penyelenggara") val = getPropCaseInsensitive(s, ["penyelenggara", "penyelenggaraLomba"]);
+    else if (header === "namalomba" || header === "nama lomba") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["namaLomba", "nama_lomba", "namalomba", "nama lomba"]) : "";
+    }
+    else if (header === "cabanglomba" || header === "cabang lomba") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["cabangLomba", "cabang_lomba", "cabanglomba", "cabang lomba"]) : "";
+    }
+    else if (header === "tingkatlomba" || header === "tingkat lomba") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["tingkatLomba", "tingkat_lomba", "tingkatlomba", "tingkat lomba"]) : "";
+    }
+    else if (header === "juarake" || header === "juara ke") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["juaraKe", "juara_ke", "juarake", "juara ke"]) : "";
+    }
+    else if (header === "penyelenggara") {
+      var prest = getPropCaseInsensitive(s, ["prestasiChecked", "prestasi_checked", "prestasichecked", "prestasi"]);
+      val = (prest === true || prest === "TRUE" || prest === "true") ? getPropCaseInsensitive(s, ["penyelenggara", "penyelenggaraLomba"]) : "";
+    }
     else if (header === "alamat") val = getPropCaseInsensitive(s, ["alamat", "alamatLengkap"]);
     else if (header === "rt") val = getPropCaseInsensitive(s, ["rt"]);
     else if (header === "rw") val = getPropCaseInsensitive(s, ["rw"]);
@@ -604,7 +619,12 @@ function saveStudent(ss, s) {
     else if (header === "tahunpelajaran" || header === "tahun pelajaran") val = targetTP;
     else if (header === "createdat" || header === "created at") val = createdAt;
     
-    newRow.push(val === undefined || val === null ? "" : val);
+    // Safety check: force truncation to 32700 characters to never breach Google Sheets 32767 limit
+    var strVal = (val === undefined || val === null) ? "" : val.toString();
+    if (strVal.length > 32700) {
+      strVal = strVal.substring(0, 32700);
+    }
+    newRow.push(strVal);
   }
   
   sheet.appendRow(newRow);

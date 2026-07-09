@@ -611,7 +611,12 @@ function saveStudent(ss, s) {
     else if (header === "tahunpelajaran" || header === "tahun pelajaran") val = targetTP;
     else if (header === "createdat" || header === "created at") val = createdAt;
     
-    newRow.push(val === undefined || val === null ? "" : val);
+    // Safety check: force truncation to 32700 characters to never breach Google Sheets 32767 limit
+    var strVal = (val === undefined || val === null) ? "" : val.toString();
+    if (strVal.length > 32700) {
+      strVal = strVal.substring(0, 32700);
+    }
+    newRow.push(strVal);
   }
   
   sheet.appendRow(newRow);
