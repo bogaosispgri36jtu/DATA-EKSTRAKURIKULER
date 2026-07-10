@@ -1010,7 +1010,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       const optDate: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
       const formattedDate = registrationDate.toLocaleDateString('id-ID', optDate);
 
-      // Column 2 (Parent)
+     
       doc.setFont('helvetica', 'normal');
       doc.text(`Tangerang, ${formattedDate}`, 110, signY + 2, { align: 'center' });
       doc.text('Pendaftar,', 110, signY + 7, { align: 'center' });
@@ -1020,6 +1020,8 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       const nameWidth = doc.getTextWidth(registeredStudent.name);
       doc.line(110 - nameWidth / 2, signY + 33, 110 + nameWidth / 2, signY + 33); // Underline
 
+
+       // Column 2 (Parent)
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9.5);
       doc.setTextColor(31, 41, 55);
@@ -1032,8 +1034,6 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.setTextColor(100, 116, 139);
       doc.text('tanda tangan & nama jelas', 165, signY + 36, { align: 'center' });
 
-
-      
 
       // Footer divider line and text
      
