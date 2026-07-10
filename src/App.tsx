@@ -157,6 +157,9 @@ const mapStudentData = (s: any): Student => {
     certificateFile: isPrestasiTrue ? (s.certificateFile || s.certificate_file || s.CertificateFile || '') : '',
     certificateFileName: isPrestasiTrue ? (s.certificateFileName || s.certificate_file_name || s.CertificateFileName || '') : '',
     
+    buktiPendaftaranFile: s.buktiPendaftaranFile || s.bukti_pendaftaran_file || s.BuktiPendaftaranFile || '',
+    buktiPendaftaranFileName: s.buktiPendaftaranFileName || s.bukti_pendaftaran_file_name || s.BuktiPendaftaranFileName || '',
+    
     tahunPelajaran: s.tahunPelajaran || s.tahun_pelajaran || s.TahunPelajaran || s.tahunpelajaran || '',
     createdAt: s.createdAt || s.created_at || s.CreatedAt || s.createdat || ''
   };
@@ -1024,6 +1027,39 @@ export default function App() {
     return mockReg;
   };
 
+  // Update specific student record (e.g. upload registration proof PDF)
+  const handleUpdateStudent = async (studentId: string, updatedFields: Partial<Student>): Promise<void> => {
+    // 1. Update React state
+    const updatedStudents = students.map(s => s.id === studentId ? { ...s, ...updatedFields } : s);
+    setStudents(updatedStudents);
+
+    // 2. Save to local storage
+    localStorage.setItem('smp_pgri_students', JSON.stringify(updatedStudents));
+
+    // 3. If live connection is active, send update to Google Apps Script
+    const gasUrl = settings.googleAppsScriptUrl || DEFAULT_GAS_URL;
+    if (isLiveConnection && gasUrl) {
+      try {
+        const studentToUpdate = updatedStudents.find(s => s.id === studentId);
+        if (studentToUpdate) {
+          await gasPost(gasUrl, {
+            action: 'updateStudent',
+            id: studentId,
+            regNo: studentToUpdate.regNo,
+            data: {
+              buktiPendaftaranFile: studentToUpdate.buktiPendaftaranFile || '',
+              buktiPendaftaranFileName: studentToUpdate.buktiPendaftaranFileName || '',
+              bukti_pendaftaran_file: studentToUpdate.buktiPendaftaranFile || '',
+              bukti_pendaftaran_file_name: studentToUpdate.buktiPendaftaranFileName || ''
+            }
+          });
+        }
+      } catch (e) {
+        console.error('Failed to sync student update to Google Sheets:', e);
+      }
+    }
+  };
+
   const generateMockStudentResponse = (studentData: Omit<Student, 'id' | 'regNo' | 'createdAt'>): Student => {
     // Count existing registrations in this school year for registration number sequence
     const yearMatches = students.filter(s => s.tahunPelajaran === studentData.tahunPelajaran).length;
@@ -1443,6 +1479,7 @@ export default function App() {
             {activeView === 'admin' && (
               <AdminDashboard 
                 students={students}
+                onUpdateStudent={handleUpdateStudent}
                 eskulList={eskulList}
                 settings={settings}
                 onAddEskul={handleAddEskul}

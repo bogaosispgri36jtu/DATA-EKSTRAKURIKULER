@@ -26,6 +26,8 @@ export interface Student {
   penyelenggara?: string;
   certificateFile?: string; // Base64 of the uploaded file/image
   certificateFileName?: string; // Name of the uploaded file
+  buktiPendaftaranFile?: string; // Base64 of the uploaded registration proof PDF
+  buktiPendaftaranFileName?: string; // Name of the uploaded registration proof PDF
   alamat: string; // Nama Kampung / Perumahan
   rt: string;
   rw: string;

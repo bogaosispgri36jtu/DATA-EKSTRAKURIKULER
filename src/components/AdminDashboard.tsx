@@ -8,7 +8,7 @@ import {
   Lock, LayoutDashboard, FileText, Settings, Plus, Trash2, 
   Download, Printer, Search, Filter, ShieldAlert, CheckCircle2,
   RefreshCcw, Eye, EyeOff, ArrowUpDown, Layers, Database, UserCheck, LogOut,
-  UserPlus, User, Shield, Key
+  UserPlus, User, Shield, Key, Upload
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
@@ -26,6 +26,7 @@ interface AdminDashboardProps {
   onResetEskulStudents: (eskulId: string) => Promise<void>;
   onResetAllData: () => Promise<void>;
   onUpdateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
+  onUpdateStudent?: (studentId: string, updatedFields: Partial<Student>) => Promise<void> | void;
   onAddAdmin?: (newAdmin: any) => Promise<any>;
   onDeleteAdmin?: (username: string) => Promise<void>;
   admins?: any[];
@@ -111,6 +112,7 @@ export default function AdminDashboard({
   onResetEskulStudents,
   onResetAllData,
   onUpdateSettings,
+  onUpdateStudent,
   onAddAdmin,
   onDeleteAdmin,
   admins = [],
@@ -278,6 +280,94 @@ export default function AdminDashboard({
   const [filterKelas, setFilterKelas] = useState('');
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
   const [selectedStudentDetail, setSelectedStudentDetail] = useState<any | null>(null);
+
+  const handleUploadBuktiPdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type !== 'application/pdf') {
+      Swal.fire({
+        icon: 'error',
+        title: 'File tidak valid',
+        text: 'Silakan pilih file berformat PDF.',
+        confirmButtonColor: '#1d4ed8'
+      });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      Swal.fire({
+        icon: 'error',
+        title: 'Ukuran file terlalu besar',
+        text: 'Maksimum ukuran file PDF adalah 10MB.',
+        confirmButtonColor: '#1d4ed8'
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Memproses Berkas...',
+      html: 'Sedang membaca file PDF...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const base64String = reader.result as string;
+        if (onUpdateStudent && selectedStudentDetail) {
+          await onUpdateStudent(selectedStudentDetail.id, {
+            buktiPendaftaranFile: base64String,
+            buktiPendaftaranFileName: file.name
+          });
+
+          setSelectedStudentDetail((prev: any) => prev ? {
+            ...prev,
+            buktiPendaftaranFile: base64String,
+            buktiPendaftaranFileName: file.name
+          } : null);
+
+          if (onRefresh) {
+            onRefresh();
+          }
+
+          Swal.fire({
+            icon: 'success',
+            title: 'Berhasil',
+            text: 'Bukti pendaftaran PDF berhasil diunggah!',
+            confirmButtonColor: '#1d4ed8'
+          });
+        } else {
+          Swal.fire({
+            icon: 'error',
+            title: 'Gagal',
+            text: 'Fungsi pembaruan data pendaftar tidak tersedia.',
+            confirmButtonColor: '#1d4ed8'
+          });
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire({
+          icon: 'error',
+          title: 'Gagal',
+          text: 'Terjadi kesalahan saat menyimpan file PDF.',
+          confirmButtonColor: '#1d4ed8'
+        });
+      }
+    };
+    reader.onerror = () => {
+      Swal.fire({
+        icon: 'error',
+        title: 'Gagal',
+        text: 'Gagal membaca file PDF.',
+        confirmButtonColor: '#1d4ed8'
+      });
+    };
+    reader.readAsDataURL(file);
+  };
 
   // Settings State
   const [gasUrlInput, setGasUrlInput] = useState(settings.googleAppsScriptUrl);
@@ -3243,10 +3333,53 @@ CREATE POLICY "Allow public delete students" ON students FOR DELETE USING (true)
                   {selectedStudentDetail.alamat}, RT {selectedStudentDetail.rt}/RW {selectedStudentDetail.rw}, Kelurahan {selectedStudentDetail.kelurahanName}, Kecamatan {selectedStudentDetail.kecamatanName}, Kabupaten/Kota {selectedStudentDetail.kabupatenName}, Provinsi {selectedStudentDetail.provinsiName}
                 </p>
               </div>
+
+              {/* Bukti Pendaftaran PDF (Request) */}
+              {selectedStudentDetail.buktiPendaftaranFile && (
+                <div className="space-y-3 border-t border-blue-100 pt-3">
+                  <span className="text-[9px] font-bold text-blue-500 block uppercase tracking-wider">Berkas Bukti Pendaftaran PDF</span>
+                  <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100/60 flex items-center justify-between gap-3 shadow-inner">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100">
+                        <FileText className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] font-bold text-slate-700 truncate max-w-xs">{selectedStudentDetail.buktiPendaftaranFileName || 'Bukti_Pendaftaran.pdf'}</p>
+                        <p className="text-[8px] font-semibold text-blue-500 uppercase">Dokumen PDF</p>
+                      </div>
+                    </div>
+                    <a
+                      href={selectedStudentDetail.buktiPendaftaranFile}
+                      target="_blank"
+                      rel="noreferrer"
+                      download={selectedStudentDetail.buktiPendaftaranFileName || `Bukti_Pendaftaran_${selectedStudentDetail.name}.pdf`}
+                      className="text-[10px] font-bold text-blue-700 bg-blue-50 hover:bg-blue-600 hover:text-white px-2.5 py-1.5 rounded-lg border border-blue-100 transition-all cursor-pointer text-center"
+                    >
+                      Buka / Unduh PDF
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Footer */}
-            <div className="p-5 border-t border-slate-100 flex justify-end bg-slate-50 rounded-b-3xl">
+            <div className="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-3xl">
+              <input
+                type="file"
+                id="admin-upload-bukti-pdf"
+                accept="application/pdf"
+                className="hidden"
+                onChange={handleUploadBuktiPdf}
+              />
+              <button
+                type="button"
+                onClick={() => document.getElementById('admin-upload-bukti-pdf')?.click()}
+                className="bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              >
+                <Upload className="w-3.5 h-3.5 text-yellow-300" />
+                <span>Unggah Bukti (PDF)</span>
+              </button>
+
               <button
                 onClick={() => setSelectedStudentDetail(null)}
                 className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs py-2 px-5 rounded-xl transition-all cursor-pointer"
