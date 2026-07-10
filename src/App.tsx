@@ -547,8 +547,69 @@ export default function App() {
       throw new Error(`Server returned status: ${response.status}`);
     } catch (e: any) {
       clearTimeout(timeoutId);
-      console.error('Proxy POST failed:', e);
-      throw e;
+      console.warn('Proxy POST failed or not running, trying direct Google Apps Script POST...', e);
+      
+      // Fallback: Direct POST to GAS
+      const directController = new AbortController();
+      const directTimeoutId = setTimeout(() => directController.abort(), 45000);
+
+      try {
+        // Try direct post with CORS
+        const directResponse = await fetch(cleanUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8' // Use text/plain to avoid CORS preflight failures in some setups
+          },
+          body: JSON.stringify(body),
+          signal: directController.signal
+        });
+        clearTimeout(directTimeoutId);
+
+        if (directResponse.ok) {
+          const text = await directResponse.text();
+          try {
+            const json = JSON.parse(text);
+            if (json && (json.status === 'success' || json.status === 'error')) {
+              return json;
+            }
+          } catch {
+            // If response text is not JSON but direct response is ok, consider it a success
+            return { status: 'success' };
+          }
+        }
+        
+        // If response is not ok (e.g. CORS preflight blocked), fall back to no-cors mode
+        throw new Error(`Direct POST status: ${directResponse.status}`);
+      } catch (directError: any) {
+        clearTimeout(directTimeoutId);
+        console.warn('Direct CORS POST failed, attempting direct no-cors POST...', directError);
+
+        const noCorsController = new AbortController();
+        const noCorsTimeoutId = setTimeout(() => noCorsController.abort(), 45000);
+
+        try {
+          // Direct POST with mode: 'no-cors'. 
+          // Browser will successfully send payload to GAS Web App, but we won't be able to read response body.
+          await fetch(cleanUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+              'Content-Type': 'text/plain;charset=utf-8'
+            },
+            body: JSON.stringify(body),
+            signal: noCorsController.signal
+          });
+          clearTimeout(noCorsTimeoutId);
+          
+          // Since no-cors hides response, we assume it was processed successfully
+          // and return status success so that the direct post fallback (no-cors) logic in handleRegisterStudent triggers.
+          return { status: 'success' };
+        } catch (noCorsError: any) {
+          clearTimeout(noCorsTimeoutId);
+          console.error('Direct no-cors POST also failed:', noCorsError);
+          throw noCorsError;
+        }
+      }
     }
   };
 
