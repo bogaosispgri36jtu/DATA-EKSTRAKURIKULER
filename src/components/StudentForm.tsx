@@ -1178,7 +1178,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
             <button
               onClick={handleDownloadPDF}
               id="btn-download-pdf"
-              className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full bg-blue-700 hover:bg-blue-800 text-white text-xl font-bold py-3.5 px-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer"
             >
               <FileCheck className="w-5 h-5 text-yellow-300" />
               Download Bukti Pendaftar (PDF)
