@@ -1013,24 +1013,25 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9.5);
       doc.setTextColor(31, 41, 55);
-      doc.text(`Tangerang, ${formattedDate}`, 110, signY + 2, { align: 'center' });
-      doc.text('Pendaftar,', 110, signY + 7, { align: 'center' });
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text(registeredStudent.name, 110, signY + 32, { align: 'center' });
-      const nameWidth = doc.getTextWidth(registeredStudent.name);
-      doc.line(110 - nameWidth / 2, signY + 33, 110 + nameWidth / 2, signY + 33); // Underline
-
-      // Column 2 (Parent)
-      doc.setFont('helvetica', 'normal');
       doc.text('Mengetahui,', 165, signY + 2, { align: 'center' });
-      doc.text('Orang Tua/Wali Murid', 165, signY + 7, { align: 'center' });
+      ddoc.text('Orang Tua/Wali Murid', 165, signY + 7, { align: 'center' });
       doc.text('........................................', 165, signY + 32, { align: 'center' });
-      
+
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(7.5);
       doc.setTextColor(100, 116, 139);
       doc.text('tanda tangan & nama jelas', 165, signY + 36, { align: 'center' });
+      
+      // Column 2 (Parent)
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Tangerang, ${formattedDate}`, 110, signY + 2, { align: 'center' });
+      doc.text('Pendaftar,', 110, signY + 7, { align: 'center' });
+
+      doc.setFont('helvetica', 'bold');
+      doc.text(registeredStudent.name, 110, signY + 32, { align: 'center' });
+      const nameWidth = doc.getTextWidth(registeredStudent.name);
+      doc.line(110 - nameWidth / 2, signY + 33, 110 + nameWidth / 2, signY + 33); // Underline
+      
 
       // Footer divider line and text
      
