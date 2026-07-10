@@ -1050,7 +1050,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.text(formattedDateTime, 198, 281, { align: 'right' });
 
       // Save PDF
-      const pdfFileName = `${registeredStudent.name}_${registeredStudent.regNo.replace(/\//g, '_')}.pdf`;
+      const pdfFileName = `Bukti Pendaftaran Ekstrakurikuler ${registeredStudent.name}_${registeredStudent.regNo}.pdf`;
       doc.save(pdfFileName);
       Swal.close();
       
