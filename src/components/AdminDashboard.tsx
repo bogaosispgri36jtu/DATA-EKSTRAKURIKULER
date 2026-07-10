@@ -567,7 +567,7 @@ export default function AdminDashboard({
 
   // Delete Eskul
   const handleDeleteEskulClick = async (id: string, name: string) => {
-    const studentCount = students.filter(s => s.eskulId === id).length;
+    const studentCount = students.filter(s => s.eskulId === id || s.eskulId2 === id || s.eskulId3 === id).length;
     
     const result = await Swal.fire({
       title: 'Hapus Ekstrakurikuler?',
@@ -928,7 +928,7 @@ export default function AdminDashboard({
       let totalSiswa = 0;
       
       eskulList.forEach(eskul => {
-        const count = students.filter(s => s.eskulId === eskul.id && s.tahunPelajaran === settings.tahunPelajaranAktif).length;
+        const count = students.filter(s => (s.eskulId === eskul.id || s.eskulId2 === eskul.id || s.eskulId3 === eskul.id) && s.tahunPelajaran === settings.tahunPelajaranAktif).length;
         totalSiswa += count;
 
         doc.setFont('helvetica', 'normal');
@@ -1288,7 +1288,7 @@ export default function AdminDashboard({
       title: 'Reset per Ekstrakurikuler',
       input: 'select',
       inputOptions: eskulList.reduce((acc, eskul) => {
-        const count = students.filter(s => s.eskulId === eskul.id).length;
+        const count = students.filter(s => s.eskulId === eskul.id || s.eskulId2 === eskul.id || s.eskulId3 === eskul.id).length;
         acc[eskul.id] = `${eskul.nama} (${count} siswa)`;
         return acc;
       }, {} as Record<string, string>),
@@ -1307,7 +1307,7 @@ export default function AdminDashboard({
 
     if (selectedEskulId) {
       const selectedEskul = eskulList.find(e => e.id === selectedEskulId);
-      const studentCount = students.filter(s => s.eskulId === selectedEskulId).length;
+      const studentCount = students.filter(s => s.eskulId === selectedEskulId || s.eskulId2 === selectedEskulId || s.eskulId3 === selectedEskulId).length;
 
       const confirm = await Swal.fire({
         title: 'Konfirmasi Penghapusan',
@@ -2150,7 +2150,7 @@ export default function AdminDashboard({
 
               <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
                 {eskulList.map(eskul => {
-                  const numRegistered = students.filter(s => s.eskulId === eskul.id).length;
+                  const numRegistered = students.filter(s => s.eskulId === eskul.id || s.eskulId2 === eskul.id || s.eskulId3 === eskul.id).length;
                   return (
                     <div key={eskul.id} className="flex items-center justify-between border border-slate-100 p-2.5 sm:p-3 rounded-xl hover:bg-slate-50 hover:shadow-sm transition-all gap-2">
                       <div className="min-w-0">
