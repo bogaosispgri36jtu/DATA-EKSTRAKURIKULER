@@ -1053,7 +1053,7 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.setTextColor(0, 0, 0); // Nilai RGB (0, 0, 0) adalah Hitam
       
       // Memasukkan Tahun Pelajaran ke dalam teks footer sebelah kiri
-      doc.text(`Sistem Pendaftaran Ekstrakurikuler TP ${registeredStudent.tahunPelajaran} | SMP PGRI JATIUWUNG`, 12, 281);
+      doc.text(`Sistem Pendaftaran Ekstrakurikuler | ${registeredStudent.tahunPelajaran} | SMP PGRI JATIUWUNG`, 12, 281);
       
       // Menampilkan tanggal format DD-MM-YYYY di sebelah kanan
       doc.text(formattedDateTime, 198, 281, { align: 'right' });
