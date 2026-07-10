@@ -1398,7 +1398,7 @@ export default function App() {
         ) : isLoading && activeView === 'admin' ? (
           <div className="h-96 flex flex-col items-center justify-center text-slate-500 gap-3">
             <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
-            <span className="text-xs font-bold">Sinkronisasi Database...</span>
+            <span className="text-xs font-base">Sinkronisasi Database...</span>
           </div>
         ) : (
           <div className="animate-fadeIn">

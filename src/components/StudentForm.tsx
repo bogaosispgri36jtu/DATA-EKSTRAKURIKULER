@@ -199,7 +199,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
               <div class="absolute inset-0 rounded-full border-4 border-blue-700 border-t-transparent animate-spin"></div>
             </div>
             <!-- Aesthetic Description below spinner -->
-            <p class="text-xs sm:text-[13px] text-slate-500 font-bold tracking-wider mt-4 animate-pulse">
+            <p class="text-xs sm:text-[10px] text-slate-500 font-base tracking-wider mt-4 animate-pulse">
               Mohon tunggu sebentar...
             </p>
           </div>
@@ -208,7 +208,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
         allowOutsideClick: false,
         allowEscapeKey: false,
         customClass: {
-          popup: 'rounded-2xl shadow-xl border border-slate-100 max-w-[260px] sm:max-w-xs'
+          popup: 'rounded-1xl shadow-xl border border-slate-100 max-w-[260px] sm:max-w-xs'
         }
       });
     } else {
@@ -819,7 +819,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
             Swal.showLoading();
           },
           width: '340px',
-          customClass: { popup: 'rounded-2xl' }
+          customClass: { popup: 'rounded-1xl' }
         });
 
         const res = await onSubmitRegistration(studentData);
@@ -831,7 +831,7 @@ export default function StudentForm({ eskulList, tahunPelajaranAktif, onSubmitRe
           text: `Selamat, Anda berhasil terdaftar dengan Nomor: ${res.regNo}`,
           confirmButtonColor: '#1d4ed8',
           width: '360px',
-          customClass: { popup: 'rounded-2xl' }
+          customClass: { popup: 'rounded-1xl' }
         });
       } catch (error) {
         Swal.fire({
