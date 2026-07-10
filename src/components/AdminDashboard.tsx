@@ -2255,35 +2255,35 @@ export default function AdminDashboard({
                 </div>
               </div>
 
-              <div className="overflow-auto rounded-xl border border-slate-100 max-h-[360px]">
-                <table className="w-full text-left border-collapse text-xs">
+              <div className="overflow-auto rounded-xl border border-slate-100 max-h-[360px] custom-compact-scrollbar">
+                <table className="w-full text-left border-collapse text-[8px]">
                   <thead>
                     <tr className="text-slate-400 font-medium uppercase tracking-wider border-b border-slate-100/40 text-[8px] sticky top-0 z-10">
-                      <th className="py-0.5 px-2 text-center w-10 bg-white/60 backdrop-blur-sm">No</th>
-                      <th className="py-0.5 px-2 bg-white/60 backdrop-blur-sm">No. Registrasi</th>
-                      <th className="py-0.5 px-2 bg-white/60 backdrop-blur-sm">Nama Lengkap</th>
-                      <th className="py-0.5 px-1.5 text-center w-12 bg-white/60 backdrop-blur-sm">L/P</th>
-                      <th className="py-0.5 px-2 text-center w-16 bg-white/60 backdrop-blur-sm">Kelas</th>
-                      <th className="py-0.5 px-2 bg-white/60 backdrop-blur-sm">Eskul 1</th>
-                      <th className="py-0.5 px-2 bg-white/60 backdrop-blur-sm">Eskul 2</th>
-                      <th className="py-0.5 px-2 bg-white/60 backdrop-blur-sm">Eskul 3</th>
-                      <th className="py-0.5 px-2 bg-white/60 backdrop-blur-sm">Email</th>
-                      <th className="py-0.5 px-2 bg-white/60 backdrop-blur-sm">Kontak HP</th>
-                      <th className="py-0.5 px-2 text-center w-20 bg-white/60 backdrop-blur-sm">Aksi</th>
+                      <th className="py-1 px-2 text-center w-10 bg-white/60 backdrop-blur-sm">No</th>
+                      <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">No. Registrasi</th>
+                      <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Nama Lengkap</th>
+                      <th className="py-1 px-1.5 text-center w-12 bg-white/60 backdrop-blur-sm">L/P</th>
+                      <th className="py-1 px-2 text-center w-16 bg-white/60 backdrop-blur-sm">Kelas</th>
+                      <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Eskul 1</th>
+                      <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Eskul 2</th>
+                      <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Eskul 3</th>
+                      <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Email</th>
+                      <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Kontak HP</th>
+                      <th className="py-1 px-2 text-center w-20 bg-white/60 backdrop-blur-sm">Aksi</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-slate-600">
+                  <tbody className="divide-y divide-slate-100 text-slate-600 text-[8px]">
                     {filteredStudents.map((s, idx) => (
-                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-1 px-2 text-center text-slate-400 text-[10px] font-mono">{idx + 1}</td>
-                        <td className="py-1 px-2 font-mono text-blue-700 text-[9px]">
-                          <span className="bg-blue-50/50 px-1 py-0.5 rounded">{s.regNo}</span>
+                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors h-7 text-[8px]">
+                        <td className="py-1 px-2 text-center text-slate-400 font-mono text-[8px]">{idx + 1}</td>
+                        <td className="py-1 px-2 font-mono text-blue-700 text-[8px]">
+                          <span className="bg-blue-50/50 px-1 py-0.5 rounded text-[8px]">{s.regNo}</span>
                         </td>
-                        <td className="py-1 px-2 font-montserrat font-medium text-slate-700 uppercase tracking-wide text-[10px] max-w-[150px] truncate" title={s.name}>
+                        <td className="py-1 px-2 font-montserrat font-medium text-slate-700 uppercase tracking-wide text-[8px] max-w-[150px] truncate" title={s.name}>
                           {s.name}
                         </td>
-                        <td className="py-1 px-1.5 text-center">
-                          <span className={`px-1 py-0.5 rounded text-[9px] font-medium ${
+                        <td className="py-1 px-1.5 text-center text-[8px]">
+                          <span className={`px-1 py-0.5 rounded text-[8px] font-medium ${
                             s.jenisKelamin === 'Laki-laki' 
                               ? 'bg-blue-50/50 text-blue-700' 
                               : 'bg-pink-50/50 text-pink-700'
@@ -2291,41 +2291,41 @@ export default function AdminDashboard({
                             {s.jenisKelamin === 'Laki-laki' ? 'L' : 'P'}
                           </span>
                         </td>
-                        <td className="py-1 px-2 text-center">
-                          <span className="bg-slate-100/70 text-slate-600 px-1.5 py-0.5 rounded text-[9px] font-medium">
+                        <td className="py-1 px-2 text-center text-[8px]">
+                          <span className="bg-slate-100/70 text-slate-600 px-1.5 py-0.5 rounded text-[8px] font-medium">
                             {s.kelas}
                           </span>
                         </td>
-                        <td className="py-1 px-2 text-slate-800 text-[10px] max-w-[140px] truncate" title={s.eskulName}>
+                        <td className="py-1 px-2 text-slate-800 text-[8px] max-w-[140px] truncate" title={s.eskulName}>
                           {s.eskulName}
                         </td>
-                        <td className="py-1 px-2 text-[10px] max-w-[140px] truncate" title={s.eskulName2 || '-'}>
+                        <td className="py-1 px-2 text-[8px] max-w-[140px] truncate" title={s.eskulName2 || '-'}>
                           {s.eskulName2 ? (
                             <span className="text-slate-600">{s.eskulName2}</span>
                           ) : (
-                            <span className="text-slate-400 italic font-medium">-</span>
+                            <span className="text-slate-400 italic font-medium text-[8px]">-</span>
                           )}
                         </td>
-                        <td className="py-1 px-2 text-[10px] max-w-[140px] truncate" title={s.eskulName3 || '-'}>
+                        <td className="py-1 px-2 text-[8px] max-w-[140px] truncate" title={s.eskulName3 || '-'}>
                           {s.eskulName3 ? (
                             <span className="text-slate-600">{s.eskulName3}</span>
                           ) : (
-                            <span className="text-slate-400 italic font-medium">-</span>
+                            <span className="text-slate-400 italic font-medium text-[8px]">-</span>
                           )}
                         </td>
-                        <td className="py-1 px-2 text-[10px] max-w-[120px] truncate text-slate-600" title={s.email || '-'}>
-                          {s.email || <span className="text-slate-400 italic font-medium">-</span>}
+                        <td className="py-1 px-2 text-[8px] max-w-[120px] truncate text-slate-600" title={s.email || '-'}>
+                          {s.email || <span className="text-slate-400 italic font-medium text-[8px]">-</span>}
                         </td>
-                        <td className="py-1 px-2 font-mono text-slate-600 text-[10px]">
+                        <td className="py-1 px-2 font-mono text-slate-600 text-[8px]">
                           {formatToIndoPhone(s.hpSiswa)}
                         </td>
-                        <td className="py-1 px-2 text-center">
+                        <td className="py-1 px-2 text-center text-[8px]">
                           <button
                             type="button"
                             onClick={() => setSelectedStudentDetail(s)}
-                            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white px-1.5 py-0.5 rounded transition-all text-[9px] font-medium cursor-pointer"
+                            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white px-1.5 py-0.5 rounded transition-all text-[8px] font-medium cursor-pointer"
                           >
-                            <Eye className="w-3 h-3" />
+                            <Eye className="w-2.5 h-2.5" />
                             <span>Detail</span>
                           </button>
                         </td>
@@ -2333,7 +2333,7 @@ export default function AdminDashboard({
                     ))}
                     {filteredStudents.length === 0 && (
                       <tr>
-                        <td colSpan={11} className="text-center py-16 text-slate-400 font-semibold bg-slate-50/50">
+                        <td colSpan={11} className="text-center py-16 text-slate-400 font-semibold bg-slate-50/50 text-[10px]">
                           Tidak ada pendaftar yang cocok dengan filter pencarian Anda.
                         </td>
                       </tr>

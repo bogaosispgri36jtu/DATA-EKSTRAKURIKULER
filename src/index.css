@@ -130,3 +130,29 @@ body, html, h1, h2, h3, h4, h5, h6, input, select, textarea, button, .font-headi
   background-color: #ffffff !important;
 }
 
+/* Thin, transparent scrollbar for compact tables */
+.custom-compact-scrollbar::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+.custom-compact-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-compact-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.25);
+  border-radius: 9999px;
+}
+
+.custom-compact-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.4);
+}
+
+/* For Firefox */
+.custom-compact-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.25) transparent;
+}
+
+
