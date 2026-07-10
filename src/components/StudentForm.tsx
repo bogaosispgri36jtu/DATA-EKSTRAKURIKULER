@@ -1037,24 +1037,25 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
 
       // Footer divider line and text
       const regDateObj = parseDateSafely(registeredStudent.createdAt);
-      const yyyy = String(regDateObj.getFullYear()).slice(-2); // Mengambil 2 digit terakhir tahun (YY)
-      const mm = String(regDateObj.getMonth() + 1).padStart(2, '0'); // (MM)
-      const dd = String(regDateObj.getDate()).padStart(2, '0'); // (DD)
+      const yyyy = String(regDateObj.getFullYear()); 
+      const mm = String(regDateObj.getMonth() + 1).padStart(2, '0'); 
+      const dd = String(regDateObj.getDate()).padStart(2, '0'); 
       const hh = String(regDateObj.getHours()).padStart(2, '0');
       const min = String(regDateObj.getMinutes()).padStart(2, '0');
       const ss = String(regDateObj.getSeconds()).padStart(2, '0');
       
-      // Format tanggal diubah menjadi DD:MM:YY dan Jam tetap HH:MM:SS
-      const formattedDateTime = `${dd}:${mm}:${yyyy} ${hh}:${min}:${ss}`;
+      const formattedDateTime = `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss}`;
 
       doc.setFont('helvetica', 'italic');
       doc.setFontSize(8);
-      doc.setTextColor(100, 116, 139);
+      
+      // MENGUBAH WARNA TEKS MENJADI HITAM
+      doc.setTextColor(0, 0, 0); // Nilai RGB (0, 0, 0) adalah Hitam
       
       // Memasukkan Tahun Pelajaran ke dalam teks footer sebelah kiri
-      doc.text(`Sistem Pendaftaran Ekstrakurikuler | TP ${registeredStudent.tahunPelajaran} | SMP PGRI JATIUWUNG`, 12, 281);
+      doc.text(`Sistem Pendaftaran Ekstrakurikuler TP ${registeredStudent.tahunPelajaran} | SMP PGRI JATIUWUNG`, 12, 281);
       
-      // Menampilkan tanggal format baru di sebelah kanan
+      // Menampilkan tanggal format DD-MM-YYYY di sebelah kanan
       doc.text(formattedDateTime, 198, 281, { align: 'right' });
 
       // Save PDF
