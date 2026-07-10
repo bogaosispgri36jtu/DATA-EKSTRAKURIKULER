@@ -1005,7 +1005,20 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
         }
       }
 
-      // Column 1 (Pendaftar)
+      // Column 1 (Sekarang Orang Tua di sebelah kiri/tengah, samping foto)
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(31, 41, 55);
+      doc.text('Mengetahui,', 110, signY + 2, { align: 'center' }); // X diubah dari 165 ke 110
+      doc.text('Orang Tua/Wali Murid', 110, signY + 7, { align: 'center' }); // X diubah dari 165 ke 110
+      doc.text('........................................', 110, signY + 32, { align: 'center' }); // X diubah dari 165 ke 110
+      
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('tanda tangan & nama jelas', 110, signY + 36, { align: 'center' }); // X diubah dari 165 ke 110
+
+      // Column 2 (Sekarang Pendaftar di sebelah kanan)
       const registrationDate = parseDateSafely(registeredStudent.createdAt);
       const optDate: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
       const formattedDate = registrationDate.toLocaleDateString('id-ID', optDate);
@@ -1013,27 +1026,16 @@ Tahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(9.5);
       doc.setTextColor(31, 41, 55);
-      doc.text(`Tangerang, ${formattedDate}`, 110, signY + 2, { align: 'center' });
-      doc.text('Pendaftar,', 110, signY + 7, { align: 'center' });
+      doc.text(`Tangerang, ${formattedDate}`, 165, signY + 2, { align: 'center' }); // X diubah dari 110 ke 165
+      doc.text('Pendaftar,', 165, signY + 7, { align: 'center' }); // X diubah dari 110 ke 165
       
       doc.setFont('helvetica', 'bold');
-      doc.text(registeredStudent.name, 110, signY + 32, { align: 'center' });
+      doc.text(registeredStudent.name, 165, signY + 32, { align: 'center' }); // X diubah dari 110 ke 165
       const nameWidth = doc.getTextWidth(registeredStudent.name);
-      doc.line(110 - nameWidth / 2, signY + 33, 110 + nameWidth / 2, signY + 33); // Underline
+      // Garis underline disesuaikan titik pusatnya ke 165
+      doc.line(165 - nameWidth / 2, signY + 33, 165 + nameWidth / 2, signY + 33); 
 
-      // Column 2 (Parent)
-      doc.setFont('helvetica', 'normal');
-      doc.text('Mengetahui,', 165, signY + 2, { align: 'center' });
-      doc.text('Orang Tua/Wali Murid', 165, signY + 7, { align: 'center' });
-      doc.text('........................................', 165, signY + 32, { align: 'center' });
-      
-      doc.setFont('helvetica', 'italic');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text('tanda tangan & nama jelas', 165, signY + 36, { align: 'center' });
-
-      // Footer divider line and text
-     
+      // Footer divider line and text (Tetap sama, tidak ada perubahan)
       const regDateObj = parseDateSafely(registeredStudent.createdAt);
       const yyyy = regDateObj.getFullYear();
       const mm = String(regDateObj.getMonth() + 1).padStart(2, '0');
