@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import jsPDF from 'jspdf';
+import QRCode from 'qrcode';
 import * as XLSX from 'xlsx';
 import { Student, Extracurricular, AppSettings } from '../types';
 import { TAHUN_PELAJARAN_LIST } from '../data';
@@ -37,6 +38,7 @@ interface AdminDashboardProps {
   onRefresh?: () => Promise<void> | void;
   classList?: string[];
   isSupabaseSchemaIncomplete?: boolean;
+  isLoading?: boolean;
 }
 
 const formatToIndoPhone = (num: any): string => {
@@ -122,7 +124,8 @@ export default function AdminDashboard({
   isLive = false,
   onRefresh,
   classList = [],
-  isSupabaseSchemaIncomplete = false
+  isSupabaseSchemaIncomplete = false,
+  isLoading = false
 }: AdminDashboardProps) {
   const isLoggedAdminUtama = !loggedAdmin ? false : (
     (loggedAdmin.status && loggedAdmin.status.toLowerCase().includes('utama'))
@@ -148,6 +151,12 @@ export default function AdminDashboard({
     setSupabaseUrlInput('');
     setSupabaseAnonKeyInput(settings.supabaseAnonKey || '');
   }, [settings]);
+
+  useEffect(() => {
+    if (isLoggedIn && onRefresh) {
+      onRefresh();
+    }
+  }, [isLoggedIn]);
 
   // Login State
   const [username, setUsername] = useState('');
@@ -855,8 +864,232 @@ export default function AdminDashboard({
     });
   };
 
+  // Download Individual Student Registration Proof PDF
+  const handleDownloadStudentPdf = async (registeredStudent: Student) => {
+    Swal.fire({
+      title: 'Membuat Bukti Pendaftaran...',
+      html: 'Sedang menyiapkan berkas PDF...',
+      allowOutsideClick: false,
+      width: '320px',
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
+    let kopImageSrc = 'https://lh3.googleusercontent.com/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q';
+
+    try {
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+
+      let startYAfterKop = 45;
+      let kopHeight = 31; // default fallback proportional height
+
+      try {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = kopImageSrc;
+        await new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+        if (img.naturalWidth && img.naturalHeight) {
+          kopHeight = (img.naturalHeight / img.naturalWidth) * 196;
+          doc.addImage(img, 'PNG', 7, 7, 196, kopHeight);
+          startYAfterKop = 7 + kopHeight + 8; // add 8mm spacing after kop
+        } else {
+          startYAfterKop = 45;
+        }
+      } catch (e) {
+        console.error("Failed to load or add Kop image", e);
+        startYAfterKop = 45;
+      }
+
+      // Title Section (BUKTI PENDAFTARAN EKSTRAKURIKULER)
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text('BUKTI PENDAFTARAN EKSTRAKURIKULER', 105, startYAfterKop, { align: 'center' });
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(55, 65, 81); // slate-700
+      doc.text(`Tahun Pelajaran ${registeredStudent.tahunPelajaran || ''}`, 105, startYAfterKop + 7, { align: 'center' });
+
+      // Fields Section Start (Not too close to Tahun Pelajaran)
+      let currentY = startYAfterKop + 15;
+
+      const drawField = (label: string, value: string) => {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(31, 41, 55);
+        doc.text(label, 15, currentY);
+        doc.text(':', 62, currentY);
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        
+        // Wrap text for long value (e.g. Alamat Lengkap)
+        if (value.length > 55) {
+          const splitText = doc.splitTextToSize(value, 125);
+          doc.text(splitText, 65, currentY);
+          currentY += (splitText.length - 1) * 5 + 5.5;
+        } else {
+          doc.text(value, 65, currentY);
+          currentY += 5.5;
+        }
+      };
+
+      // Draw all fields in a clean sequence
+      drawField('No. Registrasi', registeredStudent.regNo);
+      drawField('Nama Lengkap', registeredStudent.name);
+      drawField('Kelas', registeredStudent.kelas);
+      drawField('Jenis Kelamin', registeredStudent.jenisKelamin);
+      const birthStr = `${registeredStudent.tempatLahir || '-'}, ${(() => {
+        if (!registeredStudent.tanggalLahir) return '-';
+        try {
+          const d = parseDateSafely(registeredStudent.tanggalLahir);
+          if (isNaN(d.getTime())) return registeredStudent.tanggalLahir;
+          return d.toLocaleDateString('id-ID', {day: 'numeric', month: 'long', year: 'numeric'});
+        } catch {
+          return registeredStudent.tanggalLahir;
+        }
+      })()}`;
+      drawField('Tempat/Tanggal Lahir', birthStr);
+      drawField('Email Siswa', registeredStudent.email || '-');
+      drawField('No. HP WhatsApp', registeredStudent.hpSiswa);
+      drawField('Ekstrakurikuler Wajib', registeredStudent.eskulName.toUpperCase());
+      if (registeredStudent.eskulName2) {
+        drawField('Pilihan Ekstrakurikuler 2', registeredStudent.eskulName2.toUpperCase());
+      }
+      if (registeredStudent.eskulName3) {
+        drawField('Pilihan Ekstrakurikuler 3', registeredStudent.eskulName3.toUpperCase());
+      }
+      drawField('Nama Ayah Kandung', registeredStudent.namaAyah);
+      drawField('Nama Ibu Kandung', registeredStudent.namaIbu);
+      drawField('No. HP Orang Tua / Wali', registeredStudent.hpOrtu);
+
+      if (registeredStudent.prestasiChecked) {
+        drawField('Nama Lomba', registeredStudent.namaLomba || '-');
+        drawField('Cabang Lomba', registeredStudent.cabangLomba || '-');
+        
+        const tingkatStr = registeredStudent.tingkatLomba || '-';
+        const juaraStr = registeredStudent.juaraKe ? `Juara ${registeredStudent.juaraKe}` : '-';
+        drawField('Tingkat / Juara', `${tingkatStr} / ${juaraStr}`);
+        
+        drawField('Penyelenggara', registeredStudent.penyelenggara || '-');
+        if (registeredStudent.certificateFile) {
+          drawField('Sertifikat Lomba', 'Terlampir (Ada)');
+        }
+      }
+
+      const fullAlamatStr = `${registeredStudent.alamat}, RT ${registeredStudent.rt} / RW ${registeredStudent.rw}, Kel. ${registeredStudent.kelurahanName}, Kec. ${registeredStudent.kecamatanName}, ${registeredStudent.kabupatenName}, Prov. ${registeredStudent.provinsiName}`;
+      drawField('Alamat Lengkap', fullAlamatStr);
+
+      // Signatures & Metadata Section
+      const signY = currentY + 8;
+
+      // Draw QR Code on the bottom-left
+      const qrText = `SMP PGRI Jatiuwung - Bukti Pendaftaran\nNo: ${registeredStudent.regNo}\nNama: ${registeredStudent.name}\nKelas: ${registeredStudent.kelas}\nEskul Wajib: ${registeredStudent.eskulName}${registeredStudent.eskulName2 ? `\nEskul Pilihan 2: ${registeredStudent.eskulName2}` : ''}${registeredStudent.eskulName3 ? `\nEskul Pilihan 3: ${registeredStudent.eskulName3}` : ''}\nTahun Pelajaran: ${registeredStudent.tahunPelajaran}`;
+      
+      const qrDataUrl = await QRCode.toDataURL(qrText, { margin: 1 });
+      doc.addImage(qrDataUrl, 'JPEG', 15, signY, 30, 30);
+
+      // Draw Student Photo next to QR code on bottom-left
+      if (registeredStudent.photo) {
+        try {
+          doc.addImage(registeredStudent.photo, 'JPEG', 49, signY, 24, 32);
+          doc.setDrawColor(156, 163, 175);
+          doc.setLineWidth(0.2);
+          doc.rect(49, signY, 24, 32);
+        } catch (e) {
+          console.error("Failed to add photo next to QR code", e);
+          doc.setDrawColor(203, 213, 225);
+          doc.setLineWidth(0.2);
+          doc.rect(49, signY, 24, 32);
+          doc.setFontSize(8);
+          doc.text('Foto', 61, signY + 16, { align: 'center' });
+        }
+      }
+
+      // Column 1
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(31, 41, 55);
+      doc.text('Mengetahui,', 110, signY + 2, { align: 'center' });
+      doc.text('Orang Tua/Wali Murid', 110, signY + 7, { align: 'center' });
+      doc.text('........................................', 110, signY + 32, { align: 'center' });
+      
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text('tanda tangan & nama jelas', 110, signY + 36, { align: 'center' });
+
+      // Column 2
+      const registrationDate = parseDateSafely(registeredStudent.createdAt);
+      const optDate: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'long', year: 'numeric' };
+      const formattedDate = registrationDate.toLocaleDateString('id-ID', optDate);
+
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(31, 41, 55);
+      doc.text(`Tangerang, ${formattedDate}`, 165, signY + 2, { align: 'center' });
+      doc.text('Pendaftar,', 165, signY + 7, { align: 'center' });
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text(registeredStudent.name, 165, signY + 32, { align: 'center' });
+      const nameWidth = doc.getTextWidth(registeredStudent.name);
+      doc.line(165 - nameWidth / 2, signY + 33, 165 + nameWidth / 2, signY + 33); 
+
+      // Footer divider line and text
+      const regDateObj = parseDateSafely(registeredStudent.createdAt);
+      const yyyy = String(regDateObj.getFullYear()); 
+      const mm = String(regDateObj.getMonth() + 1).padStart(2, '0'); 
+      const dd = String(regDateObj.getDate()).padStart(2, '0'); 
+      const hh = String(regDateObj.getHours()).padStart(2, '0');
+      const min = String(regDateObj.getMinutes()).padStart(2, '0');
+      const ss_val = String(regDateObj.getSeconds()).padStart(2, '0');
+      
+      const formattedDateTime = `${dd}-${mm}-${yyyy} ${hh}:${min}:${ss_val}`;
+
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(8);
+      
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Sistem Pendaftaran Ekstrakurikuler | ${registeredStudent.tahunPelajaran} | SMP PGRI JATIUWUNG`, 12, 281);
+      doc.text(formattedDateTime, 198, 281, { align: 'right' });
+
+      // Save PDF
+      const pdfFileName = `Bukti Pendaftaran Ekstrakurikuler ${registeredStudent.name}_${registeredStudent.regNo}.pdf`;
+      doc.save(pdfFileName);
+      Swal.close();
+      
+      Swal.fire({
+        icon: 'success',
+        title: 'Unduh Berhasil!',
+        text: 'File bukti pendaftaran PDF telah disimpan di perangkat Anda.',
+        confirmButtonColor: '#1d4ed8',
+        width: '360px',
+        timer: 1500,
+        showConfirmButton: false
+      });
+    } catch (e) {
+      Swal.close();
+      console.error(e);
+      Swal.fire({
+        icon: 'error',
+        title: 'PDF Error',
+        text: 'Terjadi kesalahan saat memproses file PDF.',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+    }
+  };
+
   // Generate Recap PDF Report
-  const handlePrintPDFRecap = () => {
+  const handlePrintPDFRecap = async () => {
     if (filteredStudents.length === 0) {
       Swal.fire({ icon: 'info', title: 'Data Kosong', text: 'Tidak ada data siswa untuk dicetak.', width: '340px' });
       return;
@@ -870,42 +1103,83 @@ export default function AdminDashboard({
       didOpen: () => Swal.showLoading()
     });
 
+    let kopImageSrc = 'https://lh3.googleusercontent.com/d/1NxNXjW1OcRjs_zRf7-t0wpLhRJfZFN0q';
+    let kopHeight = 31;
+    let hasLoadedImg = false;
+    const img = new Image();
+
+    try {
+      img.crossOrigin = 'anonymous';
+      img.src = kopImageSrc;
+      await new Promise((resolve) => {
+        img.onload = resolve;
+        img.onerror = resolve;
+      });
+      if (img.naturalWidth && img.naturalHeight) {
+        kopHeight = (img.naturalHeight / img.naturalWidth) * 196;
+        hasLoadedImg = true;
+      }
+    } catch (e) {
+      console.error("Failed to load Kop image in AdminDashboard", e);
+    }
+
     try {
       const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       
-      // Header with Logo
-      if (logoImgElement) {
-        try {
-          doc.addImage(logoImgElement, 'PNG', 15, 8, 18, 18);
-        } catch (e) {
-          console.error("Failed to add preloaded logo to recap PDF", e);
+      let startYAfterKop = 45;
+      if (hasLoadedImg) {
+        doc.addImage(img, 'PNG', 7, 7, 196, kopHeight);
+        startYAfterKop = 7 + kopHeight + 6; // Spacing after Kop image
+      } else {
+        // Fallback simple text header if image loading fails
+        if (logoImgElement) {
+          try {
+            doc.addImage(logoImgElement, 'PNG', 15, 8, 18, 18);
+          } catch (e) {
+            console.error("Failed to add preloaded logo to recap PDF", e);
+          }
         }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.setTextColor(29, 78, 216);
+        doc.text('SMP PGRI JATIUWUNG', 114, 13, { align: 'center' });
+        doc.setFontSize(9.5);
+        doc.setTextColor(107, 114, 128);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER`, 114, 18, { align: 'center' });
+        doc.setFontSize(8.5);
+        doc.text('Jl. Gatot Subroto KM. 5 No. 4 Jatiuwung Kota Tangerang', 114, 22, { align: 'center' });
+        doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 114, 26, { align: 'center' });
+        
+        doc.setDrawColor(29, 78, 216);
+        doc.setLineWidth(0.5);
+        doc.line(15, 29, 195, 29);
+        startYAfterKop = 36;
       }
 
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(14);
-      doc.setTextColor(29, 78, 216);
-      doc.text('SMP PGRI JATIUWUNG', 114, 13, { align: 'center' });
-      doc.setFontSize(9.5);
-      doc.setTextColor(107, 114, 128);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER`, 114, 18, { align: 'center' });
-      doc.setFontSize(8.5);
-      doc.text('Jl. Gatot Subroto KM. 5 No. 4 Jatiuwung Kota Tangerang', 114, 22, { align: 'center' });
-      doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 114, 26, { align: 'center' });
-      
-      doc.setDrawColor(29, 78, 216);
-      doc.setLineWidth(0.5);
-      doc.line(15, 29, 195, 29);
+      if (hasLoadedImg) {
+        // Document Title styled for Kop Image layout
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        doc.setTextColor(31, 41, 55);
+        doc.text('LAPORAN REKAPITULASI PENDAFTARAN EKSTRAKURIKULER', 105, startYAfterKop, { align: 'center' });
+        
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        doc.setTextColor(75, 85, 99);
+        doc.text(`Tahun Pelajaran: ${settings.tahunPelajaranAktif} | Tanggal Cetak: ${new Date().toLocaleDateString('id-ID')}`, 105, startYAfterKop + 5, { align: 'center' });
+        
+        startYAfterKop = startYAfterKop + 14;
+      }
 
       // Section 1: Summary Table per Eskul
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.setTextColor(31, 41, 55);
-      doc.text('RINGKASAN PENDAFTARAN PER EKSTRAKURIKULER', 15, 36);
+      doc.text('RINGKASAN PENDAFTARAN PER EKSTRAKURIKULER', 15, startYAfterKop);
 
       // Draw table headers
-      let currentY = 42;
+      let currentY = startYAfterKop + 6;
       doc.setFillColor(243, 244, 246);
       doc.setDrawColor(209, 213, 219);
       doc.setLineWidth(0.2);
@@ -1959,11 +2233,16 @@ export default function AdminDashboard({
           {onRefresh && (
             <button
               onClick={onRefresh}
-              className="text-[10px] sm:text-xs bg-blue-700 hover:bg-blue-800 text-white font-bold py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-lg transition-all shadow-md cursor-pointer flex items-center gap-1 border border-blue-600/50 shrink-0"
+              disabled={isLoading}
+              className={`text-[10px] sm:text-xs font-bold py-1.5 sm:py-2 px-2.5 sm:px-3 rounded-lg transition-all shadow-md flex items-center gap-1 border shrink-0 ${
+                isLoading
+                  ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-blue-700 hover:bg-blue-800 text-white border-blue-600/50 cursor-pointer'
+              }`}
               title="Segarkan Sinkronisasi Data"
             >
-              <RefreshCcw className="w-3 h-3 shrink-0" />
-              <span>Segarkan</span>
+              <RefreshCcw className={`w-3 h-3 shrink-0 ${isLoading ? 'animate-spin' : ''}`} />
+              <span>{isLoading ? 'Menyinkronkan...' : 'Segarkan'}</span>
             </button>
           )}
         </div>
@@ -2359,7 +2638,7 @@ export default function AdminDashboard({
                       <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Eskul 3</th>
                       <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Email</th>
                       <th className="py-1 px-2 bg-white/60 backdrop-blur-sm">Kontak HP</th>
-                      <th className="py-1 px-2 text-center w-20 bg-white/60 backdrop-blur-sm">Aksi</th>
+                      <th className="py-1 px-2 text-center w-36 bg-white/60 backdrop-blur-sm">Aksi</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-slate-600 text-[8px]">
@@ -2409,15 +2688,26 @@ export default function AdminDashboard({
                         <td className="py-1 px-2 font-mono text-slate-600 text-[8px]">
                           {formatToIndoPhone(s.hpSiswa)}
                         </td>
-                        <td className="py-1 px-2 text-center text-[8px]">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedStudentDetail(s)}
-                            className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white px-1.5 py-0.5 rounded transition-all text-[8px] font-medium cursor-pointer"
-                          >
-                            <Eye className="w-2.5 h-2.5" />
-                            <span>Detail</span>
-                          </button>
+                        <td className="py-1 px-2 text-center text-[8px] whitespace-nowrap">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSelectedStudentDetail(s)}
+                              className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white px-1.5 py-0.5 rounded transition-all text-[8px] font-medium cursor-pointer"
+                            >
+                              <Eye className="w-2.5 h-2.5" />
+                              <span>Detail</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadStudentPdf(s)}
+                              className="inline-flex items-center gap-1 bg-green-50 text-green-700 hover:bg-green-600 hover:text-white px-1.5 py-0.5 rounded transition-all text-[8px] font-medium cursor-pointer"
+                              title="Unduh Bukti PDF"
+                            >
+                              <Download className="w-2.5 h-2.5" />
+                              <span>Unduh PDF</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -3364,22 +3654,6 @@ CREATE POLICY "Allow public delete students" ON students FOR DELETE USING (true)
 
             {/* Footer */}
             <div className="p-5 border-t border-slate-100 flex justify-end gap-3 bg-slate-50 rounded-b-3xl">
-              <input
-                type="file"
-                id="admin-upload-bukti-pdf"
-                accept="application/pdf"
-                className="hidden"
-                onChange={handleUploadBuktiPdf}
-              />
-              <button
-                type="button"
-                onClick={() => document.getElementById('admin-upload-bukti-pdf')?.click()}
-                className="bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs py-2 px-4 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
-              >
-                <Upload className="w-3.5 h-3.5 text-yellow-300" />
-                <span>Unggah Bukti (PDF)</span>
-              </button>
-
               <button
                 onClick={() => setSelectedStudentDetail(null)}
                 className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold text-xs py-2 px-5 rounded-xl transition-all cursor-pointer"

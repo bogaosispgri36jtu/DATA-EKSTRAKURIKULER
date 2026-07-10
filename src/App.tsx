@@ -318,7 +318,9 @@ export default function App() {
           localStorage.setItem('smp_pgri_settings', JSON.stringify(newSettings));
 
           // Sync other data as well
-          setStudents((resJson.students || []).map(mapStudentData));
+          const syncedStudents = (resJson.students || []).map(mapStudentData);
+          setStudents(syncedStudents);
+          localStorage.setItem('smp_pgri_students', JSON.stringify(syncedStudents));
           setEskulList(resJson.eskul || []);
           if (resJson.classes && Array.isArray(resJson.classes)) {
             setClassList(resJson.classes);
@@ -427,7 +429,9 @@ export default function App() {
           console.error('Failed to save settings to server', e);
         }
         
-        setStudents((resJson.students || []).map(mapStudentData));
+        const testStudents = (resJson.students || []).map(mapStudentData);
+        setStudents(testStudents);
+        localStorage.setItem('smp_pgri_students', JSON.stringify(testStudents));
         setEskulList(resJson.eskul || []);
         if (resJson.classes && Array.isArray(resJson.classes)) {
           setClassList(resJson.classes);
@@ -663,21 +667,30 @@ export default function App() {
     try {
       const cachedClasses = localStorage.getItem('smp_pgri_classes');
       const cachedEskul = localStorage.getItem('smp_pgri_eskul');
-      const activeView = localStorage.getItem('smp_pgri_active_view') || 'student';
-      if (activeView === 'student' && cachedClasses && cachedEskul) {
+      if (cachedClasses && cachedEskul) {
         return false;
       }
     } catch {}
     return true;
   });
-  const [isLiveConnection, setIsLiveConnection] = useState(false);
+  const [isLiveConnection, setIsLiveConnection] = useState(() => {
+    try {
+      const savedSettings = localStorage.getItem('smp_pgri_settings');
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        if (parsed && parsed.googleAppsScriptUrl && parsed.googleAppsScriptUrl.trim().startsWith('http')) {
+          return true;
+        }
+      }
+    } catch {}
+    return false;
+  });
   const [isSupabaseSchemaIncomplete, setIsSupabaseSchemaIncomplete] = useState(false);
   const [isInitializing, setIsInitializing] = useState(() => {
     try {
       const cachedClasses = localStorage.getItem('smp_pgri_classes');
       const cachedEskul = localStorage.getItem('smp_pgri_eskul');
-      const activeView = localStorage.getItem('smp_pgri_active_view') || 'student';
-      if (activeView === 'student' && cachedClasses && cachedEskul) {
+      if (cachedClasses && cachedEskul) {
         return false;
       }
     } catch {}
@@ -756,17 +769,16 @@ export default function App() {
     initializeApp();
   }, []);
 
-  const fetchAppData = async (currentSettings: AppSettings) => {
+  const fetchAppData = async (currentSettings: AppSettings): Promise<boolean> => {
     const hasCachedData = (() => {
-      try {
-        const cachedClasses = localStorage.getItem('smp_pgri_classes');
-        const cachedEskul = localStorage.getItem('smp_pgri_eskul');
-        const activeViewVal = localStorage.getItem('smp_pgri_active_view') || 'student';
-        return !!(cachedClasses && cachedEskul && activeViewVal === 'student');
-      } catch {
-        return false;
-      }
-    })();
+       try {
+         const cachedClasses = localStorage.getItem('smp_pgri_classes');
+         const cachedEskul = localStorage.getItem('smp_pgri_eskul');
+         return !!(cachedClasses && cachedEskul);
+       } catch {
+         return false;
+       }
+     })();
 
     if (!hasCachedData) {
       setIsLoading(true);
@@ -783,6 +795,7 @@ export default function App() {
           setIsSupabaseSchemaIncomplete(false);
           const mappedStudents = (resJson.students || []).map(mapStudentData);
           setStudents(mappedStudents);
+          localStorage.setItem('smp_pgri_students', JSON.stringify(mappedStudents));
           setEskulList(resJson.eskul || []);
           if (resJson.classes && Array.isArray(resJson.classes) && resJson.classes.length > 0) {
             setClassList(resJson.classes);
@@ -846,16 +859,24 @@ export default function App() {
           setIsLiveConnection(true);
           setIsLoading(false);
           setIsInitializing(false);
-          return;
+          return true;
         }
       } catch (error) {
         console.warn('Google Sheets API connection failed, falling back to Local Database.', error);
-        setIsLiveConnection(false);
+        if (!currentSettings.googleAppsScriptUrl || !currentSettings.googleAppsScriptUrl.trim().startsWith('http')) {
+          setIsLiveConnection(false);
+        } else {
+          setIsLiveConnection(true);
+        }
       }
     }
 
     // LOCAL DATABASE FALLBACK (localStorage)
-    setIsLiveConnection(false);
+    if (!currentSettings.googleAppsScriptUrl || !currentSettings.googleAppsScriptUrl.trim().startsWith('http')) {
+      setIsLiveConnection(false);
+    } else {
+      setIsLiveConnection(true);
+    }
     
     // Load Eskul Fallback
     const savedEskul = localStorage.getItem('smp_pgri_eskul');
@@ -1194,6 +1215,7 @@ export default function App() {
         if (resJson.students) {
           const mappedStudents = resJson.students.map(mapStudentData);
           setStudents(mappedStudents);
+          localStorage.setItem('smp_pgri_students', JSON.stringify(mappedStudents));
         }
         if (resJson.eskul) setEskulList(resJson.eskul);
         if (resJson.admins) {
@@ -1223,10 +1245,18 @@ export default function App() {
         }
         return;
       }
-      setIsLiveConnection(false);
+      if (!settings.googleAppsScriptUrl || !settings.googleAppsScriptUrl.trim().startsWith('http')) {
+        setIsLiveConnection(false);
+      } else {
+        setIsLiveConnection(true);
+      }
     } catch (e) {
       console.warn('Silent live connection test failed, using local database mode');
-      setIsLiveConnection(false);
+      if (!settings.googleAppsScriptUrl || !settings.googleAppsScriptUrl.trim().startsWith('http')) {
+        setIsLiveConnection(false);
+      } else {
+        setIsLiveConnection(true);
+      }
     }
   };
 
@@ -1282,6 +1312,16 @@ export default function App() {
 
   // Synchronized refresh handler (fetching settings first, then app data)
   const handleRefresh = async () => {
+    Swal.fire({
+      title: 'Menyinkronkan...',
+      text: 'Mengambil data terbaru dari Google Spreadsheet...',
+      allowOutsideClick: false,
+      width: '320px',
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     let currentSettings = settings;
     try {
       const response = await fetch('/api/settings');
@@ -1297,7 +1337,37 @@ export default function App() {
     } catch (e) {
       console.warn('Failed to fetch settings from backend API on refresh', e);
     }
-    await fetchAppData(currentSettings);
+
+    try {
+      const success = await fetchAppData(currentSettings);
+      if (success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Sinkronisasi Berhasil!',
+          text: 'Seluruh data pendaftaran siswa telah sinkron dengan sheet Siswa pada Google Spreadsheet.',
+          showConfirmButton: false,
+          timer: 1500,
+          width: '340px'
+        });
+      } else {
+        Swal.fire({
+          icon: 'warning',
+          title: 'Sinkronisasi Menggunakan Offline Cache',
+          text: 'Gagal terhubung dengan Spreadsheet. Data saat ini menggunakan cache lokal browser.',
+          confirmButtonColor: '#ef4444',
+          width: '340px'
+        });
+      }
+    } catch (err) {
+      console.error('Error during refresh:', err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Sinkronisasi Gagal',
+        text: 'Terjadi kesalahan sistem saat sinkronisasi data.',
+        confirmButtonColor: '#ef4444',
+        width: '340px'
+      });
+    }
   };
 
   // Add Admin Account
@@ -1426,12 +1496,12 @@ export default function App() {
 
       {/* MAIN LAYOUT */}
       <main className="flex-grow">
-        {isInitializing && activeView !== 'student' ? (
+        {isInitializing && activeView !== 'student' && !isAdminLoggedIn ? (
           <div className="h-96 flex flex-col items-center justify-center text-slate-500 gap-3">
             <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
             <span className="text-xs font-bold text-slate-600 animate-pulse">Menghubungi Server...</span>
           </div>
-        ) : isLoading && activeView === 'admin' ? (
+        ) : isLoading && activeView === 'admin' && !isAdminLoggedIn ? (
           <div className="h-96 flex flex-col items-center justify-center text-slate-500 gap-3">
             <span className="animate-spin rounded-full h-8 w-8 border-3 border-blue-700 border-t-transparent"></span>
             <span className="text-xs font-base">Sinkronisasi Database...</span>
@@ -1463,7 +1533,7 @@ export default function App() {
                         Mohon Maaf ...
                       </span>
                       <h2 className="text-[16px] font-bold text-slate-800 leading-tight">
-                        Pendaftaran Esktrakurikuller Sudah di tutup
+                        Pendaftaran Ekstrakurikuller Sudah di tutup
                       </h2>
                       <p className="text-[12px] font-base text-slate-800 leading-tight">
                         Tahun Pelajaran {settings.tahunPelajaranAktif || '2026/2027'}
@@ -1493,10 +1563,11 @@ export default function App() {
                 loggedAdmin={loggedAdmin}
                 isLoggedIn={isAdminLoggedIn}
                 setIsLoggedIn={handleSetIsAdminLoggedIn}
-                isLive={isLiveConnection && !!settings.googleAppsScriptUrl}
+                isLive={isLiveConnection || (!!settings.googleAppsScriptUrl && settings.googleAppsScriptUrl.trim().startsWith('http'))}
                 onRefresh={handleRefresh}
                 classList={classList}
                 isSupabaseSchemaIncomplete={isSupabaseSchemaIncomplete}
+                isLoading={isLoading}
               />
             )}
           </div>
