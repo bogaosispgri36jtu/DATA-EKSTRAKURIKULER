@@ -561,10 +561,13 @@ function saveStudent(ss, s) {
     }
   }
   
+  var clientId = getPropCaseInsensitive(s, ["id"]);
+  var id = (clientId && clientId.toString().trim()) ? clientId.toString().trim() : ("REG-" + Date.now() + "-" + Math.floor(Math.random() * 1000));
+  var clientRegNo = getPropCaseInsensitive(s, ["regNo", "reg_no", "noreg", "no. registrasi"]);
   var urutan = ("00" + (matchCount + 1)).slice(-3);
-  var regNo = "eskul/" + targetYear + "/" + urutan;
-  var id = "REG-" + Date.now() + "-" + Math.floor(Math.random() * 1000);
-  var createdAt = new Date().toISOString();
+  var regNo = (clientRegNo && clientRegNo.toString().trim()) ? clientRegNo.toString().trim() : ("eskul/" + targetYear + "/" + urutan);
+  var clientCreatedAt = getPropCaseInsensitive(s, ["createdAt", "created_at"]);
+  var createdAt = (clientCreatedAt && clientCreatedAt.toString().trim()) ? clientCreatedAt.toString().trim() : new Date().toISOString();
   
   // Susun baris baru secara dinamis menyesuaikan header kolom yang ada
   var newRow = [];
@@ -678,7 +681,7 @@ function parseKelasAllowed(kelasAllowed) {
 // Simpan Ekstrakurikuler Baru
 function saveEskul(ss, e) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
-  var id = "eskul-" + Date.now();
+  var id = (e.id && e.id.toString().trim()) ? e.id.toString().trim() : ("eskul-" + Date.now());
   var cleanClasses = parseKelasAllowed(e.kelasAllowed);
   sheet.appendRow([
     id,
@@ -832,8 +835,8 @@ function updateSettings(ss, config) {
 // Simpan Admin Baru ke Sheet
 function saveAdmin(ss, admin) {
   var sheet = getSheetCaseInsensitive(ss, "Admin");
-  var id = "admin-" + Date.now();
-  var createdAt = new Date().toISOString();
+  var id = (admin.id && admin.id.toString().trim()) ? admin.id.toString().trim() : ("admin-" + Date.now());
+  var createdAt = (admin.createdAt && admin.createdAt.toString().trim()) ? admin.createdAt.toString().trim() : new Date().toISOString();
   sheet.appendRow([
     id,
     admin.username,

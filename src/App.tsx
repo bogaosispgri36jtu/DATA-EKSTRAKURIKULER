@@ -937,7 +937,19 @@ export default function App() {
     const gasUrl = settings.googleAppsScriptUrl || DEFAULT_GAS_URL;
     
     const isPrestasi = studentData.prestasiChecked === true || String(studentData.prestasiChecked) === 'true';
+
+    // Pregenerate unique identifiers so they match perfectly between client state and Google Sheets
+    const pregeneratedId = `student-${Math.random().toString(36).substr(2, 9)}`;
+    const yearMatches = students.filter(s => s.tahunPelajaran === studentData.tahunPelajaran).length;
+    const sequenceStr = ("00" + (yearMatches + 1)).slice(-3);
+    const targetYear = studentData.tahunPelajaran.replace(/\D/g, '');
+    const pregeneratedRegNo = `eskul/${targetYear}/${sequenceStr}`;
+    const pregeneratedCreatedAt = new Date().toISOString();
+
     const cleanedData = {
+      id: pregeneratedId,
+      regNo: pregeneratedRegNo,
+      createdAt: pregeneratedCreatedAt,
       name: String(studentData.name || studentData.nama || '').trim(),
       nama: String(studentData.nama || studentData.name || '').trim(),
       photo: String(studentData.photo || '').trim(),
@@ -1081,15 +1093,15 @@ export default function App() {
     }
   };
 
-  const generateMockStudentResponse = (studentData: Omit<Student, 'id' | 'regNo' | 'createdAt'>): Student => {
+  const generateMockStudentResponse = (studentData: any): Student => {
     // Count existing registrations in this school year for registration number sequence
     const yearMatches = students.filter(s => s.tahunPelajaran === studentData.tahunPelajaran).length;
     const sequenceStr = ("00" + (yearMatches + 1)).slice(-3);
     const targetYear = studentData.tahunPelajaran.replace(/\D/g, '');
     
-    const regNo = `eskul/${targetYear}/${sequenceStr}`;
-    const id = `student-${Math.random().toString(36).substr(2, 9)}`;
-    const createdAt = new Date().toISOString();
+    const regNo = studentData.regNo || `eskul/${targetYear}/${sequenceStr}`;
+    const id = studentData.id || `student-${Math.random().toString(36).substr(2, 9)}`;
+    const createdAt = studentData.createdAt || new Date().toISOString();
 
     return {
       ...studentData,
@@ -1103,9 +1115,10 @@ export default function App() {
   const handleAddEskul = async (nama: string, kelasAllowed: string[], tahunPelajaran: string) => {
     const gasUrl = settings.googleAppsScriptUrl;
     const cleanKelas = (kelasAllowed || []).map(cls => cls.trim()).filter(Boolean);
-    const newEskul = { nama, kelasAllowed: cleanKelas, tahunPelajaran };
+    const createdId = `eskul-${Math.random().toString(36).substr(2, 9)}`;
+    const newEskul = { id: createdId, nama, kelasAllowed: cleanKelas, tahunPelajaran };
 
-    let createdId = `eskul-${Math.random().toString(36).substr(2, 9)}`;
+    let finalId = createdId;
     let finalKelas = cleanKelas;
 
     if (isLiveConnection && gasUrl) {
@@ -1116,7 +1129,7 @@ export default function App() {
         });
         if (responseJson && responseJson.status === 'success' && responseJson.data) {
           if (responseJson.data.id) {
-            createdId = responseJson.data.id;
+            finalId = responseJson.data.id;
           }
           if (responseJson.data.kelasAllowed) {
             const responseKelas = responseJson.data.kelasAllowed;
@@ -1131,7 +1144,7 @@ export default function App() {
     }
 
     // Local Storage Save
-    const createdEskul: Extracurricular = { id: createdId, nama, kelasAllowed: finalKelas, tahunPelajaran };
+    const createdEskul: Extracurricular = { id: finalId, nama, kelasAllowed: finalKelas, tahunPelajaran };
     const updatedList = [createdEskul, ...eskulList];
     setEskulList(updatedList);
     localStorage.setItem('smp_pgri_eskul', JSON.stringify(updatedList));
