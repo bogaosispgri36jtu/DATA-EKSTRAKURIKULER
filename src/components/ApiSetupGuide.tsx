@@ -155,7 +155,7 @@ function doPost(e) {
       response = { status: "success", message: "Eskul berhasil diperbarui." };
     }
     else if (action === "deleteEskul") {
-      deleteEskul(ss, postData.id);
+      deleteEskul(ss, postData.id, postData.nama || postData.name);
       response = { status: "success", message: "Eskul berhasil dihapus." };
     }
     else if (action === "resetEskulStudents") {
@@ -737,12 +737,34 @@ function updateEskul(ss, id, e) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var rows = sheet.getDataRange().getValues();
   var cleanClasses = parseKelasAllowed(e.kelasAllowed);
+  var found = false;
+  
+  // 1. Coba cari berdasarkan ID
   for (var i = 1; i < rows.length; i++) {
     if (rows[i] && rows[i][0] !== undefined && rows[i][0] !== null && rows[i][0].toString().trim() === id.toString().trim()) {
       sheet.getRange(i + 1, 2).setValue(e.nama);
       sheet.getRange(i + 1, 3).setValue(cleanClasses.join(",") + (cleanClasses.length > 0 ? "," : ""));
       sheet.getRange(i + 1, 4).setValue(e.tahunPelajaran);
+      found = true;
       break;
+    }
+  }
+
+  // 2. Jika tidak ditemukan berdasarkan ID (misal karena id mismatch di Vercel tempo hari),
+  //    coba cari berdasarkan Nama & Tahun Pelajaran yang sama untuk diperbarui ID dan datanya agar sinkron ke depan.
+  if (!found && e.nama) {
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i] && rows[i][1] !== undefined && rows[i][1] !== null && rows[i][3] !== undefined && rows[i][3] !== null) {
+        var rowNama = rows[i][1].toString().toLowerCase().trim();
+        var rowTahun = rows[i][3].toString().toLowerCase().trim();
+        if (rowNama === e.nama.toString().toLowerCase().trim() && rowTahun === e.tahunPelajaran.toString().toLowerCase().trim()) {
+          sheet.getRange(i + 1, 1).setValue(id); // Set ID baru agar sinkron dengan client
+          sheet.getRange(i + 1, 2).setValue(e.nama);
+          sheet.getRange(i + 1, 3).setValue(cleanClasses.join(",") + (cleanClasses.length > 0 ? "," : ""));
+          found = true;
+          break;
+        }
+      }
     }
   }
   
@@ -779,13 +801,27 @@ function updateEskul(ss, id, e) {
 }
 
 // Hapus Ekstrakurikuler
-function deleteEskul(ss, id) {
+function deleteEskul(ss, id, name) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var rows = sheet.getDataRange().getValues();
+  var found = false;
+  
+  // 1. Coba cari berdasarkan ID
   for (var i = 1; i < rows.length; i++) {
     if (rows[i] && rows[i][0] !== undefined && rows[i][0] !== null && rows[i][0].toString().trim() === id.toString().trim()) {
       sheet.deleteRow(i + 1);
+      found = true;
       break;
+    }
+  }
+
+  // 2. Jika tidak ditemukan berdasarkan ID (id mismatch), coba cari berdasarkan Nama
+  if (!found && name) {
+    for (var i = 1; i < rows.length; i++) {
+      if (rows[i] && rows[i][1] !== undefined && rows[i][1] !== null && rows[i][1].toString().toLowerCase().trim() === name.toString().toLowerCase().trim()) {
+        sheet.deleteRow(i + 1);
+        break;
+      }
     }
   }
 }

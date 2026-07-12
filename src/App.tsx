@@ -1168,12 +1168,15 @@ export default function App() {
   // Delete Extracurricular
   const handleDeleteEskul = async (id: string) => {
     const gasUrl = settings.googleAppsScriptUrl;
+    const existingEskul = eskulList.find(e => e.id === id);
+    const nama = existingEskul ? existingEskul.nama : '';
 
     if (isLiveConnection && gasUrl) {
       try {
         await gasPost(gasUrl, {
           action: 'deleteEskul',
-          id
+          id,
+          nama
         });
       } catch (e) {
         console.error(e);
