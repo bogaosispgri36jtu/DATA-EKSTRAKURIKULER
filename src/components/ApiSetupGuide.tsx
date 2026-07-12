@@ -650,10 +650,16 @@ function parseKelasAllowed(kelasAllowed) {
   
   var rawArray = [];
   if (Array.isArray(kelasAllowed)) {
-    rawArray = kelasAllowed;
-  } else if (typeof kelasAllowed === "string") {
-    rawArray = kelasAllowed.split(",");
-  } else if (kelasAllowed.toString) {
+    for (var i = 0; i < kelasAllowed.length; i++) {
+      var val = kelasAllowed[i];
+      if (val !== undefined && val !== null) {
+        var parts = val.toString().split(",");
+        for (var j = 0; j < parts.length; j++) {
+          rawArray.push(parts[j]);
+        }
+      }
+    }
+  } else {
     rawArray = kelasAllowed.toString().split(",");
   }
   
@@ -662,11 +668,7 @@ function parseKelasAllowed(kelasAllowed) {
     if (item !== undefined && item !== null) {
       var trimmed = item.toString().trim();
       if (trimmed) {
-        // Hapus jika ada koma di dalam string kelas individual
-        trimmed = trimmed.replace(/,/g, "");
-        if (trimmed) {
-          cleanClasses.push(trimmed);
-        }
+        cleanClasses.push(trimmed);
       }
     }
   }
