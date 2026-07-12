@@ -1105,20 +1105,33 @@ export default function App() {
     const cleanKelas = (kelasAllowed || []).map(cls => cls.trim()).filter(Boolean);
     const newEskul = { nama, kelasAllowed: cleanKelas, tahunPelajaran };
 
+    let createdId = `eskul-${Math.random().toString(36).substr(2, 9)}`;
+    let finalKelas = cleanKelas;
+
     if (isLiveConnection && gasUrl) {
       try {
-        await gasPost(gasUrl, {
+        const responseJson = await gasPost(gasUrl, {
           action: 'addEskul',
           data: newEskul
         });
+        if (responseJson && responseJson.status === 'success' && responseJson.data) {
+          if (responseJson.data.id) {
+            createdId = responseJson.data.id;
+          }
+          if (responseJson.data.kelasAllowed) {
+            const responseKelas = responseJson.data.kelasAllowed;
+            if (Array.isArray(responseKelas)) {
+              finalKelas = responseKelas.map((c: any) => String(c).trim()).filter(Boolean);
+            }
+          }
+        }
       } catch (e) {
         console.error(e);
       }
     }
 
     // Local Storage Save
-    const id = `eskul-${Math.random().toString(36).substr(2, 9)}`;
-    const createdEskul: Extracurricular = { id, nama, kelasAllowed: cleanKelas, tahunPelajaran };
+    const createdEskul: Extracurricular = { id: createdId, nama, kelasAllowed: finalKelas, tahunPelajaran };
     const updatedList = [createdEskul, ...eskulList];
     setEskulList(updatedList);
     localStorage.setItem('smp_pgri_eskul', JSON.stringify(updatedList));
@@ -1126,7 +1139,7 @@ export default function App() {
     // Update Class List dynamically with newly entered classes
     const updatedClasses = [...classList];
     let classListChanged = false;
-    cleanKelas.forEach(cls => {
+    finalKelas.forEach(cls => {
       const trimmed = cls.trim();
       if (trimmed && !updatedClasses.includes(trimmed)) {
         updatedClasses.push(trimmed);
