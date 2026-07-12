@@ -1102,7 +1102,8 @@ export default function App() {
   // Add Extracurricular
   const handleAddEskul = async (nama: string, kelasAllowed: string[], tahunPelajaran: string) => {
     const gasUrl = settings.googleAppsScriptUrl;
-    const newEskul = { nama, kelasAllowed, tahunPelajaran };
+    const cleanKelas = (kelasAllowed || []).map(cls => cls.trim()).filter(Boolean);
+    const newEskul = { nama, kelasAllowed: cleanKelas, tahunPelajaran };
 
     if (isLiveConnection && gasUrl) {
       try {
@@ -1117,7 +1118,7 @@ export default function App() {
 
     // Local Storage Save
     const id = `eskul-${Math.random().toString(36).substr(2, 9)}`;
-    const createdEskul: Extracurricular = { id, nama, kelasAllowed, tahunPelajaran };
+    const createdEskul: Extracurricular = { id, nama, kelasAllowed: cleanKelas, tahunPelajaran };
     const updatedList = [createdEskul, ...eskulList];
     setEskulList(updatedList);
     localStorage.setItem('smp_pgri_eskul', JSON.stringify(updatedList));
@@ -1125,7 +1126,7 @@ export default function App() {
     // Update Class List dynamically with newly entered classes
     const updatedClasses = [...classList];
     let classListChanged = false;
-    kelasAllowed.forEach(cls => {
+    cleanKelas.forEach(cls => {
       const trimmed = cls.trim();
       if (trimmed && !updatedClasses.includes(trimmed)) {
         updatedClasses.push(trimmed);
@@ -1162,7 +1163,8 @@ export default function App() {
   // Update Extracurricular
   const handleUpdateEskul = async (id: string, nama: string, kelasAllowed: string[], tahunPelajaran: string) => {
     const gasUrl = settings.googleAppsScriptUrl;
-    const updatedEskul = { nama, kelasAllowed, tahunPelajaran };
+    const cleanKelas = (kelasAllowed || []).map(cls => cls.trim()).filter(Boolean);
+    const updatedEskul = { nama, kelasAllowed: cleanKelas, tahunPelajaran };
 
     if (isLiveConnection && gasUrl) {
       try {
@@ -1177,7 +1179,7 @@ export default function App() {
     }
 
     // Local Storage Save for eskulList
-    const updatedList = eskulList.map(e => e.id === id ? { ...e, nama, kelasAllowed, tahunPelajaran } : e);
+    const updatedList = eskulList.map(e => e.id === id ? { ...e, nama, kelasAllowed: cleanKelas, tahunPelajaran } : e);
     setEskulList(updatedList);
     localStorage.setItem('smp_pgri_eskul', JSON.stringify(updatedList));
 
@@ -1205,7 +1207,7 @@ export default function App() {
     // Update Class List dynamically with any newly entered classes
     const updatedClasses = [...classList];
     let classListChanged = false;
-    kelasAllowed.forEach(cls => {
+    cleanKelas.forEach(cls => {
       const trimmed = cls.trim();
       if (trimmed && !updatedClasses.includes(trimmed)) {
         updatedClasses.push(trimmed);

@@ -1248,7 +1248,7 @@ export default function AdminDashboard({
         doc.setTextColor(31, 41, 55);
         doc.text(String(no++), 18, currentY + 5);
         doc.text(eskul.nama, 30, currentY + 5);
-        doc.text(eskul.kelasAllowed.join(', '), 120, currentY + 5);
+        doc.text((eskul.kelasAllowed || []).filter(Boolean).join(', '), 120, currentY + 5);
         doc.setFont('helvetica', 'bold');
         doc.text(`${count} Siswa`, 160, currentY + 5);
         
@@ -2513,7 +2513,7 @@ export default function AdminDashboard({
                       <div className="min-w-0">
                         <h4 className="text-xs sm:text-sm font-bold text-slate-800 font-montserrat truncate">{eskul.nama}</h4>
                         <div className="flex flex-wrap gap-1 sm:gap-1.5 mt-1 sm:mt-1.5 text-[8px] sm:text-[9px] font-bold">
-                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wider">Kelas: {eskul.kelasAllowed.join(', ')}</span>
+                          <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded uppercase tracking-wider">Kelas: {(eskul.kelasAllowed || []).filter(Boolean).join(', ')}</span>
                           <span className="bg-yellow-400/20 text-yellow-900 px-1.5 py-0.5 rounded font-mono">{eskul.tahunPelajaran}</span>
                           <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{numRegistered} Siswa</span>
                         </div>

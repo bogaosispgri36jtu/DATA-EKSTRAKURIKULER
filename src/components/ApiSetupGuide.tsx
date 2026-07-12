@@ -319,10 +319,18 @@ function getEskulList(ss) {
     var tpVal = rows[i][3];
     
     if (idVal && namaVal) {
+      var rawClasses = kelasAllowedVal ? kelasAllowedVal.toString().split(",") : [];
+      var cleanClasses = [];
+      for (var k = 0; k < rawClasses.length; k++) {
+        var cls = rawClasses[k] ? rawClasses[k].toString().trim() : "";
+        if (cls) {
+          cleanClasses.push(cls);
+        }
+      }
       eskul.push({
         id: idVal.toString(),
         nama: namaVal.toString(),
-        kelasAllowed: kelasAllowedVal ? kelasAllowedVal.toString().split(",") : [],
+        kelasAllowed: cleanClasses,
         tahunPelajaran: tpVal ? tpVal.toString() : "2026/2027"
       });
     }
@@ -639,14 +647,23 @@ function saveStudent(ss, s) {
 function saveEskul(ss, e) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var id = "eskul-" + Date.now();
+  var cleanClasses = [];
+  if (e.kelasAllowed && Array.isArray(e.kelasAllowed)) {
+    for (var k = 0; k < e.kelasAllowed.length; k++) {
+      var item = e.kelasAllowed[k] ? e.kelasAllowed[k].toString().trim() : "";
+      if (item) {
+        cleanClasses.push(item);
+      }
+    }
+  }
   sheet.appendRow([
     id,
     e.nama,
-    e.kelasAllowed.join(","),
+    cleanClasses.join(","),
     e.tahunPelajaran
   ]);
-  ensureClassesExist(ss, e.kelasAllowed);
-  return { id: id, ...e };
+  ensureClassesExist(ss, cleanClasses);
+  return { id: id, ...e, kelasAllowed: cleanClasses };
 }
 
 // Memastikan kelas pada kelasAllowed tersimpan ke sheet Kelas jika belum ada
@@ -702,16 +719,25 @@ function ensureClassesExist(ss, kelasAllowed) {
 function updateEskul(ss, id, e) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var rows = sheet.getDataRange().getValues();
+  var cleanClasses = [];
+  if (e.kelasAllowed && Array.isArray(e.kelasAllowed)) {
+    for (var k = 0; k < e.kelasAllowed.length; k++) {
+      var item = e.kelasAllowed[k] ? e.kelasAllowed[k].toString().trim() : "";
+      if (item) {
+        cleanClasses.push(item);
+      }
+    }
+  }
   for (var i = 1; i < rows.length; i++) {
     if (rows[i][0].toString() === id.toString()) {
       sheet.getRange(i + 1, 2).setValue(e.nama);
-      sheet.getRange(i + 1, 3).setValue(e.kelasAllowed.join(","));
+      sheet.getRange(i + 1, 3).setValue(cleanClasses.join(","));
       sheet.getRange(i + 1, 4).setValue(e.tahunPelajaran);
       break;
     }
   }
   
-  ensureClassesExist(ss, e.kelasAllowed);
+  ensureClassesExist(ss, cleanClasses);
   
   // Perbarui juga nama eskul yang ter-cache pada sheet Siswa
   var sheetSiswa = getSheetCaseInsensitive(ss, "Siswa");
