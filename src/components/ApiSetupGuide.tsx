@@ -734,7 +734,7 @@ function updateEskul(ss, id, e) {
   var rows = sheet.getDataRange().getValues();
   var cleanClasses = parseKelasAllowed(e.kelasAllowed);
   for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0] && rows[i][0].toString() === id.toString()) {
+    if (rows[i] && rows[i][0] !== undefined && rows[i][0] !== null && rows[i][0].toString().trim() === id.toString().trim()) {
       sheet.getRange(i + 1, 2).setValue(e.nama);
       sheet.getRange(i + 1, 3).setValue(cleanClasses.join(",") + (cleanClasses.length > 0 ? "," : ""));
       sheet.getRange(i + 1, 4).setValue(e.tahunPelajaran);
@@ -749,7 +749,7 @@ function updateEskul(ss, id, e) {
   if (sheetSiswa) {
     var sRows = sheetSiswa.getDataRange().getValues();
     if (sRows.length > 0) {
-      var headers = sRows[0].map(function(h) { return h.toString().toLowerCase(); });
+      var headers = sRows[0].map(function(h) { return h ? h.toString().toLowerCase().trim() : ""; });
       var idxId = headers.indexOf("eskulid");
       var idxName = headers.indexOf("eskulname");
       var idxId2 = headers.indexOf("eskulid2");
@@ -759,13 +759,16 @@ function updateEskul(ss, id, e) {
       
       for (var j = 1; j < sRows.length; j++) {
         var rowNum = j + 1;
-        if (idxId !== -1 && idxName !== -1 && sRows[j][idxId].toString() === id.toString()) {
+        var r = sRows[j];
+        if (!r) continue;
+        
+        if (idxId !== -1 && idxName !== -1 && idxId < r.length && r[idxId] !== undefined && r[idxId] !== null && r[idxId].toString().trim() === id.toString().trim()) {
           sheetSiswa.getRange(rowNum, idxName + 1).setValue(e.nama);
         }
-        if (idxId2 !== -1 && idxName2 !== -1 && sRows[j][idxId2].toString() === id.toString()) {
+        if (idxId2 !== -1 && idxName2 !== -1 && idxId2 < r.length && r[idxId2] !== undefined && r[idxId2] !== null && r[idxId2].toString().trim() === id.toString().trim()) {
           sheetSiswa.getRange(rowNum, idxName2 + 1).setValue(e.nama);
         }
-        if (idxId3 !== -1 && idxName3 !== -1 && sRows[j][idxId3].toString() === id.toString()) {
+        if (idxId3 !== -1 && idxName3 !== -1 && idxId3 < r.length && r[idxId3] !== undefined && r[idxId3] !== null && r[idxId3].toString().trim() === id.toString().trim()) {
           sheetSiswa.getRange(rowNum, idxName3 + 1).setValue(e.nama);
         }
       }
@@ -778,7 +781,7 @@ function deleteEskul(ss, id) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0].toString() === id.toString()) {
+    if (rows[i] && rows[i][0] !== undefined && rows[i][0] !== null && rows[i][0].toString().trim() === id.toString().trim()) {
       sheet.deleteRow(i + 1);
       break;
     }
@@ -847,7 +850,7 @@ function deleteAdmin(ss, username) {
   var sheet = getSheetCaseInsensitive(ss, "Admin");
   var rows = sheet.getDataRange().getValues();
   for (var i = 1; i < rows.length; i++) {
-    if (rows[i][1].toString().toLowerCase().trim() === username.toLowerCase().trim()) {
+    if (rows[i] && rows[i][1] !== undefined && rows[i][1] !== null && rows[i][1].toString().toLowerCase().trim() === username.toLowerCase().trim()) {
       sheet.deleteRow(i + 1);
       break;
     }
