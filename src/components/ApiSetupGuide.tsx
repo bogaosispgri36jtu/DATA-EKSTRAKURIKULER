@@ -150,6 +150,10 @@ function doPost(e) {
       var eskul = saveEskul(ss, postData.data);
       response = { status: "success", data: eskul };
     } 
+    else if (action === "updateEskul") {
+      updateEskul(ss, postData.id, postData.data);
+      response = { status: "success", message: "Eskul berhasil diperbarui." };
+    }
     else if (action === "deleteEskul") {
       deleteEskul(ss, postData.id);
       response = { status: "success", message: "Eskul berhasil dihapus." };
@@ -642,6 +646,48 @@ function saveEskul(ss, e) {
     e.tahunPelajaran
   ]);
   return { id: id, ...e };
+}
+
+// Perbarui Ekstrakurikuler dan nama eskul di pendaftar
+function updateEskul(ss, id, e) {
+  var sheet = getSheetCaseInsensitive(ss, "Eskul");
+  var rows = sheet.getDataRange().getValues();
+  for (var i = 1; i < rows.length; i++) {
+    if (rows[i][0].toString() === id.toString()) {
+      sheet.getRange(i + 1, 2).setValue(e.nama);
+      sheet.getRange(i + 1, 3).setValue(e.kelasAllowed.join(","));
+      sheet.getRange(i + 1, 4).setValue(e.tahunPelajaran);
+      break;
+    }
+  }
+  
+  // Perbarui juga nama eskul yang ter-cache pada sheet Siswa
+  var sheetSiswa = getSheetCaseInsensitive(ss, "Siswa");
+  if (sheetSiswa) {
+    var sRows = sheetSiswa.getDataRange().getValues();
+    if (sRows.length > 0) {
+      var headers = sRows[0].map(function(h) { return h.toString().toLowerCase(); });
+      var idxId = headers.indexOf("eskulid");
+      var idxName = headers.indexOf("eskulname");
+      var idxId2 = headers.indexOf("eskulid2");
+      var idxName2 = headers.indexOf("eskulname2");
+      var idxId3 = headers.indexOf("eskulid3");
+      var idxName3 = headers.indexOf("eskulname3");
+      
+      for (var j = 1; j < sRows.length; j++) {
+        var rowNum = j + 1;
+        if (idxId !== -1 && idxName !== -1 && sRows[j][idxId].toString() === id.toString()) {
+          sheetSiswa.getRange(rowNum, idxName + 1).setValue(e.nama);
+        }
+        if (idxId2 !== -1 && idxName2 !== -1 && sRows[j][idxId2].toString() === id.toString()) {
+          sheetSiswa.getRange(rowNum, idxName2 + 1).setValue(e.nama);
+        }
+        if (idxId3 !== -1 && idxName3 !== -1 && sRows[j][idxId3].toString() === id.toString()) {
+          sheetSiswa.getRange(rowNum, idxName3 + 1).setValue(e.nama);
+        }
+      }
+    }
+  }
 }
 
 // Hapus Ekstrakurikuler

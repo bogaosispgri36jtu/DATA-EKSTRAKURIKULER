@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  Lock, LayoutDashboard, FileText, Settings, Plus, Trash2, 
+  Lock, LayoutDashboard, FileText, Settings, Plus, Trash2, Edit2,
   Download, Printer, Search, Filter, ShieldAlert, CheckCircle2,
   RefreshCcw, Eye, EyeOff, ArrowUpDown, Layers, Database, UserCheck, LogOut,
   UserPlus, User, Shield, Key, Upload
@@ -23,6 +23,7 @@ interface AdminDashboardProps {
   eskulList: Extracurricular[];
   settings: AppSettings;
   onAddEskul: (nama: string, kelasAllowed: string[], tahunPelajaran: string) => Promise<void>;
+  onUpdateEskul?: (id: string, nama: string, kelasAllowed: string[], tahunPelajaran: string) => Promise<void>;
   onDeleteEskul: (id: string) => Promise<void>;
   onResetEskulStudents: (eskulId: string) => Promise<void>;
   onResetAllData: () => Promise<void>;
@@ -110,6 +111,7 @@ export default function AdminDashboard({
   eskulList,
   settings,
   onAddEskul,
+  onUpdateEskul,
   onDeleteEskul,
   onResetEskulStudents,
   onResetAllData,
@@ -219,6 +221,7 @@ export default function AdminDashboard({
   const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
   const [newEskulTahun, setNewEskulTahun] = useState(settings.tahunPelajaranAktif);
   const [isAddingEskul, setIsAddingEskul] = useState(false);
+  const [editingEskulId, setEditingEskulId] = useState<string | null>(null);
 
   // Robustly resolve grade & rombel into exact class name matching classList formatting
   const resolveClassName = (grade: string, rombel: string): string => {
@@ -518,7 +521,7 @@ export default function AdminDashboard({
     }
   };
 
-  // Add Eskul Handler
+  // Add/Edit Eskul Handler
   const handleAddEskulSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newEskulNama.trim() === '') {
@@ -548,21 +551,38 @@ export default function AdminDashboard({
 
     setIsAddingEskul(true);
     try {
-      await onAddEskul(newEskulNama, selectedClasses, newEskulTahun);
-      setNewEskulNama('');
-      setSelectedClasses([]);
-      Swal.fire({
-        icon: 'success',
-        title: 'Eskul Ditambahkan',
-        text: 'Kategori Ekstrakurikuler baru berhasil tersimpan.',
-        timer: 1500,
-        showConfirmButton: false,
-        width: '340px'
-      });
+      if (editingEskulId) {
+        if (onUpdateEskul) {
+          await onUpdateEskul(editingEskulId, newEskulNama, selectedClasses, newEskulTahun);
+        }
+        setEditingEskulId(null);
+        setNewEskulNama('');
+        setSelectedClasses([]);
+        Swal.fire({
+          icon: 'success',
+          title: 'Eskul Diperbarui',
+          text: 'Kategori Ekstrakurikuler berhasil diperbarui.',
+          timer: 1500,
+          showConfirmButton: false,
+          width: '340px'
+        });
+      } else {
+        await onAddEskul(newEskulNama, selectedClasses, newEskulTahun);
+        setNewEskulNama('');
+        setSelectedClasses([]);
+        Swal.fire({
+          icon: 'success',
+          title: 'Eskul Ditambahkan',
+          text: 'Kategori Ekstrakurikuler baru berhasil tersimpan.',
+          timer: 1500,
+          showConfirmButton: false,
+          width: '340px'
+        });
+      }
     } catch (err) {
       Swal.fire({
         icon: 'error',
-        title: 'Gagal Menambahkan',
+        title: editingEskulId ? 'Gagal Memperbarui' : 'Gagal Menambahkan',
         text: 'Koneksi API bermasalah.',
         confirmButtonColor: '#ef4444',
         width: '340px',
@@ -571,6 +591,24 @@ export default function AdminDashboard({
       });
     } finally {
       setIsAddingEskul(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingEskulId(null);
+    setNewEskulNama('');
+    setSelectedClasses([]);
+    setNewEskulTahun(settings.tahunPelajaranAktif);
+  };
+
+  const handleEditEskulClick = (eskul: Extracurricular) => {
+    setEditingEskulId(eskul.id);
+    setNewEskulNama(eskul.nama);
+    setSelectedClasses(eskul.kelasAllowed || []);
+    setNewEskulTahun(eskul.tahunPelajaran);
+    const formElement = document.getElementById('tab-eskul-management');
+    if (formElement) {
+      formElement.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
@@ -1596,14 +1634,35 @@ export default function AdminDashboard({
       });
 
       if (confirm.isConfirmed) {
-        await onResetEskulStudents(selectedEskulId);
         Swal.fire({
-          icon: 'success',
-          title: 'Reset Berhasil',
-          text: `Data siswa pada eskul ${selectedEskul?.nama} telah dikosongkan.`,
-          confirmButtonColor: '#1d4ed8',
-          width: '340px'
+          title: 'Sedang Mereset...',
+          text: 'Mengosongkan data siswa pada eskul ini di Google Spreadsheet...',
+          allowOutsideClick: false,
+          width: '340px',
+          didOpen: () => {
+            Swal.showLoading();
+          }
         });
+
+        try {
+          await onResetEskulStudents(selectedEskulId);
+          Swal.fire({
+            icon: 'success',
+            title: 'Reset Berhasil',
+            text: `Data siswa pada eskul ${selectedEskul?.nama} telah dikosongkan dari database local dan Google Spreadsheet.`,
+            confirmButtonColor: '#1d4ed8',
+            width: '340px'
+          });
+        } catch (e) {
+          console.error(e);
+          Swal.fire({
+            icon: 'error',
+            title: 'Reset Gagal',
+            text: 'Terjadi kesalahan saat menyinkronkan data dengan spreadsheet.',
+            confirmButtonColor: '#ef4444',
+            width: '340px'
+          });
+        }
       }
     }
   };
@@ -1646,26 +1705,30 @@ export default function AdminDashboard({
       if (stage2.value === 'RESET') {
         Swal.fire({
           title: 'Sedang Mereset...',
+          text: 'Membersihkan seluruh data siswa dari database & Google Spreadsheet...',
           allowOutsideClick: false,
           width: '340px',
-          didOpen: () => Swal.showLoading()
+          didOpen: () => {
+            Swal.showLoading();
+          }
         });
 
         try {
           await onResetAllData();
-          Swal.close();
           Swal.fire({
             icon: 'success',
             title: 'Database Bersih',
-            text: 'Seluruh data pendaftaran siswa berhasil dibersihkan dengan aman.',
+            text: 'Seluruh data pendaftaran siswa berhasil dibersihkan dan disinkronkan dengan Google Spreadsheet.',
             confirmButtonColor: '#1d4ed8',
             width: '340px'
           });
         } catch (e) {
-          Swal.close();
+          console.error(e);
           Swal.fire({
             icon: 'error',
-            title: 'Gagal membersihkan database',
+            title: 'Reset Gagal',
+            text: 'Gagal membersihkan database di spreadsheet atau terjadi kesalahan sistem.',
+            confirmButtonColor: '#ef4444',
             width: '340px'
           });
         }
@@ -2300,8 +2363,12 @@ export default function AdminDashboard({
             {/* Form Add New (Left side - 1 col on lg) */}
             <form onSubmit={handleAddEskulSubmit} noValidate className="bg-white rounded-xl sm:rounded-2xl shadow-sm border border-slate-100 p-4 sm:p-6 space-y-4 lg:col-span-1">
               <h2 className="text-[11px] sm:text-xs font-black text-blue-800 uppercase tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                <Plus className="w-4 sm:w-4.5 h-4 sm:h-4.5 text-blue-700" />
-                Tambah Ekstrakurikuler Baru
+                {editingEskulId ? (
+                  <Edit2 className="w-4 sm:w-4.5 h-4 sm:h-4.5 text-blue-700 animate-pulse" />
+                ) : (
+                  <Plus className="w-4 sm:w-4.5 h-4 sm:h-4.5 text-blue-700" />
+                )}
+                {editingEskulId ? 'Edit Kategori Eskul' : 'Tambah Ekstrakurikuler Baru'}
               </h2>
 
               <div className="space-y-1.5">
@@ -2411,13 +2478,24 @@ export default function AdminDashboard({
                 )}
               </div>
 
-              <button
-                type="submit"
-                disabled={isAddingEskul}
-                className="w-full bg-blue-700 hover:bg-blue-800 disabled:bg-slate-300 text-white text-[11px] sm:text-xs font-bold py-2.5 sm:py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer mt-2"
-              >
-                {isAddingEskul ? 'Menyimpan...' : 'Tambah Ekstrakurikuler'}
-              </button>
+              <div className="flex gap-2 mt-2">
+                {editingEskulId && (
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] sm:text-xs font-bold py-2.5 sm:py-3 px-4 rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
+                  >
+                    Batal
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={isAddingEskul}
+                  className={`${editingEskulId ? 'flex-1 bg-emerald-600 hover:bg-emerald-700' : 'w-full bg-blue-700 hover:bg-blue-800'} disabled:bg-slate-300 text-white text-[11px] sm:text-xs font-bold py-2.5 sm:py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5 cursor-pointer`}
+                >
+                  {isAddingEskul ? 'Menyimpan...' : editingEskulId ? 'Simpan Perubahan' : 'Tambah Ekstrakurikuler'}
+                </button>
+              </div>
             </form>
 
             {/* List Table of Eskuls (Right side - 2 cols on lg) */}
@@ -2440,13 +2518,22 @@ export default function AdminDashboard({
                           <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">{numRegistered} Siswa</span>
                         </div>
                       </div>
-                      <button
-                        onClick={() => handleDeleteEskulClick(eskul.id, eskul.nama)}
-                        className="text-red-500 hover:text-white p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-red-50 hover:bg-red-600 transition-all cursor-pointer shadow-sm border border-red-100 shrink-0"
-                        title="Hapus eskul"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleEditEskulClick(eskul)}
+                          className="text-blue-600 hover:text-white p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-blue-50 hover:bg-blue-600 transition-all cursor-pointer shadow-sm border border-blue-100"
+                          title="Edit eskul"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEskulClick(eskul.id, eskul.nama)}
+                          className="text-red-500 hover:text-white p-1.5 sm:p-2 rounded-lg sm:rounded-xl bg-red-50 hover:bg-red-600 transition-all cursor-pointer shadow-sm border border-red-100"
+                          title="Hapus eskul"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}

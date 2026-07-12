@@ -1159,9 +1159,73 @@ export default function App() {
     localStorage.setItem('smp_pgri_eskul', JSON.stringify(updatedList));
   };
 
+  // Update Extracurricular
+  const handleUpdateEskul = async (id: string, nama: string, kelasAllowed: string[], tahunPelajaran: string) => {
+    const gasUrl = settings.googleAppsScriptUrl;
+    const updatedEskul = { nama, kelasAllowed, tahunPelajaran };
+
+    if (isLiveConnection && gasUrl) {
+      try {
+        await gasPost(gasUrl, {
+          action: 'updateEskul',
+          id,
+          data: updatedEskul
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    // Local Storage Save for eskulList
+    const updatedList = eskulList.map(e => e.id === id ? { ...e, nama, kelasAllowed, tahunPelajaran } : e);
+    setEskulList(updatedList);
+    localStorage.setItem('smp_pgri_eskul', JSON.stringify(updatedList));
+
+    // Update corresponding eskul names in student list locally
+    const updatedStudents = students.map(s => {
+      let changed = false;
+      const newS = { ...s };
+      if (s.eskulId === id && s.eskulName !== nama) {
+        newS.eskulName = nama;
+        changed = true;
+      }
+      if (s.eskulId2 === id && s.eskulName2 !== nama) {
+        newS.eskulName2 = nama;
+        changed = true;
+      }
+      if (s.eskulId3 === id && s.eskulName3 !== nama) {
+        newS.eskulName3 = nama;
+        changed = true;
+      }
+      return changed ? newS : s;
+    });
+    setStudents(updatedStudents);
+    localStorage.setItem('smp_pgri_students', JSON.stringify(updatedStudents));
+
+    // Update Class List dynamically with any newly entered classes
+    const updatedClasses = [...classList];
+    let classListChanged = false;
+    kelasAllowed.forEach(cls => {
+      const trimmed = cls.trim();
+      if (trimmed && !updatedClasses.includes(trimmed)) {
+        updatedClasses.push(trimmed);
+        classListChanged = true;
+      }
+    });
+    if (classListChanged) {
+      setClassList(updatedClasses);
+      localStorage.setItem('smp_pgri_classes', JSON.stringify(updatedClasses));
+    }
+  };
+
   // Reset student registrations for a single extracurricular
   const handleResetEskulStudents = async (eskulId: string) => {
     const gasUrl = settings.googleAppsScriptUrl;
+
+    // Filter locally first to ensure immediate state update in case of lag/slow network
+    const updatedStudents = students.filter(s => s.eskulId !== eskulId && s.eskulId2 !== eskulId && s.eskulId3 !== eskulId);
+    setStudents(updatedStudents);
+    localStorage.setItem('smp_pgri_students', JSON.stringify(updatedStudents));
 
     if (isLiveConnection && gasUrl) {
       try {
@@ -1169,37 +1233,35 @@ export default function App() {
           action: 'resetEskulStudents',
           eskulId
         });
-        setTimeout(() => fetchAppData(settings), 1500);
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await fetchAppData(settings);
       } catch (e) {
         console.error(e);
+        throw e;
       }
     }
-
-    // Local storage clean
-    const updatedStudents = students.filter(s => s.eskulId !== eskulId);
-    setStudents(updatedStudents);
-    localStorage.setItem('smp_pgri_students', JSON.stringify(updatedStudents));
   };
 
   // Full Database registration clean
   const handleResetAllData = async () => {
     const gasUrl = settings.googleAppsScriptUrl;
 
+    // Clear locally first
+    setStudents([]);
+    localStorage.setItem('smp_pgri_students', JSON.stringify([]));
+
     if (isLiveConnection && gasUrl) {
       try {
         await gasPost(gasUrl, {
           action: 'resetAllData'
         });
-        setTimeout(() => fetchAppData(settings), 1500);
-        return;
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await fetchAppData(settings);
       } catch (e) {
         console.error(e);
+        throw e;
       }
     }
-
-    // Local clean
-    setStudents([]);
-    localStorage.setItem('smp_pgri_students', JSON.stringify([]));
   };
 
   // Verify connection in background without full-screen loading overlay
@@ -1553,6 +1615,7 @@ export default function App() {
                 eskulList={eskulList}
                 settings={settings}
                 onAddEskul={handleAddEskul}
+                 onUpdateEskul={handleUpdateEskul}
                 onDeleteEskul={handleDeleteEskul}
                 onResetEskulStudents={handleResetEskulStudents}
                 onResetAllData={handleResetAllData}
