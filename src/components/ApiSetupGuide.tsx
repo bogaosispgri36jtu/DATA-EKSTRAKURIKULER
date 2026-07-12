@@ -643,19 +643,41 @@ function saveStudent(ss, s) {
   return { id: id, regNo: regNo, hpSiswa: formattedHpSiswa, hpOrtu: formattedHpOrtu, createdAt: createdAt, ...s };
 }
 
+// Helper untuk mem-parsing kelasAllowed baik berupa Array maupun String dipisahkan koma
+function parseKelasAllowed(kelasAllowed) {
+  var cleanClasses = [];
+  if (!kelasAllowed) return cleanClasses;
+  
+  var rawArray = [];
+  if (Array.isArray(kelasAllowed)) {
+    rawArray = kelasAllowed;
+  } else if (typeof kelasAllowed === "string") {
+    rawArray = kelasAllowed.split(",");
+  } else if (kelasAllowed.toString) {
+    rawArray = kelasAllowed.toString().split(",");
+  }
+  
+  for (var k = 0; k < rawArray.length; k++) {
+    var item = rawArray[k];
+    if (item !== undefined && item !== null) {
+      var trimmed = item.toString().trim();
+      if (trimmed) {
+        // Hapus jika ada koma di dalam string kelas individual
+        trimmed = trimmed.replace(/,/g, "");
+        if (trimmed) {
+          cleanClasses.push(trimmed);
+        }
+      }
+    }
+  }
+  return cleanClasses;
+}
+
 // Simpan Ekstrakurikuler Baru
 function saveEskul(ss, e) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var id = "eskul-" + Date.now();
-  var cleanClasses = [];
-  if (e.kelasAllowed && Array.isArray(e.kelasAllowed)) {
-    for (var k = 0; k < e.kelasAllowed.length; k++) {
-      var item = e.kelasAllowed[k] ? e.kelasAllowed[k].toString().trim() : "";
-      if (item) {
-        cleanClasses.push(item);
-      }
-    }
-  }
+  var cleanClasses = parseKelasAllowed(e.kelasAllowed);
   sheet.appendRow([
     id,
     e.nama,
@@ -668,15 +690,8 @@ function saveEskul(ss, e) {
 
 // Memastikan kelas pada kelasAllowed tersimpan ke sheet Kelas jika belum ada
 function ensureClassesExist(ss, kelasAllowed) {
-  if (!kelasAllowed) return;
-  var classesArray = [];
-  if (Array.isArray(kelasAllowed)) {
-    classesArray = kelasAllowed;
-  } else if (typeof kelasAllowed === "string") {
-    classesArray = kelasAllowed.split(",");
-  } else {
-    return;
-  }
+  var classesArray = parseKelasAllowed(kelasAllowed);
+  if (classesArray.length === 0) return;
 
   var sheet = getSheetCaseInsensitive(ss, "Kelas");
   if (!sheet) {
@@ -688,7 +703,7 @@ function ensureClassesExist(ss, kelasAllowed) {
   var existingClasses = [];
   var startIdx = 0;
   if (rows.length > 0) {
-    var firstCell = rows[0][0] ? rows[0][0].toString().toLowerCase() : "";
+    var firstCell = rows[0][0] ? rows[0][0].toString().toLowerCase().trim() : "";
     if (firstCell === "id" || firstCell === "nama" || firstCell === "kelas" || firstCell === "nama kelas") {
       startIdx = 1;
     }
@@ -705,12 +720,10 @@ function ensureClassesExist(ss, kelasAllowed) {
 
   for (var k = 0; k < classesArray.length; k++) {
     var cls = classesArray[k];
-    if (cls) {
-      var clsStr = cls.toString().trim();
-      if (clsStr && existingClasses.indexOf(clsStr.toLowerCase()) === -1) {
-        sheet.appendRow([clsStr]);
-        existingClasses.push(clsStr.toLowerCase());
-      }
+    var clsStr = cls.toString().trim();
+    if (clsStr && existingClasses.indexOf(clsStr.toLowerCase()) === -1) {
+      sheet.appendRow([clsStr]);
+      existingClasses.push(clsStr.toLowerCase());
     }
   }
 }
@@ -719,17 +732,9 @@ function ensureClassesExist(ss, kelasAllowed) {
 function updateEskul(ss, id, e) {
   var sheet = getSheetCaseInsensitive(ss, "Eskul");
   var rows = sheet.getDataRange().getValues();
-  var cleanClasses = [];
-  if (e.kelasAllowed && Array.isArray(e.kelasAllowed)) {
-    for (var k = 0; k < e.kelasAllowed.length; k++) {
-      var item = e.kelasAllowed[k] ? e.kelasAllowed[k].toString().trim() : "";
-      if (item) {
-        cleanClasses.push(item);
-      }
-    }
-  }
+  var cleanClasses = parseKelasAllowed(e.kelasAllowed);
   for (var i = 1; i < rows.length; i++) {
-    if (rows[i][0].toString() === id.toString()) {
+    if (rows[i][0] && rows[i][0].toString() === id.toString()) {
       sheet.getRange(i + 1, 2).setValue(e.nama);
       sheet.getRange(i + 1, 3).setValue(cleanClasses.join(",") + (cleanClasses.length > 0 ? "," : ""));
       sheet.getRange(i + 1, 4).setValue(e.tahunPelajaran);
