@@ -659,7 +659,7 @@ function saveEskul(ss, e) {
   sheet.appendRow([
     id,
     e.nama,
-    cleanClasses.join(","),
+    cleanClasses.join(",") + (cleanClasses.length > 0 ? "," : ""),
     e.tahunPelajaran
   ]);
   ensureClassesExist(ss, cleanClasses);
@@ -731,7 +731,7 @@ function updateEskul(ss, id, e) {
   for (var i = 1; i < rows.length; i++) {
     if (rows[i][0].toString() === id.toString()) {
       sheet.getRange(i + 1, 2).setValue(e.nama);
-      sheet.getRange(i + 1, 3).setValue(cleanClasses.join(","));
+      sheet.getRange(i + 1, 3).setValue(cleanClasses.join(",") + (cleanClasses.length > 0 ? "," : ""));
       sheet.getRange(i + 1, 4).setValue(e.tahunPelajaran);
       break;
     }
