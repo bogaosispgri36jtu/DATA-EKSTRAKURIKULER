@@ -684,7 +684,6 @@ function saveEskul(ss, e) {
     cleanClasses.join(",") + (cleanClasses.length > 0 ? "," : ""),
     e.tahunPelajaran
   ]);
-  ensureClassesExist(ss, cleanClasses);
   return { id: id, ...e, kelasAllowed: cleanClasses };
 }
 
@@ -741,8 +740,6 @@ function updateEskul(ss, id, e) {
       break;
     }
   }
-  
-  ensureClassesExist(ss, cleanClasses);
   
   // Perbarui juga nama eskul yang ter-cache pada sheet Siswa
   var sheetSiswa = getSheetCaseInsensitive(ss, "Siswa");
