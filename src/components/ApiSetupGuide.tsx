@@ -645,7 +645,57 @@ function saveEskul(ss, e) {
     e.kelasAllowed.join(","),
     e.tahunPelajaran
   ]);
+  ensureClassesExist(ss, e.kelasAllowed);
   return { id: id, ...e };
+}
+
+// Memastikan kelas pada kelasAllowed tersimpan ke sheet Kelas jika belum ada
+function ensureClassesExist(ss, kelasAllowed) {
+  if (!kelasAllowed) return;
+  var classesArray = [];
+  if (Array.isArray(kelasAllowed)) {
+    classesArray = kelasAllowed;
+  } else if (typeof kelasAllowed === "string") {
+    classesArray = kelasAllowed.split(",");
+  } else {
+    return;
+  }
+
+  var sheet = getSheetCaseInsensitive(ss, "Kelas");
+  if (!sheet) {
+    sheet = ss.insertSheet("Kelas");
+    sheet.appendRow(["Nama Kelas"]);
+  }
+
+  var rows = sheet.getDataRange().getValues();
+  var existingClasses = [];
+  var startIdx = 0;
+  if (rows.length > 0) {
+    var firstCell = rows[0][0] ? rows[0][0].toString().toLowerCase() : "";
+    if (firstCell === "id" || firstCell === "nama" || firstCell === "kelas" || firstCell === "nama kelas") {
+      startIdx = 1;
+    }
+    for (var i = startIdx; i < rows.length; i++) {
+      var val = rows[i][0];
+      if (val !== undefined && val !== null) {
+        var valStr = val.toString().trim().toLowerCase();
+        if (valStr) {
+          existingClasses.push(valStr);
+        }
+      }
+    }
+  }
+
+  for (var k = 0; k < classesArray.length; k++) {
+    var cls = classesArray[k];
+    if (cls) {
+      var clsStr = cls.toString().trim();
+      if (clsStr && existingClasses.indexOf(clsStr.toLowerCase()) === -1) {
+        sheet.appendRow([clsStr]);
+        existingClasses.push(clsStr.toLowerCase());
+      }
+    }
+  }
 }
 
 // Perbarui Ekstrakurikuler dan nama eskul di pendaftar
@@ -660,6 +710,8 @@ function updateEskul(ss, id, e) {
       break;
     }
   }
+  
+  ensureClassesExist(ss, e.kelasAllowed);
   
   // Perbarui juga nama eskul yang ter-cache pada sheet Siswa
   var sheetSiswa = getSheetCaseInsensitive(ss, "Siswa");
